@@ -1,0 +1,107 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 7889492220b215265f7f092aa32f22ad68c27bc80ec611c2e6d8a6765ff1284e
+
+name:           jsonnet
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/jsonnet#readme>
+homepage:       https://github.com/githubuser/jsonnet#readme
+bug-reports:    https://github.com/githubuser/jsonnet/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2020 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/jsonnet
+
+library
+  exposed-modules:
+      Language.Jsonnet
+    , Language.Jsonnet.Error
+    , Language.Jsonnet.Pretty
+  other-modules:
+      Paths_jsonnet
+    , Language.Jsonnet.Parser
+    , Language.Jsonnet.Syntax
+    , Language.Jsonnet.Core
+    , Language.Jsonnet.Desugar
+    , Language.Jsonnet.Annotate
+    , Language.Jsonnet.Common
+    , Language.Jsonnet.Eval
+    , Language.Jsonnet.JSON
+    , Language.Jsonnet.Parser.SrcSpan
+    , Language.Jsonnet.Std
+    , Language.Jsonnet.Syntax.Annotated
+  hs-source-dirs:
+      src
+  build-depends:
+      base,
+      directory,
+      filepath,
+      megaparsec,
+      ansi-wl-pprint,
+      mtl,
+      fixplate,
+      data-fix,
+      free,
+      bytestring,
+      text,
+      unbound-generics,
+      containers,
+      unordered-containers,
+      vector,
+      semigroupoids,
+      deriving-compat,
+      transformers-compat,
+      parser-combinators
+
+  default-language: Haskell2010
+  default-extensions:
+      MultiParamTypeClasses
+    , FlexibleContexts
+    , FlexibleInstances
+    , DeriveGeneric
+    , LambdaCase
+
+--executable jsonnet-exe
+--  main-is: Main.hs
+--  other-modules:
+--      Paths_jsonnet
+--  hs-source-dirs:
+--      app
+--  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--  build-depends:
+--      base >=4.7 && <5
+--    , jsonnet
+--  default-language: Haskell2010
+
+test-suite jsonnet-test
+  type: exitcode-stdio-1.0
+  main-is: Test.hs
+  other-modules:
+      Paths_jsonnet
+  hs-source-dirs:
+      test/golden
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , ansi-wl-pprint
+    , jsonnet
+    , text
+    , filepath
+    , bytestring
+    , tasty
+    , tasty-golden
+    , tasty-hunit
+  default-language: Haskell2010
