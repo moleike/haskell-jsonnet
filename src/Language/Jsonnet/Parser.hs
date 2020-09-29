@@ -24,11 +24,12 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
+import System.Directory
+import System.FilePath.Posix (takeDirectory)
 import System.IO.Error (tryIOError)
 import Text.Megaparsec hiding (ParseError, parse, sepBy1)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-import System.Directory
 
 type Parser = Parsec Void Text
 
@@ -52,17 +53,21 @@ resolveImports ::
   FilePath ->
   Expr' ->
   m Expr
-resolveImports dir = foldFixM go
+resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const (Import fp))) a) = do
+    go (AnnF (InR (Const (Import imp))) a) = do
       expr <-
-        resolveImports dir
-          =<< parse fp
-          =<< readFile' fp a
+        resolveImports imp
+          =<< parse imp
+          =<< readFile' imp a
       pure expr
-    readFile' fp a = do
-      inp <- liftIO (tryIOError $ withCurrentDirectory dir $ T.readFile fp)
+    readFile' imp a = do
+      inp <-
+        liftIO
+          ( tryIOError $ withCurrentDirectory (takeDirectory fp) $
+              T.readFile imp
+          )
       liftEither $ left (flip ImportError (Just a)) inp
 
 sc :: Parser ()

@@ -21,7 +21,6 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Text.PrettyPrint.ANSI.Leijen (displayS, pretty, renderCompact)
-import System.FilePath.Posix (takeDirectory)
 
 type JsonnetM = ReaderT Config (ExceptT Error IO)
 
@@ -44,7 +43,7 @@ parse inp =
   asks fname >>= lift . withExceptT ParserError . go
   where
     go fp =
-      Parser.resolveImports (takeDirectory fp)
+      Parser.resolveImports fp
         =<< Parser.parse fp inp
 
 desugar :: Expr -> JsonnetM Core
