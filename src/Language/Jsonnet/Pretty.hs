@@ -94,9 +94,11 @@ instance Pretty EvalError where
           <+> pretty e
       AssertionFailed e ->
         text "Assertion failed:"
+          <+> e
+      StdError e -> e
+      RuntimeError e ->
+        text "Runtime error:"
           <+> text (unpack e)
-      StdError e ->
-        text (unpack e)
 
 instance Pretty Error where
   pretty =

@@ -20,6 +20,7 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval as E
 import Language.Jsonnet.Pretty ()
 import Numeric
+import Text.PrettyPrint.ANSI.Leijen ((<+>), pretty, text)
 import Text.Printf
 
 -- The Jsonnet standard library, `std`, with each builtin function implemented
@@ -107,8 +108,10 @@ length' = \case
   VObj o -> pure $ length (H.keys o)
   v ->
     throwError
-      ( StdError $
-          "length operates on strings, objects, and arrays, got "
+      ( StdError
+          $ text
+          $ T.unpack
+          $ "length operates on strings, objects, and arrays, got "
             <> E.valueType v
       )
 
@@ -135,8 +138,10 @@ parseOctal num = case readOct (T.unpack num) of
   [(n, "")] -> pure n
   _ ->
     throwError
-      ( StdError $
-          num
+      ( StdError
+          $ text
+          $ T.unpack
+          $ num
             <> " is not a base 8 integer"
       )
 
@@ -145,8 +150,10 @@ parseHex num = case readHex (T.unpack num) of
   [(n, "")] -> pure n
   _ ->
     throwError
-      ( StdError $
-          num
+      ( StdError
+          $ text
+          $ T.unpack
+          $ num
             <> " is not a base 16 integer"
       )
 

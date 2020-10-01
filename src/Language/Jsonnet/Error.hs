@@ -18,8 +18,9 @@ data EvalError
   | DivByZero
   | VarNotFound Text
   | ManifestError ManifestError
-  | AssertionFailed Text
-  | StdError Text
+  | AssertionFailed Doc
+  | StdError Doc
+  | RuntimeError Text
   deriving (Show)
 
 newtype ManifestError = NotAJsonValue Text

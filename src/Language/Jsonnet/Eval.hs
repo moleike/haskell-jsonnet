@@ -226,8 +226,9 @@ eval = \case
   CIfElse c e1 e2 -> eval c >>= \case
     VBool c' -> if c' then eval e1 else eval e2
     v -> throwTypeMismatch "bool" v
-
---CErr _ -> throwError TypeMismatch
+  CErr e ->
+    (eval >=> toString) e
+      >>= throwError . RuntimeError
 
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =
