@@ -56,19 +56,21 @@ resolveImports ::
 resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const (Import imp))) a) = do
+    go (AnnF (InR (Const (Import fp'))) a) = do
       expr <-
-        resolveImports imp
-          =<< parse imp
-          =<< readFile' imp a
+        resolveImports fp'
+          =<< parse fp'
+          =<< readImportFile fp' a
       pure expr
-    readFile' imp a = do
-      inp <-
-        liftIO
-          ( tryIOError $ withCurrentDirectory (takeDirectory fp) $
-              T.readFile imp
-          )
+    readImportFile fp' a = do
+      inp <- readFile' fp'
       liftEither $ left (flip ImportError (Just a)) inp
+      where
+        readFile' =
+          liftIO
+            . tryIOError
+            . withCurrentDirectory (takeDirectory fp)
+            . T.readFile
 
 sc :: Parser ()
 sc = L.space space1 lineComment blockComment

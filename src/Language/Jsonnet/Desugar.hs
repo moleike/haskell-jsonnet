@@ -12,6 +12,7 @@ import Control.Applicative
 import Data.Fix as F
 import Data.Functor.Product
 import Data.List.NonEmpty as NE
+import Data.Text as T (pack)
 import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Annotate
@@ -34,13 +35,29 @@ instance HasSrcSpan a => Desugarer (Ann ExprF a) where
     where
       go (AnnF f a) = alg $ CAnno (srcSpan a) <$> f
 
+-- FIXME 'local a = b, b = c; foo' and
+-- 'local a = b; local b = c; foo' should reduce to the same value,
+-- but the latter will fail with unbound var b.
+
 alg :: ExprF Core -> Core
 alg = \case
   ELit l -> CLit l
   EIdent i -> CVar (s2n i)
   EFun ns e -> foldr (\n c -> CLam (bind' n c)) e ns
   EApply a bs -> foldl CApp a bs
-  ELocal bnds e -> let' bnds e
+  ELocal bnds e ->
+    CLet $
+      bind
+        ( rec $
+            NE.toList
+              ( fmap
+                  ( \(n, a) ->
+                      ((s2n n), Embed a)
+                  )
+                  bnds
+              )
+        )
+        e
   EBinOp op a b -> CBinOp op a b
   EUnyOp op a -> CUnyOp op a
   EIfElse c t e -> CIfElse c t e
@@ -49,24 +66,19 @@ alg = \case
   EObj a -> CObj $ bind' "self" a
   ELookup a b -> CLookup a b
   EErr e -> CErr e
-  EAssert c m e -> CAssert c m e
+  EAssert c m e ->
+    CIfElse
+      c
+      e
+      ( CErr $
+          maybe
+            (CLit $ String "Assertion failed")
+            (CLit . String . T.pack)
+            m
+      )
 
 bind' :: Alpha a => String -> a -> Bind Var a
 bind' = bind . s2n
-
-let' :: NonEmpty (String, Core) -> Core -> Core
-let' bnds =
-  CLet
-    . bind
-      ( rec $
-          NE.toList
-            ( fmap
-                ( \(n, a) ->
-                    ((s2n n), Embed a)
-                )
-                bnds
-            )
-      )
 
 --let' :: NonEmpty (String, Core) -> Core -> Core
 --let' = flip $ foldr go
