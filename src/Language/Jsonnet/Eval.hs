@@ -272,8 +272,8 @@ evalComp Lt n1 n2 = evalBin ((<) @Double) n1 n2
 evalComp Gt n1 n2 = evalBin ((>) @Double) n1 n2
 evalComp Le n1 n2 = evalBin ((<=) @Double) n1 n2
 evalComp Ge n1 n2 = evalBin ((>=) @Double) n1 n2
-evalComp Eq n1 n2 = VBool <$> assertEqual n1 n2
-evalComp Ne n1 n2 = (VBool . not) <$> assertEqual n1 n2
+evalComp Eq n1 n2 = VBool <$> n1 `equalTo` n2
+evalComp Ne n1 n2 = (VBool . not) <$> n1 `equalTo` n2
 
 evalLogical :: LogicalOp -> Value -> Value -> Eval Value
 evalLogical LAnd n1 n2 = evalBin (&&) n1 n2
@@ -306,8 +306,8 @@ liftMaybe e =
     Nothing -> throwError e
     Just a -> pure a
 
-assertEqual :: Value -> Value -> Eval Bool
-assertEqual a b = (==) <$> manifest a <*> manifest b
+equalTo :: Value -> Value -> Eval Bool
+equalTo a b = (==) <$> manifest a <*> manifest b
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s

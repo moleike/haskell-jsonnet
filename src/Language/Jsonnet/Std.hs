@@ -31,7 +31,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
   where
     xs :: [(Text, Value)]
     xs =
-      [ ("assertEqual", inj E.assertEqual),
+      [ ("assertEqual", inj assertEqual),
         ("type", inj E.valueType),
         ("isString", inj (isType "string")),
         ("isBoolean", inj (isType "boolean")),
@@ -97,6 +97,20 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
         ("join", inj T.intercalate),
         ("reverse", inj (reverse @Value))
       ]
+
+assertEqual :: Value -> Value -> Eval Bool
+assertEqual a b = do
+  a' <- manifest a
+  b' <- manifest b
+  if a' /= b'
+    then
+      throwError
+        ( AssertionFailed $
+            pretty a'
+              <+> text "!="
+              <+> pretty b'
+        )
+    else (pure True)
 
 isType :: Text -> Value -> Bool
 isType ty = (==) ty . valueType
