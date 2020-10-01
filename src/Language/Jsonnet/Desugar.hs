@@ -49,6 +49,7 @@ alg = \case
   EObj a -> CObj $ bind' "self" a
   ELookup a b -> CLookup a b
   EErr e -> CErr e
+  EAssert c m e -> CAssert c m e
 
 bind' :: Alpha a => String -> a -> Bind Var a
 bind' = bind . s2n

@@ -220,15 +220,20 @@ eval = \case
     e' <- eval e
     evalUnyOp op e'
   CLookup e1 e2 -> do
-    e1' <- eval e1
-    e2' <- eval e2
-    evalLookup e1' e2'
+    v1 <- eval e1
+    v2 <- eval e2
+    evalLookup v1 v2
   CIfElse c e1 e2 -> eval c >>= \case
-    VBool c' -> if c' then eval e1 else eval e2
+    VBool b -> if b then eval e1 else eval e2
     v -> throwTypeMismatch "bool" v
   CErr e ->
     (eval >=> toString) e
       >>= throwError . RuntimeError
+  CAssert c m e -> eval c >>= \case
+    VBool b -> if b
+      then eval e
+      else throwError (AssertionFailed $ pretty m)
+    v -> throwTypeMismatch "bool" v
 
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =

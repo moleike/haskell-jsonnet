@@ -1,0 +1,2 @@
+Assertion failed: x should be equal to y
+    ./test/golden/error.assert.fail1.jsonnet:15:1,20:1

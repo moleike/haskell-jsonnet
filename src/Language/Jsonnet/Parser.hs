@@ -158,6 +158,16 @@ errorP = Fix <$> annotateLoc error
   where
     error = keywordP "error" *> (mkErrorF <$> exprP)
 
+assertP :: Parser Expr'
+assertP = Fix <$> annotateLoc assert
+  where
+    assert = do
+      cond <- keywordP "assert" *> exprP
+      msg <- optional (symbol ":" *> stringLiteral)
+      _ <- symbol ";"
+      expr <- exprP
+      pure $ mkAssertF cond msg expr
+
 ifElseP :: Parser Expr'
 ifElseP = Fix <$> annotateLoc ifElseExpr
   where
@@ -314,6 +324,7 @@ primP =
         localP,
         importP,
         errorP,
+        assertP,
         parens exprP
       ]
 

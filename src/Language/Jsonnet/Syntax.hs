@@ -30,6 +30,7 @@ data ExprF a
   | EIfElse a a a
   | EErr a
   | ELookup a a
+  | EAssert a (Maybe String) a
   deriving
     ( Show,
       Functor,
@@ -93,3 +94,6 @@ mkArrayF = InL . EArr
 
 mkErrorF :: a -> ExprF' a
 mkErrorF = InL . EErr
+
+mkAssertF :: a -> Maybe String -> a -> ExprF' a
+mkAssertF e m = InL . EAssert e m

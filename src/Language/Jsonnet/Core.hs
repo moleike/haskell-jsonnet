@@ -32,6 +32,7 @@ data Core
   | CIfElse Core Core Core
   | CErr Core
   | CLookup Core Core
+  | CAssert Core (Maybe String) Core
   deriving (Show, Typeable, Generic)
 
 instance Alpha Core
