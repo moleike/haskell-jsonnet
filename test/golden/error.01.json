@@ -1,0 +1,2 @@
+Runtime error: foo
+    ./test/golden/error.01.jsonnet:14:29,14:40

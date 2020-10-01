@@ -1,0 +1,2 @@
+No such key: y
+    ./test/golden/error.field-not-exist.jsonnet:14:1,15:1
