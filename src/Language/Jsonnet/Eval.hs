@@ -295,10 +295,16 @@ evalBitwise ShiftR n1 n2 = evalBin (shiftR @Int64) n1 n2
 
 evalLookup :: Value -> Value -> Eval Value
 evalLookup (VArr a) (VNum i) =
-  liftMaybe (IndexOutOfBounds (round i)) (a !? round i) >>= force
+  liftMaybe (IndexOutOfBounds $ round i) (a !? round i) >>= force
 evalLookup (VObj o) (VStr s) =
   liftMaybe (NoSuchKey s) (H.lookup s o) >>= force
-evalLookup v _ = throwTypeMismatch "array/object" v
+evalLookup (VStr s) (VNum i)
+  | i' < 0 = throwError (IndexOutOfBounds i')
+  | T.length s - 1 < i' = throwError (IndexOutOfBounds i')
+  | otherwise = pure $ VStr $ T.singleton $ s `T.index` i'
+  where
+    i' = round i
+evalLookup v _ = throwTypeMismatch "array/object/string" v
 
 evalLiteral :: Literal -> Eval Value
 evalLiteral = \case
