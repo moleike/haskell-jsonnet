@@ -269,8 +269,9 @@ evalArith :: ArithOp -> Value -> Value -> Eval Value
 evalArith Add n1 n2 = evalBin ((+) @Double) n1 n2
 evalArith Sub n1 n2 = evalBin ((-) @Double) n1 n2
 evalArith Mul n1 n2 = evalBin ((*) @Double) n1 n2
-evalArith Div (VNum _) (VNum 0) = throwError (DivByZero)
+evalArith Div (VNum _) (VNum 0) = throwError DivByZero
 evalArith Div n1 n2 = evalBin ((/) @Double) n1 n2
+evalArith Mod (VNum _) (VNum 0) = throwError DivByZero
 evalArith Mod n1 n2 = evalBin (mod @Int64) n1 n2
 
 evalComp :: CompOp -> Value -> Value -> Eval Value
