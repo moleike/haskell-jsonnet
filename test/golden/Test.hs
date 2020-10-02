@@ -37,8 +37,8 @@ goldenTests = do
       "Jsonnet golden tests"
       [ goldenVsString
           (takeBaseName jsonnetFile) -- test name
-          jsonFile -- golden file path
+          goldenFile -- golden file path
           (run jsonnetFile)
         | jsonnetFile <- jsonnetFiles,
-          let jsonFile = replaceExtension jsonnetFile ".json"
+          let goldenFile = replaceExtension jsonnetFile ".golden"
       ]
