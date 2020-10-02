@@ -8,21 +8,15 @@
 
 module Language.Jsonnet.Desugar where
 
-import Control.Applicative
 import Data.Fix as F
-import Data.Functor.Product
 import Data.List.NonEmpty as NE
-import Data.Text as T (pack)
-import Data.Typeable (Typeable)
-import GHC.Generics
+import Data.Maybe
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Internal.Fold (toListOf)
-import qualified Unbound.Generics.PermM as PermM
 
 class Desugarer a where
   desugar :: a -> Core
@@ -71,9 +65,8 @@ alg = \case
       c
       e
       ( CErr $
-          maybe
+          fromMaybe
             (CLit $ String "Assertion failed")
-            (CLit . String . T.pack)
             m
       )
 

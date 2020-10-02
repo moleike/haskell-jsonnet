@@ -1,0 +1,2 @@
+Runtime error: a must be bigger than b
+    ./test/golden/error.assert.fail2.jsonnet:2:3,3:8

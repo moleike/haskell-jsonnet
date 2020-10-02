@@ -165,7 +165,7 @@ assertP = Fix <$> annotateLoc assert
   where
     assert = do
       cond <- keywordP "assert" *> exprP
-      msg <- optional (symbol ":" *> stringLiteral)
+      msg <- optional (symbol ":" *> exprP)
       _ <- symbol ";"
       expr <- exprP
       pure $ mkAssertF cond msg expr

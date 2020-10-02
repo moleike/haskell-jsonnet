@@ -230,8 +230,11 @@ eval = \case
         else eval e2
     v -> throwTypeMismatch "bool" v
   CErr e ->
-    (eval >=> toString) e
-      >>= throwError . RuntimeError
+    ( eval
+        >=> toString
+        >=> throwError . RuntimeError
+    )
+      e
 
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =
