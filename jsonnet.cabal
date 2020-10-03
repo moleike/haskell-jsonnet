@@ -46,25 +46,23 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base,
-      directory,
-      filepath,
-      megaparsec,
-      ansi-wl-pprint,
-      mtl,
-      fixplate,
-      data-fix,
-      free,
-      bytestring,
-      text,
-      unbound-generics,
-      containers,
-      unordered-containers,
-      vector,
-      semigroupoids,
-      deriving-compat,
-      transformers-compat,
-      parser-combinators
+      ansi-wl-pprint       >= 0.6.9 && < 0.7
+    , base                 >= 4.13.0 && < 4.14
+    , bytestring           >= 0.10.10 && < 0.11
+    , containers           >= 0.6.2 && < 0.7
+    , data-fix             >= 0.3.0 && < 0.4
+    , text                 >= 1.2.4 && < 1.3
+    , deriving-compat      >= 0.5.9 && < 0.6
+    , transformers-compat  >= 0.6.5 && < 0.7
+    , directory            >= 1.3.6 && < 1.4
+    , filepath             >= 1.4.2 && < 1.5
+    , megaparsec           >= 8.0.0 && < 9.0
+    , mtl                  >= 2.2.2 && < 2.3
+    , parser-combinators   >= 1.2.1 && < 1.3
+    , semigroupoids        >= 5.3.4 && < 5.4
+    , unordered-containers >= 0.2.10.0 && < 0.3
+    , unbound-generics     >= 0.4.1 && < 0.5
+    , vector               >= 0.12.1 && < 0.13
 
   default-language: Haskell2010
   default-extensions:
@@ -95,7 +93,7 @@ test-suite jsonnet-test
       test/golden
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      base
     , ansi-wl-pprint
     , jsonnet
     , text
