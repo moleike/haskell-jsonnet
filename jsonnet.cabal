@@ -1,29 +1,24 @@
-cabal-version: 1.12
-
--- This file has been generated from package.yaml by hpack version 0.31.2.
---
--- see: https://github.com/sol/hpack
---
--- hash: 7889492220b215265f7f092aa32f22ad68c27bc80ec611c2e6d8a6765ff1284e
+cabal-version:  >= 1.12
 
 name:           jsonnet
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/jsonnet#readme>
-homepage:       https://github.com/githubuser/jsonnet#readme
-bug-reports:    https://github.com/githubuser/jsonnet/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
+description:    Please see the README on GitHub at <https://github.com/moleike/jsonnet-haskell#readme>
+homepage:       https://github.com/moleike/jsonnet-haskell#readme
+bug-reports:    https://github.com/moleike/jsonnet-haskell/issues
+author:         Alexandre Moreno
+maintainer:     alexmorenocano@gmail.com
+copyright:      2020 Alexandre Moreno
 license:        BSD3
+x-license:      BSD-3-Clause OR Apache-2.0
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
+    CHANGELOG.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/jsonnet
+  location: https://github.com/moleike/jsonnet-haskell
 
 library
   exposed-modules:
