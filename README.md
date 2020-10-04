@@ -1,6 +1,6 @@
 # jsonnet-haskell
 
-[![Actions Status](https://github.com/moleike/jsonnet-haskell/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-haskell/actions)
+[![Actions Status](https://github.com/moleike/jsonnet-haskell/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-haskell/actions) [![Join the chat at https://gitter.im/jsonnet-haskell/community](https://badges.gitter.im/jsonnet-haskell/community.svg)](https://gitter.im/jsonnet-haskell/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 A Haskell implementation of the [Jsonnet](jsonnet) configuration language. 
 For an introduction to the language itself, see the [tutorial](tutorial) or language [reference](reference).
