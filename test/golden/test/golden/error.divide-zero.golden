@@ -1,2 +1,0 @@
-Divide by zero exception
-    ./test/golden/error.divide-zero.jsonnet:14:1,15:1
