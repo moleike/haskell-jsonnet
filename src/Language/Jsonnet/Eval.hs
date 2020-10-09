@@ -247,6 +247,7 @@ evalObj (Object o) =
         VStr _ -> pure (a, b)
         VNull -> pure (a, b)
         v -> throwInvalidKey v
+    f (Hidden k) = pure (VNull, undefined)
     g (k, _) = case k of
       VNull -> False
       _ -> True
