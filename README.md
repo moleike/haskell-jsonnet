@@ -17,6 +17,7 @@ For an introduction to the language itself, see the [tutorial][tutorial] or lang
 - [ ] text blocks 
 - [ ] verbatim strings
 - [ ] object-level locals and asserts
+- [ ] `$` reference (to the outer-most object)
 - [ ] keyword parameters 
 - [ ] default arguments
 - [ ] top-level arguments
