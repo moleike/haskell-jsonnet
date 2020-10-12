@@ -16,9 +16,11 @@ type Expr = Ann ExprF SrcSpan
 -- annotated syntax tree with unresolved imports
 type Expr' = Ann ExprF' SrcSpan
 
-mkApply :: Expr' -> NonEmpty Expr' -> Expr'
+mkApply :: Expr' ->  [Expr'] -> Expr'
+mkApply a@(Fix (AnnF _ ann)) [] =
+  Fix $ AnnF (InL $ EApply a []) ann
 mkApply a@(Fix (AnnF _ ann)) b =
-  Fix $ AnnF (InL $ EApply a b) (fold1 (ann <| fmap attrib b))
+  Fix $ AnnF (InL $ EApply a b) (fold1 (ann <| fmap attrib (fromList b)))
 
 mkLookup :: Expr' -> Expr' -> Expr'
 mkLookup a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =

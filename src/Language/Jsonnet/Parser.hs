@@ -180,17 +180,17 @@ ifElseP = Fix <$> annotateLoc ifElseExpr
         (mkIfF cond expr)
         (keywordP "else" *> (mkIfElseF cond expr <$> exprP))
 
-params :: Parser (NonEmpty String)
-params = parens (identifier `NE.sepBy1` comma)
+paramsP :: Parser [String]
+paramsP = parens (identifier `sepBy` comma)
 
 function ::
-  Parser (NonEmpty String) ->
+  Parser [String] ->
   Parser Expr' ->
   Parser Expr'
 function ps expr = Fix <$> annotateLoc (mkFunF <$> ps <*> expr)
 
 functionP :: Parser Expr'
-functionP = keywordP "function" *> function params exprP
+functionP = keywordP "function" *> function paramsP exprP
 
 localP :: Parser Expr'
 localP = Fix <$> annotateLoc localExpr
@@ -208,7 +208,7 @@ localP = Fix <$> annotateLoc localExpr
       pure (name, expr)
     localFunc = do
       name <- identifier
-      ps <- params
+      ps <- paramsP
       _ <- symbol "="
       expr <- function (pure ps) exprP
       pure (name, expr)
@@ -230,7 +230,7 @@ objectP = Fix <$> annotateLoc object
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
-      ps <- params
+      ps <- paramsP
       _ <- symbol ":"
       v <- function (pure ps) exprP
       pure $ KeyValue k v
@@ -312,7 +312,7 @@ postfixOperators =
           <|> lookup
       )
   where
-    apply = flip mkApply <$> parens (exprP `NE.sepBy1` comma)
+    apply = flip mkApply <$> parens (exprP `sepBy` comma)
     index = flip mkLookup <$> brackets exprP
     lookup = flip mkLookup <$> (symbol "." *> unquoted)
 

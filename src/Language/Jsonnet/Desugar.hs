@@ -37,7 +37,9 @@ alg :: ExprF Core -> Core
 alg = \case
   ELit l -> CLit l
   EIdent i -> CVar (s2n i)
+  EFun [] e -> CLam (bind' "()" e) -- this is a workaround for no params
   EFun ns e -> foldr (\n c -> CLam (bind' n c)) e ns
+  EApply a [] -> CApp a (CLit Null) -- here null plays the role of unit type
   EApply a bs -> foldl CApp a bs
   ELocal bnds e ->
     CLet $

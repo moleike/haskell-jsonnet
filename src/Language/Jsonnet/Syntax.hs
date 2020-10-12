@@ -19,8 +19,8 @@ type Name = String
 data ExprF a
   = ELit Literal
   | EIdent Name
-  | EFun (NonEmpty Name) a
-  | EApply a (NonEmpty a)
+  | EFun [Name] a
+  | EApply a [a]
   | ELocal (NonEmpty (Name, a)) a
   | EObj (Object a)
   | EArr [a]
@@ -68,10 +68,10 @@ mkBoolF = InL . ELit . Bool
 mkIdentF :: Name -> ExprF' a
 mkIdentF = InL . EIdent
 
-mkFunF :: NonEmpty Name -> a -> ExprF' a
+mkFunF :: [Name] -> a -> ExprF' a
 mkFunF b = InL . EFun b
 
-mkApplyF :: a -> NonEmpty a -> ExprF' a
+mkApplyF :: a -> [a] -> ExprF' a
 mkApplyF b = InL . EApply b
 
 mkIfF :: a -> a -> ExprF' a
