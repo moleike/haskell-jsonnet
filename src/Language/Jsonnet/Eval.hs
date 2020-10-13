@@ -243,11 +243,11 @@ evalObj (Object o) =
     f KeyValue {..} = do
       a <- eval key
       b <- mkThunk (eval value)
-      case a of
-        VStr _ -> pure (a, b)
-        VNull -> pure (a, b)
-        v -> throwInvalidKey v
-    f (Hidden _) = pure (VNull, undefined)
+      case (a, hidden) of
+        (VStr _, True) -> pure (VNull, b)
+        (VStr _, _) -> pure (a, b)
+        (VNull, _) -> pure (a, b)
+        (v, _) -> throwInvalidKey v
     g (k, _) = case k of
       VNull -> False
       _ -> True

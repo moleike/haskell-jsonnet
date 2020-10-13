@@ -64,8 +64,9 @@ instance Alpha UnyOp
 
 data KeyValue a = KeyValue
   { key :: a,
-    value :: a
-  } | Hidden { key :: a }
+    value :: a,
+    hidden :: Bool
+  }
   deriving
     ( Eq,
       Read,

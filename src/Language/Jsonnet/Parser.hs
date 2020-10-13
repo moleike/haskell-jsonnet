@@ -229,19 +229,19 @@ objectP = Fix <$> annotateLoc object
       k <- keyP
       _ <- symbol ":"
       v <- exprP
-      pure $ KeyValue k v
+      pure $ KeyValue k v False
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
       ps <- params
       _ <- symbol ":"
       v <- function (pure ps) exprP
-      pure $ KeyValue k v
+      pure $ KeyValue k v False
     hidden = do
       k <- keyP
       void doubleSemicolon
-      void exprP
-      return $ Hidden k
+      v <- exprP
+      return $ KeyValue k v True
 
 
 importP :: Parser Expr'
