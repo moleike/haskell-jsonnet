@@ -124,6 +124,10 @@ instance HasValue Double where
   proj v = throwTypeMismatch "number" v
   inj = VNum
 
+instance HasValue Key where
+  proj = undefined
+  inj = undefined
+
 instance {-# OVERLAPS #-} Integral a => HasValue a where
   proj (VNum n) = pure (round n)
   proj v = throwTypeMismatch "number" v
@@ -311,7 +315,7 @@ evalLookup :: Value -> Value -> Eval Value
 evalLookup (VArr a) (VNum i) =
   liftMaybe (IndexOutOfBounds $ round i) (a !? round i) >>= force
 evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey s) (H.lookup (Visible s) o) >>= force
+  liftMaybe (NoSuchKey s) (H.lookup (Visible s) o <|> H.lookup (Hidden s) o) >>= force
 evalLookup (VStr s) (VNum i)
   | i' < 0 = throwError (IndexOutOfBounds i')
   | T.length s - 1 < i' = throwError (IndexOutOfBounds i')
@@ -386,4 +390,10 @@ manifest =
 
 -- Utils
 visibleKeys :: HashMap Key a -> HashMap Text a
-visibleKeys = H.fromList . map (\(Visible k, v) -> (k, v)) . filter (\(Visible _, _) -> True) . H.toList
+visibleKeys = H.fromList . map getVisibleKey . filter isVisible . H.toList
+  where
+    getVisibleKey (Visible k, v) = (k, v)
+    getVisibleKey _ = error "Hidden key"
+
+    isVisible (Visible _, _) = True
+    isVisible _ = False
