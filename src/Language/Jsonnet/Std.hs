@@ -27,7 +27,7 @@ import Text.Printf
 -- in Haskell code (incomplete)
 
 std :: Value
-std = VObj $ (Thunk . pure) <$> H.fromList xs
+std = VObj $ (Thunk . pure) <$> H.fromList (map (\(k, v) -> (Visible k, v)) xs)
   where
     xs :: [(Text, Value)]
     xs =
@@ -39,7 +39,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
         ("isObject", inj (isType "object")),
         ("isArray", inj (isType "array")),
         ("isFunction", inj (isType "function")),
-        ("objectFields", inj (H.keys @Text @Value)),
+        ("objectFields", inj (H.keys @Key @Value)),
         ("length", inj length'),
         ("abs", inj (abs @Double)),
         ("sign", inj (signum @Double)), -- incl. 0.0, (-0.0), and NaN
