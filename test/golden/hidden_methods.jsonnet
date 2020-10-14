@@ -1,1 +1,1 @@
-{ foo :: function(x) x }
+{ foo(x) :: x + 1 }

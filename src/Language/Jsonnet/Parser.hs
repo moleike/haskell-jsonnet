@@ -224,25 +224,22 @@ arrayP = Fix <$> annotateLoc array
 objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc object
   where
-    object = mkObjectF <$> braces ((try hidden <|> try methodP <|> pairP) `sepBy` comma)
+    object = mkObjectF <$> braces ((try methodP <|> pairP) `sepBy` comma)
     pairP = do
       k <- keyP
-      _ <- symbol ":"
+      h <- hidden
       v <- exprP
-      pure $ KeyValue k v False
+      pure $ KeyValue k v h
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
       ps <- paramsP
-      _ <- symbol ":"
+      h <- hidden
       v <- function (pure ps) exprP
-      pure $ KeyValue k v False
-    hidden = do
-      k <- keyP
-      void doubleSemicolon
-      v <- exprP
-      return $ KeyValue k v True
-
+      pure $ KeyValue k v h
+    hidden =
+      try (symbol "::" *> pure True)
+        <|> (symbol ":" *> pure False)
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl
