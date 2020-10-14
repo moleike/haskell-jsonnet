@@ -28,10 +28,10 @@ import Text.Printf
 -- in Haskell code (incomplete)
 
 std :: Value
-std = VObj $ (Thunk . pure) <$> H.fromList (map (\(k, v) -> (Visible k, v)) xs)
+std = VObj $ (Thunk . pure) <$> H.fromList xs
   where
-    xs :: [(Text, Value)]
-    xs =
+    xs :: [(Key, Value)]
+    xs = map (\(k, v) -> (Visible k, v))
       [ ("assertEqual", inj assertEqual),
         ("type", inj E.valueType),
         ("isString", inj (isType "string")),

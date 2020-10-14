@@ -89,14 +89,11 @@ data Value
   | VObj !(HashMap Key Thunk)
   | VClos !(Thunk -> Eval Value)
 
-
 data Key = Hidden Text | Visible Text deriving Eq
-
 
 instance Hashable Key where
   hashWithSalt salt (Visible text) = hashWithSalt salt text
   hashWithSalt salt (Hidden text) = hashWithSalt salt text
-
 
 proj' :: HasValue a => Thunk -> Eval a
 proj' = force >=> proj
@@ -378,18 +375,16 @@ manifest =
     VNum n -> pure $ JNum n
     VStr s -> pure $ JStr s
     VArr a -> JArr <$> traverse (force >=> manifest) a
-    VObj o ->
-      let visibleKeys' = visibleKeys o
-       in JObj <$> traverse (force >=> manifest) visibleKeys'
+    VObj o -> JObj <$> traverse (force >=> manifest) (visibleKeys o)
     VClos _ -> throwError (ManifestError $ NotAJsonValue "function")
 
 
 -- Utils
 visibleKeys :: HashMap Key a -> HashMap Text a
-visibleKeys = H.fromList . map getVisibleKey . filter isVisible . H.toList
+visibleKeys = H.fromList . map getVisibleKey . filter (isVisible . fst) . H.toList
   where
     getVisibleKey (Visible k, v) = (k, v)
     getVisibleKey _ = error "Hidden key"
 
-    isVisible (Visible _, _) = True
+    isVisible (Visible _) = True
     isVisible _ = False
