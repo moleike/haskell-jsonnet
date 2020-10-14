@@ -124,10 +124,6 @@ instance HasValue Double where
   proj v = throwTypeMismatch "number" v
   inj = VNum
 
-instance HasValue Key where
-  proj = undefined
-  inj = undefined
-
 instance {-# OVERLAPS #-} Integral a => HasValue a where
   proj (VNum n) = pure (round n)
   proj v = throwTypeMismatch "number" v
