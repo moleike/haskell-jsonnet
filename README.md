@@ -11,15 +11,13 @@ For an introduction to the language itself, see the [tutorial][tutorial] or lang
 
 ### Build
 
-Building from source can be done using [stack][stack] or [cabal][cabal]:
+Using the [stack][stack] build tool:
 
 ```bash
 git clone github.com/moleike/jsonnet-haskell.git
 cd line-bot-sdk
-stack install # Alternatively, `cabal install`
+stack build
 ```
-
-[cabal]: https://www.haskell.org/cabal
 [stack]: https://docs.haskellstack.org/en/stable/README
 
 
