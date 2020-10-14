@@ -96,9 +96,6 @@ parens = between (symbol "(") (symbol ")")
 comma :: Parser Text
 comma = symbol ","
 
-doubleSemicolon :: Parser Text
-doubleSemicolon = symbol "::"
-
 annotateLoc :: Parser (f a) -> Parser (AnnF f SrcSpan a)
 annotateLoc p = do
   begin <- getSourcePos
@@ -227,19 +224,17 @@ objectP = Fix <$> annotateLoc object
     object = mkObjectF <$> braces ((try methodP <|> pairP) `sepBy` comma)
     pairP = do
       k <- keyP
-      h <- hidden
+      h <- sepP
       v <- exprP
       pure $ KeyValue k v h
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
       ps <- paramsP
-      h <- hidden
+      h <- sepP
       v <- function (pure ps) exprP
       pure $ KeyValue k v h
-    hidden =
-      try (symbol "::" *> pure True)
-        <|> (symbol ":" *> pure False)
+    sepP = try (symbol "::" $> True) <|> (symbol ":" $> False)
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl

@@ -16,7 +16,7 @@ type Expr = Ann ExprF SrcSpan
 -- annotated syntax tree with unresolved imports
 type Expr' = Ann ExprF' SrcSpan
 
-mkApply :: Expr' ->  [Expr'] -> Expr'
+mkApply :: Expr' -> [Expr'] -> Expr'
 mkApply a@(Fix (AnnF _ ann)) [] =
   Fix $ AnnF (InL $ EApply a []) ann
 mkApply a@(Fix (AnnF _ ann)) b =

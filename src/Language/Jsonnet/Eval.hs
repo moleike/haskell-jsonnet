@@ -20,8 +20,8 @@ import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.Bits
 import Data.HashMap.Lazy (HashMap)
-import Data.Hashable (Hashable(..))
 import qualified Data.HashMap.Lazy as H
+import Data.Hashable (Hashable (..))
 import Data.IORef
 import Data.Int
 import Data.Map.Lazy (Map)
@@ -89,7 +89,7 @@ data Value
   | VObj !(HashMap Key Thunk)
   | VClos !(Thunk -> Eval Value)
 
-data Key = Hidden Text | Visible Text deriving Eq
+data Key = Hidden Text | Visible Text deriving (Eq)
 
 instance Hashable Key where
   hashWithSalt salt (Visible text) = hashWithSalt salt text
@@ -249,8 +249,8 @@ evalObj (Object o) =
   where
     mkKey (VStr k, v, hidden) =
       if hidden
-         then (Hidden k, v)
-         else (Visible k, v)
+        then (Hidden k, v)
+        else (Visible k, v)
     f KeyValue {..} = do
       a <- eval key
       b <- mkThunk (eval value)
@@ -378,13 +378,11 @@ manifest =
     VObj o -> JObj <$> traverse (force >=> manifest) (visibleKeys o)
     VClos _ -> throwError (ManifestError $ NotAJsonValue "function")
 
-
 -- Utils
 visibleKeys :: HashMap Key a -> HashMap Text a
 visibleKeys = H.fromList . map getVisibleKey . filter (isVisible . fst) . H.toList
   where
     getVisibleKey (Visible k, v) = (k, v)
     getVisibleKey _ = error "Hidden key"
-
     isVisible (Visible _) = True
     isVisible _ = False
