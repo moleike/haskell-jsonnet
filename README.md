@@ -9,7 +9,21 @@ For an introduction to the language itself, see the [tutorial][tutorial] or lang
 [tutorial]: https://jsonnet.org/learning/tutorial.html
 [reference]: https://jsonnet.org/ref/language.html
 
-## Language features not yet implemented
+### Build
+
+Building from source can be done using [stack][stack] or [cabal][cabal]:
+
+```bash
+git clone github.com/moleike/jsonnet-haskell.git
+cd line-bot-sdk
+stack install # Alternatively, `cabal install`
+```
+
+[cabal]: https://www.haskell.org/cabal
+[stack]: https://docs.haskellstack.org/en/stable/README
+
+
+### Language features not yet implemented
 
 - [ ] array and object comprehension
 - [ ] array slices
