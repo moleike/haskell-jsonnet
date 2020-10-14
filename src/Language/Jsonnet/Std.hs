@@ -9,6 +9,7 @@ import Control.Applicative
 import Control.Monad.Except
 import qualified Data.ByteString as B
 import Data.Foldable
+import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.List
 import Data.Text (Text)
@@ -29,8 +30,8 @@ import Text.Printf
 std :: Value
 std = VObj $ (Thunk . pure) <$> H.fromList xs
   where
-    xs :: [(Text, Value)]
-    xs =
+    xs :: [(Key, Value)]
+    xs = map (\(k, v) -> (Visible k, v))
       [ ("assertEqual", inj assertEqual),
         ("type", inj E.valueType),
         ("isString", inj (isType "string")),
@@ -39,7 +40,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
         ("isObject", inj (isType "object")),
         ("isArray", inj (isType "array")),
         ("isFunction", inj (isType "function")),
-        ("objectFields", inj (H.keys @Text @Value)),
+        ("objectFields", inj objectFields),
         ("length", inj length'),
         ("abs", inj (abs @Double)),
         ("sign", inj (signum @Double)), -- incl. 0.0, (-0.0), and NaN
@@ -97,6 +98,9 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
         ("join", inj T.intercalate),
         ("reverse", inj (reverse @Value))
       ]
+
+objectFields :: HashMap Key Value -> [Text]
+objectFields o = [k | Visible k <- H.keys o]
 
 assertEqual :: Value -> Value -> Eval Bool
 assertEqual a b = do

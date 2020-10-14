@@ -20,6 +20,7 @@ import Control.Monad.Except
 import Control.Monad.State.Lazy
 import Data.Bits
 import Data.HashMap.Lazy (HashMap)
+import Data.Hashable (Hashable(..))
 import qualified Data.HashMap.Lazy as H
 import Data.IORef
 import Data.Int
@@ -85,8 +86,14 @@ data Value
   | VNum !Double
   | VStr !Text
   | VArr !(Vector Thunk)
-  | VObj !(HashMap Text Thunk)
+  | VObj !(HashMap Key Thunk)
   | VClos !(Thunk -> Eval Value)
+
+data Key = Hidden Text | Visible Text deriving Eq
+
+instance Hashable Key where
+  hashWithSalt salt (Visible text) = hashWithSalt salt text
+  hashWithSalt salt (Hidden text) = hashWithSalt salt text
 
 proj' :: HasValue a => Thunk -> Eval a
 proj' = force >=> proj
@@ -139,7 +146,7 @@ instance {-# OVERLAPPING #-} HasValue [Char] where
   proj v = throwTypeMismatch "string" v
   inj = VStr . T.pack
 
-instance HasValue a => HasValue (HashMap Text a) where
+instance HasValue a => HasValue (HashMap Key a) where
   proj (VObj o) = traverse proj' o
   proj v = throwTypeMismatch "object" v
   inj o = VObj $ (Thunk . pure . inj) <$> o
@@ -238,16 +245,20 @@ eval = \case
 
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =
-  VObj . H.fromList . map (\(VStr k, v) -> (k, v)) . filter g <$> traverse f o
+  VObj . H.fromList . map mkKey . filter g <$> traverse f o
   where
+    mkKey (VStr k, v, hidden) =
+      if hidden
+         then (Hidden k, v)
+         else (Visible k, v)
     f KeyValue {..} = do
       a <- eval key
       b <- mkThunk (eval value)
       case a of
-        VStr _ -> pure (a, b)
-        VNull -> pure (a, b)
+        VStr _ -> pure (a, b, hidden)
+        VNull -> pure (a, b, hidden)
         v -> throwInvalidKey v
-    g (k, _) = case k of
+    g (k, _, _) = case k of
       VNull -> False
       _ -> True
 
@@ -297,7 +308,7 @@ evalLookup :: Value -> Value -> Eval Value
 evalLookup (VArr a) (VNum i) =
   liftMaybe (IndexOutOfBounds $ round i) (a !? round i) >>= force
 evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey s) (H.lookup s o) >>= force
+  liftMaybe (NoSuchKey s) (H.lookup (Visible s) o <|> H.lookup (Hidden s) o) >>= force
 evalLookup (VStr s) (VNum i)
   | i' < 0 = throwError (IndexOutOfBounds i')
   | T.length s - 1 < i' = throwError (IndexOutOfBounds i')
@@ -364,5 +375,16 @@ manifest =
     VNum n -> pure $ JNum n
     VStr s -> pure $ JStr s
     VArr a -> JArr <$> traverse (force >=> manifest) a
-    VObj o -> JObj <$> traverse (force >=> manifest) o
+    VObj o -> JObj <$> traverse (force >=> manifest) (visibleKeys o)
     VClos _ -> throwError (ManifestError $ NotAJsonValue "function")
+
+
+-- Utils
+visibleKeys :: HashMap Key a -> HashMap Text a
+visibleKeys = H.fromList . map getVisibleKey . filter (isVisible . fst) . H.toList
+  where
+    getVisibleKey (Visible k, v) = (k, v)
+    getVisibleKey _ = error "Hidden key"
+
+    isVisible (Visible _) = True
+    isVisible _ = False
