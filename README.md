@@ -15,7 +15,7 @@ Using the [stack][stack] build tool:
 
 ```bash
 git clone github.com/moleike/jsonnet-haskell.git
-cd line-bot-sdk
+cd jsonnet-haskell
 stack build
 ```
 [stack]: https://docs.haskellstack.org/en/stable/README
@@ -43,7 +43,8 @@ stack build
 
 
 ## Acknowledgments
-I took inspiration from [Expresso][Expresso], [hnix][hnix], and numerous other libraries. Thanks to their authors.
+I took inspiration from [Expresso][Expresso], [hnix][hnix], [fixplate][fixplate], and numerous other libraries. Thanks to their authors.
 
 [Expresso]: https://github.com/willtim/Expresso
 [hnix]: https://github.com/haskell-nix/hnix
+[fixplate]: https://hackage.haskell.org/package/fixplate
