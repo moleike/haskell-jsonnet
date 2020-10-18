@@ -19,7 +19,7 @@ import Unbound.Generics.LocallyNameless
 type Var = Name Core
 
 data Core
-  = CAnno SrcSpan Core
+  = CLoc SrcSpan Core
   | CLit Literal
   | CVar Var
   | CLam (Bind Var Core)

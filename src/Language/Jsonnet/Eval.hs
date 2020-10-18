@@ -182,7 +182,7 @@ updateCtx (var, th) st@EvalState {..} = st {ctx = M.insert var th ctx}
 
 eval :: Core -> Eval Value
 eval = \case
-  CAnno sp e -> do
+  CLoc sp e -> do
     modify $ updateSpan sp
     eval e
   CLit l -> evalLiteral l

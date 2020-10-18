@@ -25,7 +25,7 @@ desugar =
     . annMap srcSpan
 
 -- annotate nodes with a boolean denoting outermost objects
-zipWithOutermost :: Ann ExprF SrcSpan -> Ann ExprF (SrcSpan, Bool)
+zipWithOutermost :: Ann ExprF a -> Ann ExprF (a, Bool)
 zipWithOutermost = annZip . inherit go False
   where
     go (Fix (AnnF (EObj _) _)) False = (True, True)
@@ -33,7 +33,7 @@ zipWithOutermost = annZip . inherit go False
     go _ x = (False, x)
 
 alg :: AnnF ExprF (SrcSpan, Bool) Core -> Core
-alg (AnnF f (a, b)) = go b $ CAnno a <$> f
+alg (AnnF f (a, b)) = go b $ CLoc a <$> f
   where
     go outermost = \case
       ELit l -> CLit l
