@@ -23,21 +23,20 @@ stack build
 
 ### Language features not yet implemented
 
-- [ ] array and object comprehension
-- [ ] array slices
-- [ ] Python-style string formatting
-- [ ] text blocks 
-- [ ] verbatim strings
-- [ ] object-level locals and asserts
-- [ ] `$` reference (to the outer-most object)
-- [ ] keyword parameters 
-- [ ] default arguments
-- [ ] top-level arguments
-- [ ] external variables
-- [ ] object composition (merging objects)
-- [ ] hidden fields
-- [ ] `super` keyword
-- [ ] tailstrict annotation
+- array and object comprehension
+- array slices
+- Python-style string formatting
+- text blocks 
+- verbatim strings
+- object-level locals and asserts
+- ~~outermost object reference `$`~~
+- keyword parameters 
+- default arguments
+- top-level arguments
+- external variables
+- object composition (merging objects and `super` keyword)
+- ~~hidden fields~~
+- tailstrict annotation
 
 [//]: # "Implementation overview"
 
