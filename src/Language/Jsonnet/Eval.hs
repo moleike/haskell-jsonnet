@@ -378,11 +378,5 @@ manifest =
     VObj o -> JObj <$> traverse (force >=> manifest) (visibleKeys o)
     VClos _ -> throwError (ManifestError $ NotAJsonValue "function")
 
--- Utils
 visibleKeys :: HashMap Key a -> HashMap Text a
-visibleKeys = H.fromList . map getVisibleKey . filter (isVisible . fst) . H.toList
-  where
-    getVisibleKey (Visible k, v) = (k, v)
-    getVisibleKey _ = error "Hidden key"
-    isVisible (Visible _) = True
-    isVisible _ = False
+visibleKeys o = H.fromList $ [(k, v) | (Visible k, v) <- H.toList o]
