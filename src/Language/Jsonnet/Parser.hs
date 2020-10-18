@@ -16,6 +16,7 @@ import Data.Functor
 import Data.Functor.Sum
 import Data.List.NonEmpty as NE
 import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Void
 import GHC.IO.Exception hiding (IOError)
@@ -141,7 +142,7 @@ numberP = Fix <$> annotateLoc (try float <|> integer)
     integer = mkIntF <$> lexeme L.decimal
 
 identP :: Parser Expr'
-identP = Fix <$> annotateLoc (mkIdentF <$> identifier)
+identP = Fix <$> annotateLoc (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier))
 
 booleanP :: Parser Expr'
 booleanP = Fix <$> annotateLoc boolean

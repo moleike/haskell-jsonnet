@@ -35,5 +35,13 @@ synthetise g = go
         x = fmap go f
         h = g . fmap attrib
 
+inherit :: Functor f => (Fix f -> a -> (b, a)) -> a -> Fix f -> Ann f b
+inherit h root = go root
+  where
+    go p s@(Fix t) = let (b, a) = h s p in Fix (AnnF (fmap (go a) t) b)
+
+annZip :: Functor f => Fix (AnnF (AnnF f a) b) -> Ann f (a, b)
+annZip (Fix (AnnF (AnnF t x) y)) = Fix (AnnF (fmap annZip t) (x, y))
+
 --instance (Show a, Show1 f) => Show1 (Const a :*: f) where
 --  liftShowsPrec = liftShowsPrecDefault
