@@ -35,7 +35,7 @@ stack build
 - top-level arguments
 - external variables
 - object composition (merging objects and `super` keyword)
-- ~~hidden fields~~
+- ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
 - tailstrict annotation
 
 [//]: # "Implementation overview"
