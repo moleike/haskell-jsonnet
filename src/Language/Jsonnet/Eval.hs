@@ -1,4 +1,5 @@
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -21,7 +22,7 @@ import Control.Monad.State.Lazy
 import Data.Bits
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
-import Data.Hashable (Hashable (..))
+import Data.Hashable (Hashable)
 import Data.IORef
 import Data.Int
 import Data.Map.Lazy (Map)
@@ -31,6 +32,7 @@ import qualified Data.Text as T
 import Data.Vector ((!?), Vector)
 import qualified Data.Vector as V
 import Debug.Trace
+import GHC.Generics (Generic)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
@@ -79,6 +81,13 @@ mkThunk ev = do
         pure v
       Just v -> pure v
 
+data Key
+  = Visible Text
+  | Hidden Text
+  deriving (Eq, Generic)
+
+instance Hashable Key
+
 -- jsonnet value
 data Value
   = VNull
@@ -88,12 +97,6 @@ data Value
   | VArr !(Vector Thunk)
   | VObj !(HashMap Key Thunk)
   | VClos !(Thunk -> Eval Value)
-
-data Key = Hidden Text | Visible Text deriving (Eq)
-
-instance Hashable Key where
-  hashWithSalt salt (Visible text) = hashWithSalt salt text
-  hashWithSalt salt (Hidden text) = hashWithSalt salt text
 
 proj' :: HasValue a => Thunk -> Eval a
 proj' = force >=> proj
