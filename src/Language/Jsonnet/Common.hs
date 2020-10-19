@@ -14,8 +14,9 @@ import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
+import Data.Scientific (Scientific)
 
-data Literal = Null | Bool Bool | String Text | Number Double
+data Literal = Null | Bool Bool | String Text | Number Scientific
   deriving (Show, Eq, Ord, Generic)
 
 makeClosedAlpha ''Literal

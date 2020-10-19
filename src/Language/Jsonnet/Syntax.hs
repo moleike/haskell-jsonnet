@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import GHC.Generics
 import Language.Jsonnet.Common
 import Text.Show.Deriving
+import Data.Scientific (Scientific)
 
 type Name = String
 
@@ -56,7 +57,7 @@ mkNullF = (InL . ELit) Null
 mkIntF :: Integral b => b -> ExprF' a
 mkIntF = InL . ELit . Number . fromIntegral
 
-mkFloatF :: Double -> ExprF' a
+mkFloatF :: Scientific -> ExprF' a
 mkFloatF = InL . ELit . Number
 
 mkStrF :: String -> ExprF' a

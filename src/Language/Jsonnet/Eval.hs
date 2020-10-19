@@ -41,6 +41,7 @@ import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Unbound.Generics.LocallyNameless
+import Data.Scientific (Scientific, toRealFloat, fromFloatDigits)
 
 type Eval = FreshMT (ExceptT EvalError (StateT EvalState IO))
 
@@ -92,7 +93,7 @@ instance Hashable Key
 data Value
   = VNull
   | VBool !Bool
-  | VNum !Double
+  | VNum !Scientific
   | VStr !Text
   | VArr !(Vector Thunk)
   | VObj !(HashMap Key Thunk)
@@ -119,10 +120,15 @@ instance HasValue Text where
   proj v = throwTypeMismatch "string" v
   inj = VStr
 
-instance HasValue Double where
+instance HasValue Scientific where
   proj (VNum n) = pure n
   proj v = throwTypeMismatch "number" v
   inj = VNum
+
+instance HasValue Double where
+  proj (VNum n) = pure (toRealFloat n)
+  proj v = throwTypeMismatch "number" v
+  inj = VNum . fromFloatDigits
 
 instance {-# OVERLAPS #-} Integral a => HasValue a where
   proj (VNum n) = pure (round n)

@@ -136,10 +136,9 @@ stringP :: Parser Expr'
 stringP = Fix <$> annotateLoc (mkStrF <$> stringLiteral)
 
 numberP :: Parser Expr'
-numberP = Fix <$> annotateLoc (try float <|> integer)
+numberP = Fix <$> annotateLoc number
   where
-    float = mkFloatF <$> lexeme L.float
-    integer = mkIntF <$> lexeme L.decimal
+    number = mkFloatF <$> lexeme L.scientific
 
 identP :: Parser Expr'
 identP = Fix <$> annotateLoc (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier))

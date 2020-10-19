@@ -17,6 +17,7 @@ import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
 import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep)
 import Unbound.Generics.LocallyNameless (Name, name2String)
+import Data.Scientific (toRealFloat)
 
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
@@ -31,7 +32,7 @@ instance Pretty JSON where
   pretty =
     \case
       JNull -> text "null"
-      JNum a -> double a
+      JNum a -> double (toRealFloat a)
       JBool True -> text "true"
       JBool False -> text "false"
       JStr a -> dquotes (text (unpack a))
