@@ -1,2 +1,2 @@
-Assertion failed: 1.0 != 2.0
+Assertion failed: 1 != 2
     ./test/golden/error.sanity.jsonnet:14:1,14:21

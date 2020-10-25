@@ -19,6 +19,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.State.Lazy
+import qualified Data.Aeson as JSON
 import Data.Bits
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
@@ -27,6 +28,7 @@ import Data.IORef
 import Data.Int
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
+import Data.Scientific (Scientific, fromFloatDigits, toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Vector ((!?), Vector)
@@ -36,12 +38,10 @@ import GHC.Generics (Generic)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
-import Language.Jsonnet.JSON
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Unbound.Generics.LocallyNameless
-import Data.Scientific (Scientific, toRealFloat, fromFloatDigits)
 
 type Eval = FreshMT (ExceptT EvalError (StateT EvalState IO))
 
@@ -376,16 +376,24 @@ evalBin ::
   Eval Value
 evalBin f v1 v2 = inj <$> liftA2 f (proj v1) (proj v2)
 
-manifest :: Value -> Eval JSON
+manifest :: Value -> Eval JSON.Value
 manifest =
   \case
-    VNull -> pure JNull
-    VBool b -> pure $ JBool b
-    VNum n -> pure $ JNum n
-    VStr s -> pure $ JStr s
-    VArr a -> JArr <$> traverse (force >=> manifest) a
-    VObj o -> JObj <$> traverse (force >=> manifest) (visibleKeys o)
+    VNull -> pure JSON.Null
+    VBool b -> pure $ JSON.Bool b
+    VNum n -> pure $ JSON.Number n
+    VStr s -> pure $ JSON.String s
+    VArr a -> JSON.Array <$> forceArray a
+    VObj o -> JSON.Object <$> forceObject o
     VClos _ -> throwError (ManifestError $ NotAJsonValue "function")
 
+forceArray :: Vector Thunk -> Eval (Vector JSON.Value)
+forceArray = traverse (force >=> manifest)
+
+forceObject :: HashMap Key Thunk -> Eval (HashMap Text JSON.Value)
+forceObject = traverse (force >=> manifest) . visibleKeys
+
 visibleKeys :: HashMap Key a -> HashMap Text a
-visibleKeys o = H.fromList $ [(k, v) | (Visible k, v) <- H.toList o]
+visibleKeys o = H.fromList $ do
+  (Visible k, v) <- H.toList o
+  pure (k, v)

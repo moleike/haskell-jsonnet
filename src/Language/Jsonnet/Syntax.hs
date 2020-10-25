@@ -9,11 +9,11 @@ module Language.Jsonnet.Syntax where
 import Control.Applicative (Const (..))
 import Data.Functor.Sum
 import Data.List.NonEmpty
+import Data.Scientific (Scientific)
 import qualified Data.Text as T
 import GHC.Generics
 import Language.Jsonnet.Common
 import Text.Show.Deriving
-import Data.Scientific (Scientific)
 
 type Name = String
 
