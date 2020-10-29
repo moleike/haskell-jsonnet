@@ -1,17 +1,20 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Jsonnet.Pretty where
 
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.Text as JSON (encodeToLazyText)
 import qualified Data.HashMap.Lazy as H
 import Data.List (sortOn)
 import Data.Scientific (Scientific (..))
-import Data.Text (unpack)
-import qualified Data.Text.Lazy as LT (unpack)
-import Data.Text.Lazy.Builder (toLazyText)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as LT
+import Data.Text.Lazy.Builder
 import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import qualified Data.Vector as V
 import GHC.IO.Exception (IOException (..))
@@ -33,24 +36,20 @@ ppJson i =
     JSON.Number n -> ppNumber n
     JSON.Bool True -> text "true"
     JSON.Bool False -> text "false"
-    JSON.String s -> dquotes (text (unpack s))
+    JSON.String s -> ppString s
     JSON.Array a -> ppArray a
     JSON.Object o -> ppObject o
   where
-    encloseSep :: Doc -> Doc -> Doc -> [Doc] -> Doc
     encloseSep l r s ds = case ds of
       [] -> l <> r
       _ -> l <$$> indent i (vcat $ punctuate s ds) <$$> r
-    ppObject :: JSON.Object -> Doc
     ppObject o = encloseSep lbrace rbrace comma xs
       where
-        prop (k, v) = dquotes (text (unpack k)) <> colon <+> ppJson i v
+        prop (k, v) = dquotes (text (T.unpack k)) <> colon <+> ppJson i v
         xs = map prop (sortOn fst $ H.toList o)
-    ppArray :: JSON.Array -> Doc
     ppArray a = encloseSep lbracket rbracket comma xs
       where
         xs = map (ppJson i) (V.toList a)
-    ppNumber :: Scientific -> Doc
     ppNumber s
       | e < 0 || e > 1024 =
         text
@@ -60,6 +59,7 @@ ppJson i =
       | otherwise = integer (coefficient s * 10 ^ e)
       where
         e = base10Exponent s
+    ppString = text . LT.unpack . JSON.encodeToLazyText
 
 instance Pretty JSON.Value where
   pretty = ppJson 4
@@ -87,7 +87,7 @@ instance Pretty ParseError where
 instance Pretty ManifestError where
   pretty (NotAJsonValue e) =
     text "Not a JSON value:"
-      <+> text (unpack e)
+      <+> text (T.unpack e)
 
 instance Pretty EvalError where
   pretty =
@@ -95,15 +95,15 @@ instance Pretty EvalError where
       TypeMismatch {..} ->
         text "Type mismatch:"
           <+> text "expected"
-          <+> text (unpack expected)
+          <+> text (T.unpack expected)
           <+> text "but got"
-          <+> text (unpack actual)
+          <+> text (T.unpack actual)
       InvalidKey k ->
         text "Invalid key:"
-          <+> text (unpack k)
+          <+> text (T.unpack k)
       NoSuchKey k ->
         text "No such key:"
-          <+> text (unpack k)
+          <+> text (T.unpack k)
       IndexOutOfBounds i ->
         text "Index out of bounds:"
           <+> (int i)
@@ -111,7 +111,7 @@ instance Pretty EvalError where
         text "Divide by zero exception"
       VarNotFound v ->
         text "Variable"
-          <+> squotes (text $ unpack v)
+          <+> squotes (text $ T.unpack v)
           <+> text "is not defined"
       ManifestError e ->
         text "Manifest error:"
@@ -122,7 +122,7 @@ instance Pretty EvalError where
       StdError e -> e
       RuntimeError e ->
         text "Runtime error:"
-          <+> text (unpack e)
+          <+> text (T.unpack e)
 
 instance Pretty Error where
   pretty =

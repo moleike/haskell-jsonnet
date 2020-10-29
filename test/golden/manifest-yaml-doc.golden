@@ -1,15 +1,1 @@
-"x:
-- 1
-- 2
-- 3
-- true
-- false
-- null
-- "string\nstring\n"
-y:
-  a: 1
-  b: 2
-  c:
-  - 1
-  - 2
-"
+"x:\n- 1\n- 2\n- 3\n- true\n- false\n- null\n- \"string\\nstring\\n\"\ny:\n  a: 1\n  b: 2\n  c:\n  - 1\n  - 2\n"
