@@ -7,9 +7,10 @@ module Language.Jsonnet.Pretty where
 
 import qualified Data.Aeson as JSON
 import qualified Data.HashMap.Lazy as H
-import Data.Scientific (Scientific (..), toRealFloat)
-import Data.Text as BS (Text, unpack)
-import qualified Data.Text.Lazy as LBS (unpack)
+import Data.List (sortOn)
+import Data.Scientific (Scientific (..))
+import Data.Text (unpack)
+import qualified Data.Text.Lazy as LT (unpack)
 import Data.Text.Lazy.Builder (toLazyText)
 import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import qualified Data.Vector as V
@@ -25,44 +26,43 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
 
+ppJson :: Int -> JSON.Value -> Doc
+ppJson i =
+  \case
+    JSON.Null -> text "null"
+    JSON.Number n -> ppNumber n
+    JSON.Bool True -> text "true"
+    JSON.Bool False -> text "false"
+    JSON.String s -> dquotes (text (unpack s))
+    JSON.Array a -> ppArray a
+    JSON.Object o -> ppObject o
+  where
+    encloseSep :: Doc -> Doc -> Doc -> [Doc] -> Doc
+    encloseSep l r s ds = case ds of
+      [] -> l <> r
+      _ -> l <$$> indent i (vcat $ punctuate s ds) <$$> r
+    ppObject :: JSON.Object -> Doc
+    ppObject o = encloseSep lbrace rbrace comma xs
+      where
+        prop (k, v) = dquotes (text (unpack k)) <> colon <+> ppJson i v
+        xs = map prop (sortOn fst $ H.toList o)
+    ppArray :: JSON.Array -> Doc
+    ppArray a = encloseSep lbracket rbracket comma xs
+      where
+        xs = map (ppJson i) (V.toList a)
+    ppNumber :: Scientific -> Doc
+    ppNumber s
+      | e < 0 || e > 1024 =
+        text
+          $ LT.unpack
+          $ toLazyText
+          $ scientificBuilder s
+      | otherwise = integer (coefficient s * 10 ^ e)
+      where
+        e = base10Exponent s
+
 instance Pretty JSON.Value where
-  pretty =
-    \case
-      JSON.Null -> text "null"
-      JSON.Number n -> ppNumber n
-      JSON.Bool True -> text "true"
-      JSON.Bool False -> text "false"
-      JSON.String s -> dquotes (text (unpack s))
-      JSON.Array a -> ppArray a
-      JSON.Object o -> ppObject o
-
-encloseSep :: Doc -> Doc -> Doc -> [Doc] -> Doc
-encloseSep l r s ds = case ds of
-  [] -> l <> r
-  _ -> l <$$> indent 4 (vcat $ punctuate s ds) <$$> r
-
--- | encode numbers just like aeson
-ppNumber :: Scientific -> Doc
-ppNumber s
-  | e < 0 || e > 1024 =
-    text
-      $ LBS.unpack
-      $ toLazyText
-      $ scientificBuilder s
-  | otherwise = integer (coefficient s * 10 ^ e)
-  where
-    e = base10Exponent s
-
-ppObject :: JSON.Object -> Doc
-ppObject o = encloseSep lbrace rbrace comma xs
-  where
-    prop (k, v) = dquotes (text (unpack k)) <> colon <+> pretty v
-    xs = map prop (H.toList o)
-
-ppArray :: JSON.Array -> Doc
-ppArray a = encloseSep lbracket rbracket comma xs
-  where
-    xs = map pretty (V.toList a)
+  pretty = ppJson 4
 
 instance Pretty SrcSpan where
   pretty (SrcSpan {spanBegin, spanEnd}) =

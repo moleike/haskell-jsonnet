@@ -1,22 +1,22 @@
 [
     {
-        "foo": "test1",
         "bar": {
             "baz": {
                 "qux": {
                     "quux": "test1"
                 }
             }
-        }
+        },
+        "foo": "test1"
     },
     {
-        "foo": "test2",
         "bar": {
             "baz": {
                 "qux": {
                     "quux": "test2"
                 }
             }
-        }
+        },
+        "foo": "test2"
     }
 ]

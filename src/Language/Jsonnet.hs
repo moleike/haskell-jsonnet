@@ -10,7 +10,6 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
-import qualified Data.Text as T
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
@@ -20,7 +19,6 @@ import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
-import Text.PrettyPrint.ANSI.Leijen (displayS, pretty, renderCompact)
 
 type JsonnetM = ReaderT Config (ExceptT Error IO)
 
@@ -29,11 +27,11 @@ data Config = Config
   }
   deriving (Eq, Show)
 
-jsonnet :: Config -> Text -> IO (Either Error Text)
-jsonnet conf = runJsonnetM conf . (interpret >=> render)
-
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
 runJsonnetM conf = runExceptT . flip runReaderT conf
+
+jsonnet :: Config -> Text -> IO (Either Error JSON.Value)
+jsonnet conf = runJsonnetM conf . interpret
 
 interpret :: Text -> JsonnetM JSON.Value
 interpret = parse >=> desugar >=> evaluate
@@ -60,9 +58,3 @@ evaluate = lift . runEval evalSt . (Eval.eval >=> Eval.manifest)
   where
     stdlib = singleton "std" (Thunk $ pure std)
     evalSt = EvalState {ctx = stdlib, curSpan = Nothing}
-
-render :: JSON.Value -> JsonnetM Text
-render = pure . T.pack . show . pretty
-
-renderC :: JSON.Value -> JsonnetM Text
-renderC a = pure $ T.pack $ displayS (renderCompact (pretty a)) ""

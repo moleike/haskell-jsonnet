@@ -7,7 +7,9 @@ module Language.Jsonnet.Std (std) where
 
 import Control.Applicative
 import Control.Monad.Except
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
+import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
@@ -17,9 +19,10 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vector (Vector)
 import Data.Word
+import qualified Data.YAML.Aeson as YAML
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval as E
-import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Pretty (ppJson)
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen ((<+>), pretty, text)
 import Text.Printf
@@ -98,7 +101,9 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("lines", inj T.unlines), -- yes, really
           ("repeat", inj repeat'),
           ("join", inj T.intercalate),
-          ("reverse", inj (reverse @Value))
+          ("reverse", inj (reverse @Value)),
+          ("manifestYamlDoc", inj manifestYamlDoc),
+          ("manifestJsonEx", inj manifestJsonEx)
         ]
 
 objectFields :: HashMap Key Value -> [Text]
@@ -206,3 +211,11 @@ concatForM f xs = liftM concat (mapM f xs)
 
 foldlM' :: Foldable t => (b -> a -> Eval b) -> t a -> b -> Eval b
 foldlM' = flip . foldlM
+
+manifestYamlDoc :: Value -> Eval ByteString
+manifestYamlDoc = fmap YAML.encode1Strict . manifest
+
+manifestJsonEx :: Value -> Text -> Eval String
+manifestJsonEx x indent = fmap (show . ppJson sp) (manifest x)
+  where
+    sp = T.length indent

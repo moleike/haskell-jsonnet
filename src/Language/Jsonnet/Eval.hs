@@ -21,6 +21,7 @@ import Control.Monad.Except
 import Control.Monad.State.Lazy
 import qualified Data.Aeson as JSON
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.Hashable (Hashable)
@@ -31,6 +32,7 @@ import qualified Data.Map.Lazy as M
 import Data.Scientific (Scientific, fromFloatDigits, toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Vector ((!?), Vector)
 import qualified Data.Vector as V
 import Debug.Trace
@@ -40,7 +42,7 @@ import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
-import Text.PrettyPrint.ANSI.Leijen (pretty)
+import Text.PrettyPrint.ANSI.Leijen (Doc, pretty)
 import Unbound.Generics.LocallyNameless
 
 type Eval = FreshMT (ExceptT EvalError (StateT EvalState IO))
@@ -120,6 +122,16 @@ instance HasValue Text where
   proj v = throwTypeMismatch "string" v
   inj = VStr
 
+instance {-# OVERLAPPING #-} HasValue [Char] where
+  proj (VStr s) = pure $ T.unpack s
+  proj v = throwTypeMismatch "string" v
+  inj = VStr . T.pack
+
+instance HasValue ByteString where
+  proj (VStr s) = pure (encodeUtf8 s)
+  proj v = throwTypeMismatch "string" v
+  inj = VStr . decodeUtf8
+
 instance HasValue Scientific where
   proj (VNum n) = pure n
   proj v = throwTypeMismatch "number" v
@@ -149,11 +161,6 @@ instance HasValue a => HasValue (Vector a) where
 instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
   proj = fmap V.toList . proj
   inj = inj . V.fromList
-
-instance {-# OVERLAPPING #-} HasValue [Char] where
-  proj (VStr s) = pure $ T.unpack s
-  proj v = throwTypeMismatch "string" v
-  inj = VStr . T.pack
 
 instance HasValue a => HasValue (HashMap Key a) where
   proj (VObj o) = traverse proj' o
