@@ -216,12 +216,12 @@ localP = Fix <$> annotateLoc localExpr
 arrayP :: Parser Expr'
 arrayP = Fix <$> annotateLoc array
   where
-    array = mkArrayF <$> brackets (exprP `sepBy` comma)
+    array = mkArrayF <$> brackets (exprP `sepEndBy` comma)
 
 objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc object
   where
-    object = mkObjectF <$> braces ((try methodP <|> pairP) `sepBy` comma)
+    object = mkObjectF <$> braces ((try methodP <|> pairP) `sepEndBy` comma)
     pairP = do
       k <- keyP
       h <- sepP
