@@ -45,7 +45,7 @@ ppJson i =
       _ -> l <$$> indent i (vcat $ punctuate s ds) <$$> r
     ppObject o = encloseSep lbrace rbrace comma xs
       where
-        prop (k, v) = dquotes (text (T.unpack k)) <> colon <+> ppJson i v
+        prop (k, v) = ppString k <> colon <+> ppJson i v
         xs = map prop (sortOn fst $ H.toList o)
     ppArray a = encloseSep lbracket rbracket comma xs
       where
