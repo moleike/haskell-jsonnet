@@ -4,10 +4,7 @@ module Language.Jsonnet.Annotate where
 
 import Control.Applicative (Const (..))
 import Data.Fix
-import Data.Functor.Classes
-import Data.Functor.Classes.Generic
 import Data.Functor.Product
-import Data.List.NonEmpty as NE
 
 -- | Annotated trees, based on fixplate
 type AnnF f a = Product (Const a) f

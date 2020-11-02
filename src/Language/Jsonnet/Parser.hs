@@ -11,10 +11,11 @@ import Control.Monad
 import Control.Monad.Combinators.Expr
 import qualified Control.Monad.Combinators.NonEmpty as NE
 import Control.Monad.Except
+import Data.Char
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
-import Data.List.NonEmpty as NE
+import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -25,6 +26,7 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
+import Numeric
 import System.Directory
 import System.FilePath.Posix (takeDirectory)
 import System.IO.Error (tryIOError)
@@ -124,16 +126,51 @@ keywordP keyword = lexeme (string keyword <* notFollowedBy alphaNumChar)
 
 -- unfinished string parser
 stringLiteral :: Parser String
-stringLiteral = squoted <|> dquoted
+stringLiteral = quoted (char '\"') <|> quoted (char '\'')
   where
-    dquoted = char '\"' *> manyTill L.charLiteral (char '\"')
-    squoted = char '\'' *> manyTill L.charLiteral (char '\'')
+    quoted c =
+      c
+        *> manyTill
+          ( try escapeUnicode <|> escapeAscii
+              <|> anySingle
+          )
+          c
+
+escapeAscii :: Parser Char
+escapeAscii = do
+  char '\\'
+  choice
+    [ char '\"' $> '\"',
+      char '\'' $> '\'', -- this is specific to jsonnet
+      char '\\' $> '\\',
+      char '/' $> '/',
+      char 'n' $> '\n',
+      char 'r' $> '\r',
+      char 'f' $> '\f',
+      char 't' $> '\t',
+      char 'b' $> '\b'
+    ]
+
+escapeUnicode :: Parser Char
+escapeUnicode = do
+  string "\\u"
+  hex <- ("0x" ++) <$> count 4 hexDigitChar
+  pure (chr $ read hex)
+
+verbatimString :: Parser String
+verbatimString = char '@' *> (quoted (char '\'') <|> quoted (char '\"'))
+  where
+    quoted c =
+      c
+        *> manyTill
+          ((c *> c) <|> anySingle)
+          (try $ c <* notFollowedBy c)
 
 unquoted :: Parser Expr'
 unquoted = Fix <$> annotateLoc (mkStrF <$> identifier)
 
 stringP :: Parser Expr'
-stringP = Fix <$> annotateLoc (mkStrF <$> stringLiteral)
+stringP = Fix <$> annotateLoc (mkStrF <$> (verbatimString <|> stringLiteral))
 
 numberP :: Parser Expr'
 numberP = Fix <$> annotateLoc number

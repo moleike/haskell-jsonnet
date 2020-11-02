@@ -1,1 +1,1 @@
-"{\n  \"x\": [\n    1,\n    2,\n    3,\n    true,\n    false,\n    null,\n    \"string\\nstring\\n\"\n  ],\n  \"y\": {\n    \"a\": 1,\n    \"b\": 2,\n    \"c\": [\n      1,\n      2\n    ]\n  }\n}"
+"{\n  \"x\": [\n    1,\n    2,\n    3,\n    true,\n    false,\n    null,\n    \"string\\\\n\\\"string\\\"\\\\n\"\n  ],\n  \"y\": {\n    \"a\": 1,\n    \"b\": 2,\n    \"c\": [\n      1,\n      2\n    ]\n  }\n}"

@@ -27,7 +27,7 @@ stack build
 - array slices
 - Python-style string formatting
 - text blocks 
-- verbatim strings
+- ~~verbatim strings~~
 - object-level locals and asserts
 - ~~outermost object reference `$`~~
 - keyword parameters 
