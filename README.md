@@ -1,6 +1,6 @@
-# jsonnet-haskell
+# jsonnet-hs
 
-[![Actions Status](https://github.com/moleike/jsonnet-haskell/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-haskell/actions) [![Join the chat at https://gitter.im/jsonnet-haskell/community](https://badges.gitter.im/jsonnet-haskell/community.svg)](https://gitter.im/jsonnet-haskell/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Actions Status](https://github.com/moleike/jsonnet-hs/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-hs/actions) [![Join the chat at https://gitter.im/jsonnet-hs/community](https://badges.gitter.im/jsonnet-hs/community.svg)](https://gitter.im/jsonnet-hs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 A Haskell implementation of the [Jsonnet][jsonnet] configuration language. 
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
@@ -14,8 +14,8 @@ For an introduction to the language itself, see the [tutorial][tutorial] or lang
 Using the [stack][stack] build tool:
 
 ```bash
-git clone github.com/moleike/jsonnet-haskell.git
-cd jsonnet-haskell
+git clone github.com/moleike/jsonnet-hs.git
+cd jsonnet-hs
 stack build
 ```
 [stack]: https://docs.haskellstack.org/en/stable/README
