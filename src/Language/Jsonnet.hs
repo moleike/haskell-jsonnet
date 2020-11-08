@@ -1,10 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Jsonnet where
 
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
@@ -21,7 +23,22 @@ import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
 
-type JsonnetM = ReaderT Config (ExceptT Error IO)
+newtype JsonnetM a = JsonnetM
+  { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
+  }
+  deriving
+    ( Functor,
+      Applicative,
+      Monad,
+      MonadIO,
+      MonadFix,
+      MonadReader Config,
+      MonadError Error,
+      MonadThrow,
+      MonadCatch,
+      MonadMask,
+      MonadFail
+    )
 
 data Config = Config
   { fname :: FilePath
@@ -29,7 +46,7 @@ data Config = Config
   deriving (Eq, Show)
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
-runJsonnetM conf = runExceptT . flip runReaderT conf
+runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
 
 jsonnet :: Config -> Text -> IO (Either Error JSON.Value)
 jsonnet conf = runJsonnetM conf . interpret
@@ -39,7 +56,7 @@ interpret = parse >=> desugar >=> evaluate
 
 parse :: Text -> JsonnetM Expr
 parse inp =
-  asks fname >>= lift . withExceptT ParserError . go
+  asks fname >>= JsonnetM . lift . withExceptT ParserError . go
   where
     go fp =
       Parser.resolveImports fp
@@ -55,7 +72,7 @@ runEval' st = withExceptT mkErr . runEval st
 
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
-evaluate = lift . runEval' evalSt . (eval >=> manifest)
+evaluate = JsonnetM . lift . runEval' evalSt . (eval >=> manifest)
   where
     stdlib = singleton "std" (Thunk $ pure std)
     evalSt = EvalState {ctx = stdlib, curSpan = Nothing}
