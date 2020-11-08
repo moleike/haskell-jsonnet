@@ -13,12 +13,13 @@ import Data.Text (Text)
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
-import qualified Language.Jsonnet.Eval as Eval
-import Language.Jsonnet.Eval (Eval, EvalState (..), Thunk (..))
+import Language.Jsonnet.Eval (Eval, EvalState (..), eval, runEval)
+import Language.Jsonnet.Manifest (manifest)
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
+import Language.Jsonnet.Value
 
 type JsonnetM = ReaderT Config (ExceptT Error IO)
 
@@ -47,14 +48,14 @@ parse inp =
 desugar :: Expr -> JsonnetM Core
 desugar = pure . Desugar.desugar
 
-runEval :: EvalState -> Eval a -> ExceptT Error IO a
-runEval st = withExceptT mkErr . Eval.runEval st
+runEval' :: EvalState -> Eval a -> ExceptT Error IO a
+runEval' st = withExceptT mkErr . runEval st
   where
     mkErr (e, EvalState {curSpan}) = EvalError e curSpan
 
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
-evaluate = lift . runEval evalSt . (Eval.eval >=> Eval.manifest)
+evaluate = lift . runEval' evalSt . (eval >=> manifest)
   where
     stdlib = singleton "std" (Thunk $ pure std)
     evalSt = EvalState {ctx = stdlib, curSpan = Nothing}

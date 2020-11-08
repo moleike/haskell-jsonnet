@@ -65,7 +65,7 @@ instance Pretty JSON.Value where
   pretty = ppJson 4
 
 instance Pretty SrcSpan where
-  pretty (SrcSpan {spanBegin, spanEnd}) =
+  pretty SrcSpan {spanBegin, spanEnd} =
     text (sourceName spanBegin)
       <> colon
       <> lc spanBegin
@@ -106,7 +106,7 @@ instance Pretty EvalError where
           <+> text (T.unpack k)
       IndexOutOfBounds i ->
         text "Index out of bounds:"
-          <+> (int i)
+          <+> int i
       DivByZero ->
         text "Divide by zero exception"
       VarNotFound v ->

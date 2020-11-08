@@ -3,11 +3,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Language.Jsonnet.Std (std) where
+module Language.Jsonnet.Std
+  ( std,
+    toString,
+    equals,
+  )
+where
 
 import Control.Applicative
 import Control.Monad.Except
-import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import Data.ByteString (ByteString)
 import Data.Foldable
@@ -21,8 +25,10 @@ import Data.Vector (Vector)
 import Data.Word
 import qualified Data.YAML.Aeson as YAML
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval as E
+import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Manifest (manifest)
 import Language.Jsonnet.Pretty (ppJson)
+import Language.Jsonnet.Value
 import Numeric
 import Text.PrettyPrint.ANSI.Leijen ((<+>), pretty, text)
 import Text.Printf
@@ -38,13 +44,14 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
       map
         (\(k, v) -> (Hidden k, v))
         [ ("assertEqual", inj assertEqual),
-          ("type", inj E.valueType),
+          ("type", inj valueType),
           ("isString", inj (isType "string")),
           ("isBoolean", inj (isType "boolean")),
           ("isNumber", inj (isType "number")),
           ("isObject", inj (isType "object")),
           ("isArray", inj (isType "array")),
           ("isFunction", inj (isType "function")),
+          ("equals", inj equals),
           ("objectFields", inj objectFields),
           ("length", inj length'),
           ("abs", inj (abs @Double)),
@@ -66,7 +73,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("acos", inj (acos @Double)),
           ("atan", inj (atan @Double)),
           ("mod", inj (mod @Integer)),
-          ("toString", inj E.toString),
+          ("toString", inj toString),
           ("codepoint", inj (fromEnum . T.head)),
           ("char", inj (T.singleton . toEnum)),
           ("substr", inj substr),
@@ -106,6 +113,13 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("manifestJsonEx", inj manifestJsonEx)
         ]
 
+toString :: Value -> Eval Text
+toString (VStr s) = pure s
+toString v = (T.pack . show . pretty) <$> manifest v
+
+equals :: Value -> Value -> Eval Bool
+equals a b = (==) <$> manifest a <*> manifest b
+
 objectFields :: HashMap Key Value -> [Text]
 objectFields o = [k | Visible k <- H.keys o]
 
@@ -137,7 +151,7 @@ length' = \case
           $ text
           $ T.unpack
           $ "length operates on strings, objects, and arrays, got "
-            <> E.valueType v
+            <> valueType v
       )
 
 substr :: Text -> Int -> Int -> Text

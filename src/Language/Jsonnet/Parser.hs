@@ -1,7 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
 
 module Language.Jsonnet.Parser where
 
@@ -15,7 +13,6 @@ import Data.Char
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
-import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -26,7 +23,6 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
-import Numeric
 import System.Directory
 import System.FilePath.Posix (takeDirectory)
 import System.IO.Error (tryIOError)
@@ -60,11 +56,9 @@ resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
     go (AnnF (InR (Const (Import fp'))) a) = do
-      expr <-
-        resolveImports fp'
-          =<< parse fp'
-          =<< readImportFile fp' a
-      pure expr
+      resolveImports fp'
+        =<< parse fp'
+        =<< readImportFile fp' a
     readImportFile fp' a = do
       inp <- readFile' fp'
       liftEither $ left (flip ImportError (Just a)) inp
