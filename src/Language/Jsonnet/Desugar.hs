@@ -2,15 +2,16 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 module Language.Jsonnet.Desugar (desugar) where
 
 import Data.Fix as F
 import Data.List.NonEmpty (NonEmpty (..), toList)
-import Data.Maybe
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
@@ -55,6 +56,7 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
         where
           self = CObj (mkVar "self" e)
       ELookup e1 e2 -> CLookup e1 e2
+      EIndex e1 e2 -> CLookup e1 e2
       EErr e -> CErr e
       EAssert c m e ->
         CIfElse
@@ -65,9 +67,28 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
                 (CLit $ String "Assertion failed")
                 m
           )
+      ESlice {..} ->
+        stdFunc
+          "slice"
+          [ maybeNull start,
+            maybeNull end,
+            maybeNull step,
+            expr
+          ]
+        where
+          maybeNull = fromMaybe (CLit Null)
 
 mkVar :: Alpha a => String -> a -> Bind Var a
 mkVar = bind . s2n
+
+stdFunc :: Text -> [Core] -> Core
+stdFunc f =
+  foldl
+    CApp
+    ( CLookup
+        (CVar "std")
+        (CLit $ String f)
+    )
 
 mkLet bnds e =
   bind

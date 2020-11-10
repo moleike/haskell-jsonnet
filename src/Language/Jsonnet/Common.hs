@@ -91,7 +91,7 @@ instance Read1 KeyValue where
 instance Show1 KeyValue where
   liftShowsPrec = liftShowsPrecDefault
 
-data Object a = Object [KeyValue a]
+newtype Object a = Object [KeyValue a]
   deriving
     ( Eq,
       Read,

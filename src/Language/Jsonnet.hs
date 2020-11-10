@@ -1,10 +1,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Jsonnet where
+module Language.Jsonnet
+  ( JsonnetM,
+    Config (..),
+    jsonnet,
+    runJsonnetM,
+    parse,
+    desugar,
+    evaluate,
+  )
+where
 
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
@@ -58,9 +66,9 @@ parse :: Text -> JsonnetM Expr
 parse inp =
   asks fname >>= JsonnetM . lift . withExceptT ParserError . go
   where
-    go fp =
-      Parser.resolveImports fp
-        =<< Parser.parse fp inp
+    go fp = do
+      ast <- Parser.parse fp inp
+      Parser.resolveImports fp ast
 
 desugar :: Expr -> JsonnetM Core
 desugar = pure . Desugar.desugar

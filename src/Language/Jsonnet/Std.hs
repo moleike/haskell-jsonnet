@@ -18,10 +18,12 @@ import Data.Foldable
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.List
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vector (Vector)
+import qualified Data.Vector as V
 import Data.Word
 import qualified Data.YAML.Aeson as YAML
 import Language.Jsonnet.Error
@@ -110,7 +112,8 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("join", inj T.intercalate),
           ("reverse", inj (reverse @Value)),
           ("manifestYamlDoc", inj manifestYamlDoc),
-          ("manifestJsonEx", inj manifestJsonEx)
+          ("manifestJsonEx", inj manifestJsonEx),
+          ("slice", inj (slice @Value))
         ]
 
 toString :: Value -> Eval Text
@@ -221,7 +224,7 @@ repeat' :: [Value] -> Int -> [Value]
 repeat' xs times = join $ replicate times xs
 
 concatForM :: (a -> Eval [b]) -> [a] -> Eval [b]
-concatForM f xs = liftM concat (mapM f xs)
+concatForM f xs = fmap concat (mapM f xs)
 
 foldlM' :: Foldable t => (b -> a -> Eval b) -> t a -> b -> Eval b
 foldlM' = flip . foldlM
@@ -233,3 +236,15 @@ manifestJsonEx :: Value -> Text -> Eval String
 manifestJsonEx x indent = fmap (show . ppJson sp) (manifest x)
   where
     sp = T.length indent
+
+slice ::
+  Maybe Int ->
+  Maybe Int ->
+  Maybe Int ->
+  Vector a ->
+  Vector a
+slice i n s v = go (fromMaybe 0 i) (fromMaybe len n) s v
+  where
+    go i n Nothing = V.slice i n
+    go i n (Just s) = V.ifilter (\x _ -> x `mod` s == 0) . V.drop i . V.take n
+    len = V.length v

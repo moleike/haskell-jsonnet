@@ -144,7 +144,7 @@ evalComp Gt n1 n2 = evalBin ((>) @Double) n1 n2
 evalComp Le n1 n2 = evalBin ((<=) @Double) n1 n2
 evalComp Ge n1 n2 = evalBin ((>=) @Double) n1 n2
 evalComp Eq n1 n2 = VBool <$> n1 `Std.equals` n2
-evalComp Ne n1 n2 = (VBool . not) <$> n1 `Std.equals` n2
+evalComp Ne n1 n2 = VBool . not <$> n1 `Std.equals` n2
 
 evalLogical :: LogicalOp -> Value -> Value -> Eval Value
 evalLogical LAnd n1 n2 = evalBin (&&) n1 n2

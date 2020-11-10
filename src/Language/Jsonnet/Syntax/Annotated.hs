@@ -26,6 +26,14 @@ mkLookup :: Expr' -> Expr' -> Expr'
 mkLookup a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =
   Fix $ AnnF (InL $ ELookup a b) (ann1 <> ann2)
 
+mkIndex :: Expr' -> Expr' -> Expr'
+mkIndex a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =
+  Fix $ AnnF (InL $ EIndex a b) (ann1 <> ann2)
+
+mkSlice :: Maybe Expr' -> Maybe Expr' -> Maybe Expr' -> Expr' -> Expr'
+mkSlice i n s e@(Fix (AnnF _ ann1)) =
+  Fix $ AnnF (InL $ ESlice e i n s) ann1
+
 mkBinOp :: BinOp -> Expr' -> Expr' -> Expr'
 mkBinOp op a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =
   Fix $ AnnF (InL $ EBinOp op a b) (ann1 <> ann2)

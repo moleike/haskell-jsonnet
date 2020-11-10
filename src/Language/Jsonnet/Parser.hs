@@ -13,6 +13,7 @@ import Data.Char
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -55,7 +56,7 @@ resolveImports ::
 resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const (Import fp'))) a) = do
+    go (AnnF (InR (Const (Import fp'))) a) =
       resolveImports fp'
         =<< parse fp'
         =<< readImportFile fp' a
@@ -249,6 +250,7 @@ arrayP = Fix <$> annotateLoc array
   where
     array = mkArrayF <$> brackets (exprP `sepEndBy` comma)
 
+--a[start:stop:step]
 objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc object
   where
@@ -340,13 +342,20 @@ postfixOperators :: Parser (Expr' -> Expr')
 postfixOperators =
   foldr1 (flip (.))
     <$> some
-      ( apply <|> index
+      ( apply
+          <|> try slice
+          <|> index
           <|> lookup
       )
   where
     apply = flip mkApply <$> parens (exprP `sepBy` comma)
-    index = flip mkLookup <$> brackets exprP
+    index = flip mkIndex <$> brackets exprP
     lookup = flip mkLookup <$> (symbol "." *> unquoted)
+    slice = brackets $ do
+      start <- optional exprP <* symbol ":"
+      end <- optional exprP <* symbol ":"
+      step <- optional exprP
+      pure $ mkSlice start end step
 
 primP :: Parser Expr'
 primP =

@@ -1,11 +1,7 @@
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module Language.Jsonnet.Core where
 
@@ -26,7 +22,7 @@ data Core
   | CApp Core Core
   | CLet (Bind (Rec [(Var, Embed Core)]) Core) -- letrec
   | CObj (Bind Var (Object Core))
-  | CArr [(Core)]
+  | CArr [Core]
   | CBinOp BinOp Core Core
   | CUnyOp UnyOp Core
   | CIfElse Core Core Core
