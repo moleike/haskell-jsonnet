@@ -113,7 +113,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("reverse", inj (reverse @Value)),
           ("manifestYamlDoc", inj manifestYamlDoc),
           ("manifestJsonEx", inj manifestJsonEx),
-          ("slice", inj (slice @Value))
+          ("slice", inj slice)
         ]
 
 toString :: Value -> Eval Text
@@ -233,7 +233,7 @@ manifestYamlDoc :: Value -> Eval ByteString
 manifestYamlDoc = fmap YAML.encode1Strict . manifest
 
 manifestJsonEx :: Value -> Text -> Eval String
-manifestJsonEx x indent = fmap (show . ppJson sp) (manifest x)
+manifestJsonEx x indent = show . ppJson sp <$> manifest x
   where
     sp = T.length indent
 
@@ -241,10 +241,41 @@ slice ::
   Maybe Int ->
   Maybe Int ->
   Maybe Int ->
+  Value ->
+  Eval Value
+slice i n s v@(VArr _) = inj' (sliceV @Value i n s) v
+slice i n s v@(VStr _) = inj' (sliceS i n s) v
+slice _ _ _ v = throwTypeMismatch "array/string" v
+
+sliceS ::
+  Maybe Int ->
+  Maybe Int ->
+  Maybe Int ->
+  Text ->
+  Text
+sliceS i n s t = go (fromMaybe 0 i) (fromMaybe len n) s t
+  where
+    go i n Nothing = T.drop i . T.take n
+    go i n (Just s) =
+      T.pack . snd . unzip
+        . filter (\(x, _) -> x `mod` s == 0)
+        . zip [0..]
+        . T.unpack
+        . T.drop i
+        . T.take n
+    len = T.length t
+
+sliceV ::
+  Maybe Int ->
+  Maybe Int ->
+  Maybe Int ->
   Vector a ->
   Vector a
-slice i n s v = go (fromMaybe 0 i) (fromMaybe len n) s v
+sliceV i n s v = go (fromMaybe 0 i) (fromMaybe len n) s v
   where
     go i n Nothing = V.slice i n
-    go i n (Just s) = V.ifilter (\x _ -> x `mod` s == 0) . V.drop i . V.take n
+    go i n (Just s) =
+      V.ifilter (\x _ -> x `mod` s == 0)
+        . V.drop i
+        . V.take n
     len = V.length v

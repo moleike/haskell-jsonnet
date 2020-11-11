@@ -166,6 +166,19 @@ throwTypeMismatch expected =
   throwError . TypeMismatch expected
     . valueType
 
+inj' :: (HasValue a, HasValue b) =>
+  (a -> b) ->
+  (Value -> Eval Value)
+inj' f v = inj . f <$> proj v
+
+inj'' ::
+  (HasValue a, HasValue b, HasValue c) =>
+  (a -> b -> c) ->
+  Value ->
+  Value ->
+  Eval Value
+inj'' f v1 v2 = inj <$> liftA2 f (proj v1) (proj v2)
+
 valueType :: Value -> Text
 valueType =
   \case

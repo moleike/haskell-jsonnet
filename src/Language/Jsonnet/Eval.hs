@@ -183,19 +183,19 @@ liftMaybe e =
     Nothing -> throwError e
     Just a -> pure a
 
-append :: Value -> Value -> Eval Text
-append v1 v2 = T.append <$> Std.toString v1 <*> Std.toString v2
-
-throwInvalidKey :: MonadError EvalError m => Value -> m a
-throwInvalidKey = throwError . InvalidKey . valueType
-
 evalBin ::
   (HasValue a, HasValue b, HasValue c) =>
   (a -> b -> c) ->
   Value ->
   Value ->
   Eval Value
-evalBin f v1 v2 = inj <$> liftA2 f (proj v1) (proj v2)
+evalBin = inj''
+
+append :: Value -> Value -> Eval Text
+append v1 v2 = T.append <$> Std.toString v1 <*> Std.toString v2
+
+throwInvalidKey :: MonadError EvalError m => Value -> m a
+throwInvalidKey = throwError . InvalidKey . valueType
 
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}

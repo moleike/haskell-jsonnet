@@ -12,5 +12,10 @@ limitations under the License.
 */
 
 local arr = std.range(0, 5);
+local str = '012345';
 
-std.assertEqual(arr[3::2], [3, 5])
+std.assertEqual(arr[2:4:1], [2,3]) &&
+
+std.assertEqual(str[2:4:1], '23') &&
+
+true
