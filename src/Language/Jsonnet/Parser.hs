@@ -94,6 +94,9 @@ parens = between (symbol "(") (symbol ")")
 comma :: Parser Text
 comma = symbol ","
 
+colon :: Parser Text
+colon = symbol ":"
+
 annotateLoc :: Parser (f a) -> Parser (AnnF f SrcSpan a)
 annotateLoc p = do
   begin <- getSourcePos
@@ -197,7 +200,7 @@ assertP = Fix <$> annotateLoc assert
   where
     assert = do
       cond <- keywordP "assert" *> exprP
-      msg <- optional (symbol ":" *> exprP)
+      msg <- optional (colon *> exprP)
       _ <- symbol ";"
       expr <- exprP
       pure $ mkAssertF cond msg expr
@@ -267,7 +270,7 @@ objectP = Fix <$> annotateLoc object
       h <- sepP
       v <- function (pure ps) exprP
       pure $ KeyValue k v h
-    sepP = try (symbol "::" $> True) <|> (symbol ":" $> False)
+    sepP = try (symbol "::" $> True) <|> (colon $> False)
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl
@@ -321,7 +324,8 @@ opTable =
     [ binary ">>" (mkBinOp (Bitwise ShiftR)),
       binary "<<" (mkBinOp (Bitwise ShiftL))
     ],
-    [ binary ">" (mkBinOp (Comp Gt)),
+    [ binary "in" (mkBinOp In),
+      binary ">" (mkBinOp (Comp Gt)),
       binary "<=" (mkBinOp (Comp Le)),
       binary ">=" (mkBinOp (Comp Ge)),
       binary "<" (mkBinOp (Comp Lt))
@@ -352,8 +356,8 @@ postfixOperators =
     index = flip mkIndex <$> brackets exprP
     lookup = flip mkLookup <$> (symbol "." *> unquoted)
     slice = brackets $ do
-      start <- optional exprP <* symbol ":"
-      end <- optional exprP <* symbol ":"
+      start <- optional exprP <* colon
+      end <- optional exprP <* colon
       step <- optional exprP
       pure $ mkSlice start end step
 

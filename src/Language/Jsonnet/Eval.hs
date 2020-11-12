@@ -122,6 +122,7 @@ evalUnyOp Minus x = inj <$> fmap (negate @Double) (proj x)
 evalUnyOp Plus x = inj <$> fmap (id @Double) (proj x)
 
 evalBinOp :: BinOp -> Value -> Value -> Eval Value
+evalBinOp In s o = evalBin Std.objectHasAll o s
 evalBinOp (Arith Add) x@(VStr _) y = inj <$> append x y
 evalBinOp (Arith Add) x y@(VStr _) = inj <$> append x y
 evalBinOp (Arith op) x y = evalArith op x y

@@ -7,6 +7,7 @@ module Language.Jsonnet.Std
   ( std,
     toString,
     equals,
+    objectHasAll,
   )
 where
 
@@ -113,6 +114,9 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("reverse", inj (reverse @Value)),
           ("manifestYamlDoc", inj manifestYamlDoc),
           ("manifestJsonEx", inj manifestJsonEx),
+          ("objectHasEx", inj objectHasEx),
+          ("objectHas", inj objectHas),
+          ("objectHasAll", inj objectHasAll),
           ("slice", inj slice)
         ]
 
@@ -259,7 +263,7 @@ sliceS i n s t = go (fromMaybe 0 i) (fromMaybe len n) s t
     go i n (Just s) =
       T.pack . snd . unzip
         . filter (\(x, _) -> x `mod` s == 0)
-        . zip [0..]
+        . zip [0 ..]
         . T.unpack
         . T.drop i
         . T.take n
@@ -279,3 +283,13 @@ sliceV i n s v = go (fromMaybe 0 i) (fromMaybe len n) s v
         . V.drop i
         . V.take n
     len = V.length v
+
+objectHasEx :: HashMap Key Thunk -> Text -> Bool -> Bool
+objectHasEx o f True = H.member (Visible f) o || H.member (Hidden f) o
+objectHasEx o f False = H.member (Visible f) o
+
+objectHas :: HashMap Key Thunk -> Text -> Bool
+objectHas o f = objectHasEx o f False
+
+objectHasAll :: HashMap Key Thunk -> Text -> Bool
+objectHasAll o f = objectHasEx o f True

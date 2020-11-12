@@ -30,6 +30,7 @@ data BinOp
   | Comp CompOp
   | Bitwise BitwiseOp
   | Logical LogicalOp
+  | In
   deriving (Eq, Show, Generic)
 
 data UnyOp

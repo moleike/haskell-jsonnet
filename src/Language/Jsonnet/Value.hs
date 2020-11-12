@@ -133,6 +133,11 @@ instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
   proj = fmap V.toList . proj
   inj = inj . V.fromList
 
+instance {-# OVERLAPS #-} HasValue (HashMap Key Thunk) where
+  proj (VObj o) = pure o
+  proj v = throwTypeMismatch "object" v
+  inj = VObj
+
 instance HasValue a => HasValue (HashMap Key a) where
   proj (VObj o) = traverse proj' o
   proj v = throwTypeMismatch "object" v
@@ -163,10 +168,12 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
 
 throwTypeMismatch :: MonadError EvalError m => Text -> Value -> m a
 throwTypeMismatch expected =
-  throwError . TypeMismatch expected
+  throwError
+    . TypeMismatch expected
     . valueType
 
-inj' :: (HasValue a, HasValue b) =>
+inj' ::
+  (HasValue a, HasValue b) =>
   (a -> b) ->
   (Value -> Eval Value)
 inj' f v = inj . f <$> proj v
