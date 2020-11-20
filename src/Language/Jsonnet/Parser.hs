@@ -215,11 +215,13 @@ ifElseP = Fix <$> annotateLoc ifElseExpr
         (mkIfF cond expr)
         (keywordP "else" *> (mkIfElseF cond expr <$> exprP))
 
-paramsP :: Parser [String]
-paramsP = parens (identifier `sepBy` comma)
+paramsP :: Parser [Param Expr']
+paramsP = parens (param `sepBy` comma)
+  where
+    param = (,) <$> identifier <*> optional (symbol "=" *> exprP)
 
 function ::
-  Parser [String] ->
+  Parser [Param Expr'] ->
   Parser Expr' ->
   Parser Expr'
 function ps expr = Fix <$> annotateLoc (mkFunF <$> ps <*> expr)

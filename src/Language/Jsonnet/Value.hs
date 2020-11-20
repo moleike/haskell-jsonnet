@@ -50,7 +50,7 @@ data Value
   | VStr !Text
   | VArr !(Vector Thunk)
   | VObj !(HashMap Key Thunk)
-  | VClos !(Thunk -> Eval Value)
+  | VClos !(Maybe Thunk) !(Thunk -> Eval Value)
 
 data Key
   = Visible Text
@@ -145,22 +145,22 @@ instance HasValue a => HasValue (HashMap Key a) where
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
   proj v = throwTypeMismatch "impossible" v
-  inj f = VClos $ \x -> force x >>= fmap (inj . f) . proj
+  inj f = VClos Nothing $ \x -> force x >>= fmap (inj . f) . proj
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> c) where
   proj v = throwTypeMismatch "impossible" v
   inj f = inj $ \x -> inj (f x)
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
-  proj (VClos f) = pure $ \x -> do
+  proj (VClos _ f) = pure $ \x -> do
     r <- f (Thunk $ pure $ inj x)
     proj r
   proj v = throwTypeMismatch "function" v
-  inj f = VClos $ \v -> proj' v >>= fmap inj . f
+  inj f = VClos Nothing $ \v -> proj' v >>= fmap inj . f
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
-  proj (VClos f) = pure $ \x y -> do
-    VClos g <- f (Thunk $ pure $ inj x)
+  proj (VClos _ f) = pure $ \x y -> do
+    VClos _ g <- f (Thunk $ pure $ inj x)
     r <- g (Thunk $ pure $ inj y)
     proj r
   proj v = throwTypeMismatch "function" v
@@ -195,4 +195,4 @@ valueType =
     VStr _ -> "string"
     VArr _ -> "array"
     VObj _ -> "object"
-    VClos _ -> "function"
+    VClos _ _ -> "function"

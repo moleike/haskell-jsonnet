@@ -16,10 +16,12 @@ import Text.Show.Deriving
 
 type Name = String
 
+type Param a = (Name, Maybe a)
+
 data ExprF a
   = ELit Literal
   | EIdent Name
-  | EFun [Name] a
+  | EFun [Param a] a
   | EApply a [a]
   | ELocal
       { bnds :: NonEmpty (Name, a),
@@ -82,8 +84,8 @@ mkBoolF = InL . ELit . Bool
 mkIdentF :: Name -> ExprF' a
 mkIdentF = InL . EIdent
 
-mkFunF :: [Name] -> a -> ExprF' a
-mkFunF b = InL . EFun b
+mkFunF :: [Param a] -> a -> ExprF' a
+mkFunF a = InL . EFun a
 
 mkApplyF :: a -> [a] -> ExprF' a
 mkApplyF b = InL . EApply b

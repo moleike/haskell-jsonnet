@@ -18,8 +18,8 @@ data Core
   = CLoc SrcSpan Core
   | CLit Literal
   | CVar Var
-  | CLam (Bind Var Core)
-  | CApp Core Core
+  | CFun (Bind [(Var, Embed (Maybe Core))] Core)
+  | CApp Core [Core]
   | CLet (Bind (Rec [(Var, Embed Core)]) Core) -- letrec
   | CObj (Bind Var (Object Core))
   | CArr [Core]

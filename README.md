@@ -31,7 +31,7 @@ stack build
 - object-level locals and asserts
 - ~~outermost object reference `$`~~
 - keyword parameters 
-- default arguments
+- ~~default arguments~~
 - top-level arguments
 - external variables
 - object composition (merging objects and `super` keyword)

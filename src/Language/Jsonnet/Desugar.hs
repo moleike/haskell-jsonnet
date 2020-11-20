@@ -39,10 +39,8 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
     go outermost = \case
       ELit l -> CLit l
       EIdent i -> CVar (s2n i)
-      EFun [] e -> CLam (mkVar "()" e)
-      EFun ns e -> foldr (\n c -> CLam (mkVar n c)) e ns
-      EApply e [] -> CApp e (CLit Null) -- here null plays the role of unit type
-      EApply e es -> foldl CApp e es
+      EFun ps e -> CFun $ mkFun ps e
+      EApply e es -> CApp e es
       ELocal bnds e -> CLet $ mkLet bnds e
       EBinOp op e1 e2 -> CBinOp op e1 e2
       EUnyOp op e -> CUnyOp op e
@@ -83,12 +81,13 @@ mkVar = bind . s2n
 
 stdFunc :: Text -> [Core] -> Core
 stdFunc f =
-  foldl
-    CApp
+  CApp
     ( CLookup
         (CVar "std")
         (CLit $ String f)
     )
+
+mkFun = bind . fmap (\(n, e) -> (s2n n, Embed e))
 
 mkLet bnds e =
   bind

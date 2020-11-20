@@ -15,7 +15,9 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.State.Lazy
+import Data.Bifunctor (second)
 import Data.Bits
+import Data.Foldable
 import qualified Data.HashMap.Lazy as H
 import Data.Int
 import qualified Data.Map.Lazy as M
@@ -43,14 +45,12 @@ eval = \case
     env <- gets ctx
     v <- liftMaybe (VarNotFound $ T.pack $ show n) (M.lookup n env)
     force v
-  CLam bnd -> do
-    (n, e) <- unbind bnd
-    pure $ VClos $ \th -> do
-      modify $ updateCtx (n, th)
-      eval e
+  CFun e -> do
+    (bnds, e1) <- unbind e
+    evalFun bnds e1
   CApp e1 e2 -> do
     eval e1 >>= \case
-      VClos c -> mkThunk (eval e2) >>= c
+      v@(VClos _ _) -> evalApp v e2
       v -> throwTypeMismatch "function" v
   CLet bnd -> mdo
     (r, e1) <- unbind bnd
@@ -71,7 +71,7 @@ eval = \case
       evalObj e
     modify $ updateCtx (self, th)
     force th
-  CArr e -> VArr . V.fromList <$> traverse (mkThunk . eval) e
+  CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp op e1 e2 -> do
     e1' <- eval e1
     e2' <- eval e2
@@ -96,17 +96,37 @@ eval = \case
     )
       e
 
+thunk :: Core -> Eval Thunk
+thunk = mkThunk . eval
+
+evalApp :: Value -> [Core] -> Eval Value
+evalApp v as = foldlM f v as >>= g
+  where
+    f (VClos _ c) e = thunk e >>= c
+    f v _ = throwTypeMismatch "function" v
+    g = \case
+      VClos (Just th) h -> h th >>= g
+      v -> pure v
+
+evalFun :: [(Var, Embed (Maybe Core))] -> Core -> Eval Value
+evalFun [] e = flip VClos force . Just <$> thunk e
+evalFun bnds e = foldr f (eval e) bnds
+  where
+    f (n, Embed opt) e = do
+      opt' <- traverse thunk opt
+      pure $ VClos opt' $ \th -> do
+        modify $ updateCtx (n, th)
+        e
+
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =
   VObj . H.fromList . map mkKey . filter g <$> traverse f o
   where
-    mkKey (VStr k, v, hidden) =
-      if hidden
-        then (Hidden k, v)
-        else (Visible k, v)
+    mkKey (VStr k, v, True) = (Hidden k, v)
+    mkKey (VStr k, v, False) = (Visible k, v)
     f KeyValue {..} = do
       a <- eval key
-      b <- mkThunk (eval value)
+      b <- thunk value
       case a of
         VStr _ -> pure (a, b, hidden)
         VNull -> pure (a, b, hidden)
@@ -144,19 +164,19 @@ evalComp Lt n1 n2 = evalBin ((<) @Double) n1 n2
 evalComp Gt n1 n2 = evalBin ((>) @Double) n1 n2
 evalComp Le n1 n2 = evalBin ((<=) @Double) n1 n2
 evalComp Ge n1 n2 = evalBin ((>=) @Double) n1 n2
-evalComp Eq n1 n2 = VBool <$> n1 `Std.equals` n2
-evalComp Ne n1 n2 = VBool . not <$> n1 `Std.equals` n2
+evalComp Eq n1 n2 = VBool <$> Std.equals n1 n2
+evalComp Ne n1 n2 = VBool . not <$> Std.equals n1 n2
 
 evalLogical :: LogicalOp -> Value -> Value -> Eval Value
-evalLogical LAnd n1 n2 = evalBin (&&) n1 n2
-evalLogical LOr n1 n2 = evalBin (||) n1 n2
+evalLogical LAnd = evalBin (&&)
+evalLogical LOr = evalBin (||)
 
 evalBitwise :: BitwiseOp -> Value -> Value -> Eval Value
-evalBitwise And n1 n2 = evalBin ((.&.) @Int64) n1 n2
-evalBitwise Or n1 n2 = evalBin ((.|.) @Int64) n1 n2
-evalBitwise Xor n1 n2 = evalBin (xor @Int64) n1 n2
-evalBitwise ShiftL n1 n2 = evalBin (shiftL @Int64) n1 n2
-evalBitwise ShiftR n1 n2 = evalBin (shiftR @Int64) n1 n2
+evalBitwise And = evalBin ((.&.) @Int64)
+evalBitwise Or = evalBin ((.|.) @Int64)
+evalBitwise Xor = evalBin (xor @Int64)
+evalBitwise ShiftL = evalBin (shiftL @Int64)
+evalBitwise ShiftR = evalBin (shiftR @Int64)
 
 evalLookup :: Value -> Value -> Eval Value
 evalLookup (VArr a) (VNum i) =
