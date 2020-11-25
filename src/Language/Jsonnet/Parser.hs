@@ -354,7 +354,7 @@ postfixOperators =
           <|> lookup
       )
   where
-    apply = flip mkApply <$> parens (exprP `sepBy` comma)
+    apply = flip mkApply <$> argsP
     index = flip mkIndex <$> brackets exprP
     lookup = flip mkLookup <$> (symbol "." *> unquoted)
     slice = brackets $ do
@@ -362,6 +362,13 @@ postfixOperators =
       end <- optional exprP <* colon
       step <- optional exprP
       pure $ mkSlice start end step
+
+argsP :: Parser (Args Expr')
+argsP = try (parens named) <|> parens posal
+  where
+    posal = Positional <$> (exprP `sepBy` comma)
+    named = Named <$> (args `sepBy` comma)
+    args = (,) <$> identifier <*> (symbol "=" *> exprP)
 
 primP :: Parser Expr'
 primP =

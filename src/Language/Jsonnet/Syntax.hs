@@ -22,7 +22,7 @@ data ExprF a
   = ELit Literal
   | EIdent Name
   | EFun [Param a] a
-  | EApply a [a]
+  | EApply a (Args a)
   | ELocal
       { bnds :: NonEmpty (Name, a),
         expr :: a
@@ -87,8 +87,8 @@ mkIdentF = InL . EIdent
 mkFunF :: [Param a] -> a -> ExprF' a
 mkFunF a = InL . EFun a
 
-mkApplyF :: a -> [a] -> ExprF' a
-mkApplyF b = InL . EApply b
+mkApplyF :: a -> Args a -> ExprF' a
+mkApplyF a = InL . EApply a
 
 mkIfF :: a -> a -> ExprF' a
 mkIfF c = InL . EIf c

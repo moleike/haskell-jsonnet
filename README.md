@@ -30,7 +30,7 @@ stack build
 - ~~verbatim strings~~
 - object-level locals and asserts
 - ~~outermost object reference `$`~~
-- keyword parameters 
+- ~~keyword parameters~~
 - ~~default arguments~~
 - top-level arguments
 - external variables

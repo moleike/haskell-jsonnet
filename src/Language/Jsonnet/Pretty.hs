@@ -123,6 +123,12 @@ instance Pretty EvalError where
       RuntimeError e ->
         text "Runtime error:"
           <+> text (T.unpack e)
+      ParamNotBound s ->
+        text "Parameter not bound:"
+          <+> text (T.unpack s)
+      BadParam s ->
+        text "Function has no parameter"
+          <+> text (T.unpack s)
 
 instance Pretty Error where
   pretty =

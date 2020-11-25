@@ -68,18 +68,20 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
       ESlice {..} ->
         stdFunc
           "slice"
-          [ maybeNull start,
-            maybeNull end,
-            maybeNull step,
-            expr
-          ]
+          ( Positional
+              [ maybeNull start,
+                maybeNull end,
+                maybeNull step,
+                expr
+              ]
+          )
         where
           maybeNull = fromMaybe (CLit Null)
 
 mkVar :: Alpha a => String -> a -> Bind Var a
 mkVar = bind . s2n
 
-stdFunc :: Text -> [Core] -> Core
+stdFunc :: Text -> Args Core -> Core
 stdFunc f =
   CApp
     ( CLookup
@@ -87,7 +89,7 @@ stdFunc f =
         (CLit $ String f)
     )
 
-mkFun = bind . fmap (\(n, e) -> (s2n n, Embed e))
+mkFun = bind . rec . fmap (\(n, e) -> (s2n n, Embed e))
 
 mkLet bnds e =
   bind

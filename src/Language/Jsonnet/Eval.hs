@@ -18,9 +18,12 @@ import Control.Monad.State.Lazy
 import Data.Bifunctor (second)
 import Data.Bits
 import Data.Foldable
+import Data.Function (on)
 import qualified Data.HashMap.Lazy as H
 import Data.Int
+import Data.List
 import qualified Data.Map.Lazy as M
+import Data.Maybe (catMaybes, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Vector ((!?))
@@ -35,6 +38,10 @@ import qualified Language.Jsonnet.Std as Std
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
 
+-- an evaluator for the core calculus, based on a
+-- big-step, call-by-need operational semantics, matching
+-- jsonnet specificaton
+
 eval :: Core -> Eval Value
 eval = \case
   CLoc sp e -> do
@@ -43,33 +50,30 @@ eval = \case
   CLit l -> evalLiteral l
   CVar n -> do
     env <- gets ctx
-    v <- liftMaybe (VarNotFound $ T.pack $ show n) (M.lookup n env)
+    v <- liftMaybe (VarNotFound $ T.pack $ name2String n) (M.lookup n env)
     force v
   CFun e -> do
     (bnds, e1) <- unbind e
-    evalFun bnds e1
-  CApp e1 e2 -> do
-    eval e1 >>= \case
-      v@(VClos _ _) -> evalApp v e2
-      v -> throwTypeMismatch "function" v
+    evalFun (second unembed <$> unrec bnds) e1
+  CApp e1 e2 -> eval e1 >>= \v -> evalApp v e2
   CLet bnd -> mdo
     (r, e1) <- unbind bnd
     bnds <-
       mapM
         ( \(v, Embed e) -> do
-            modify $ flip (foldr updateCtx) bnds
+            updateEnv bnds
             pure (v, Thunk $ eval e)
         )
         (unrec r)
-    modify $ flip (foldr updateCtx) bnds
+    updateEnv bnds
     eval e1
   CObj bnd -> mdo
     (self, e) <- unbind bnd
     -- tying the knot
     th <- mkThunk $ do
-      modify $ updateCtx (self, th)
+      updateEnv [(self, th)]
       evalObj e
-    modify $ updateCtx (self, th)
+    updateEnv [(self, th)]
     force th
   CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp op e1 e2 -> do
@@ -99,24 +103,57 @@ eval = \case
 thunk :: Core -> Eval Thunk
 thunk = mkThunk . eval
 
-evalApp :: Value -> [Core] -> Eval Value
-evalApp v as = foldlM f v as >>= g
+evalApp :: Value -> Args Core -> Eval Value
+evalApp (VFun f) as = traverse thunk as >>= f
+evalApp v@(VClos _) (Positional ps) = foldlM f v ps
   where
-    f (VClos _ c) e = thunk e >>= c
+    f (VClos c) e = thunk e >>= c
     f v _ = throwTypeMismatch "function" v
-    g = \case
-      VClos (Just th) h -> h th >>= g
-      v -> pure v
+evalApp v _ = throwTypeMismatch "function" v
 
-evalFun :: [(Var, Embed (Maybe Core))] -> Core -> Eval Value
-evalFun [] e = flip VClos force . Just <$> thunk e
-evalFun bnds e = foldr f (eval e) bnds
+buildParams as bnds = traverse f as
   where
-    f (n, Embed opt) e = do
-      opt' <- traverse thunk opt
-      pure $ VClos opt' $ \th -> do
-        modify $ updateCtx (n, th)
-        e
+    ns = fst $ unzip bnds
+    f (a, b) = case g a of
+      Nothing -> throwError $ BadParam $ T.pack a
+      Just n -> pure (n, b)
+    g a = find ((a ==) . name2String) ns
+
+appDefaults rs e = do
+  case findIndex isNothing ds of
+    Just x -> throwError $ ParamNotBound (T.pack $ name2String $ ns !! x)
+    Nothing -> mdo
+      bnds <-
+        mapM
+          ( \(v, e) -> do
+              updateEnv bnds
+              pure (v, Thunk $ eval e)
+          )
+          (zip ns $ catMaybes ds)
+      updateEnv bnds
+      eval e
+  where
+    (ns, ds) = unzip rs
+
+evalFun :: [(Var, Maybe Core)] -> Core -> Eval Value
+evalFun bnds e = pure $ VFun $ \case
+  Positional ps -> do
+    case compare (length ns) (length ps) of
+      LT -> throwError $ TooManyArgs (length ps)
+      EQ -> do
+        updateEnv (zip ns ps)
+        eval e
+      GT -> do
+        updateEnv (zip ns ps)
+        appDefaults rs e
+    where
+      rs = drop (length ps) bnds
+      (ns, _) = unzip bnds
+  Named ps -> do
+    (ns, vs) <- unzip <$> buildParams ps bnds
+    let rs = filter ((`notElem` ns) . fst) bnds
+    updateEnv (zip ns vs)
+    appDefaults rs e
 
 evalObj :: Object Core -> Eval Value
 evalObj (Object o) =
@@ -221,5 +258,7 @@ throwInvalidKey = throwError . InvalidKey . valueType
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}
 
-updateCtx :: (Var, Thunk) -> EvalState -> EvalState
-updateCtx (var, th) st@EvalState {..} = st {ctx = M.insert var th ctx}
+updateEnv :: MonadState EvalState m => [(Var, Thunk)] -> m ()
+updateEnv = modify . flip (foldr f)
+  where
+    f (var, th) st@EvalState {..} = st {ctx = M.insert var th ctx}

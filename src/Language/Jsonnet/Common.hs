@@ -16,7 +16,11 @@ import GHC.Generics (Generic, Generic1)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
-data Literal = Null | Bool Bool | String Text | Number Scientific
+data Literal
+  = Null
+  | Bool Bool
+  | String Text
+  | Number Scientific
   deriving (Show, Eq, Ord, Generic)
 
 makeClosedAlpha ''Literal
@@ -114,4 +118,28 @@ instance Read1 Object where
   liftReadsPrec = liftReadsPrecDefault
 
 instance Show1 Object where
+  liftShowsPrec = liftShowsPrecDefault
+
+data Args a = Positional [a] | Named [(String, a)]
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Generic,
+      Generic1,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (Args a)
+
+instance Eq1 Args where
+  liftEq = liftEqDefault
+
+instance Read1 Args where
+  liftReadsPrec = liftReadsPrecDefault
+
+instance Show1 Args where
   liftShowsPrec = liftShowsPrecDefault

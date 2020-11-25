@@ -18,8 +18,8 @@ data Core
   = CLoc SrcSpan Core
   | CLit Literal
   | CVar Var
-  | CFun (Bind [(Var, Embed (Maybe Core))] Core)
-  | CApp Core [Core]
+  | CFun (Bind (Rec [(Var, Embed (Maybe Core))]) Core)
+  | CApp Core (Args Core)
   | CLet (Bind (Rec [(Var, Embed Core)]) Core) -- letrec
   | CObj (Bind Var (Object Core))
   | CArr [Core]
@@ -31,6 +31,12 @@ data Core
   deriving (Show, Typeable, Generic)
 
 instance Alpha Core
+
+--data Params
+--  = EmptyPs
+--  | ConsPs (Rebind (Var, Embed (Maybe Core)) Params)
+--  deriving (Show, Typeable, Generic)
+--instance Alpha Params
 
 instance IsString Var where
   fromString = string2Name

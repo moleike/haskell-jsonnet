@@ -19,6 +19,9 @@ data EvalError
   | VarNotFound Text
   | ManifestError ManifestError
   | AssertionFailed Doc
+  | TooManyArgs Int
+  | ParamNotBound Text
+  | BadParam Text
   | StdError Doc
   | RuntimeError Text
   deriving (Show)

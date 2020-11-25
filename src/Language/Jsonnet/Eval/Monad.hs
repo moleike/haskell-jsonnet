@@ -35,8 +35,10 @@ newtype Eval a = Eval
       Fresh
     )
 
+type Env = Map Var Thunk
+
 data EvalState = EvalState
-  { ctx :: Map Var Thunk,
+  { ctx :: Env,
     curSpan :: Maybe SrcSpan
   }
 
