@@ -90,7 +90,6 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("asciiLower", inj T.toLower),
           ("asciiUpper", inj T.toUpper),
           ("stringChars", inj (T.chunksOf 1)),
-          ("format", inj (printf @String)),
           ("parseInt", inj (read . T.unpack :: Text -> Int)),
           ("parseOctal", inj parseOctal),
           ("parseHex", inj parseHex),
@@ -122,7 +121,7 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
-toString v = (T.pack . show . pretty) <$> manifest v
+toString v = T.pack . show . pretty <$> manifest v
 
 equals :: Value -> Value -> Eval Bool
 equals a b = (==) <$> manifest a <*> manifest b
