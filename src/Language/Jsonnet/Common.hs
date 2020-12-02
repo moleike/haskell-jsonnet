@@ -68,7 +68,7 @@ instance Alpha LogicalOp
 
 instance Alpha UnyOp
 
-data KeyValue a = KeyValue
+data Field a = Field
   { key :: a,
     value :: a,
     hidden :: Bool
@@ -85,39 +85,15 @@ data KeyValue a = KeyValue
       Traversable
     )
 
-instance Alpha a => Alpha (KeyValue a)
+instance Alpha a => Alpha (Field a)
 
-instance Eq1 KeyValue where
+instance Eq1 Field where
   liftEq = liftEqDefault
 
-instance Read1 KeyValue where
+instance Read1 Field where
   liftReadsPrec = liftReadsPrecDefault
 
-instance Show1 KeyValue where
-  liftShowsPrec = liftShowsPrecDefault
-
-newtype Object a = Object [KeyValue a]
-  deriving
-    ( Eq,
-      Read,
-      Show,
-      Typeable,
-      Generic,
-      Generic1,
-      Functor,
-      Foldable,
-      Traversable
-    )
-
-instance Alpha a => Alpha (Object a)
-
-instance Eq1 Object where
-  liftEq = liftEqDefault
-
-instance Read1 Object where
-  liftReadsPrec = liftReadsPrecDefault
-
-instance Show1 Object where
+instance Show1 Field where
   liftShowsPrec = liftShowsPrecDefault
 
 data Args a = Positional [a] | Named [(String, a)]
@@ -142,4 +118,32 @@ instance Read1 Args where
   liftReadsPrec = liftReadsPrecDefault
 
 instance Show1 Args where
+  liftShowsPrec = liftShowsPrecDefault
+
+data Assert a = Assert
+  { cond :: a,
+    msg :: Maybe a,
+    expr :: a
+  }
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Generic,
+      Generic1,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (Assert a)
+
+instance Eq1 Assert where
+  liftEq = liftEqDefault
+
+instance Read1 Assert where
+  liftReadsPrec = liftReadsPrecDefault
+
+instance Show1 Assert where
   liftShowsPrec = liftShowsPrecDefault

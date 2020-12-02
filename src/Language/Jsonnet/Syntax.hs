@@ -27,16 +27,16 @@ data ExprF a
       { bnds :: NonEmpty (Name, a),
         expr :: a
       }
-  | EObj (Object a)
+  | EObj
+     { locals :: [(Name, a)],
+       fields :: [Field a]
+       --asserts :: [Assert a]
+     }
   | EArr [a]
   | EErr a
   | ELookup a a
   | EIndex a a
-  | EAssert
-      { cond :: a,
-        msg :: Maybe a,
-        expr :: a
-      }
+  | EAssert (Assert a)
   | EIf a a
   | EIfElse a a a
   | ESlice
@@ -108,8 +108,8 @@ mkIndexF e = InL . EIndex e
 mkSliceF :: a -> Maybe a -> Maybe a -> Maybe a -> ExprF' a
 mkSliceF e f g = InL . ESlice e f g
 
-mkObjectF :: [KeyValue a] -> ExprF' a
-mkObjectF = InL . EObj . Object
+mkObjectF :: [Field a] -> [(Name, a)] -> ExprF' a
+mkObjectF fs ls = InL $ EObj ls fs
 
 mkArrayF :: [a] -> ExprF' a
 mkArrayF = InL . EArr
@@ -118,4 +118,4 @@ mkErrorF :: a -> ExprF' a
 mkErrorF = InL . EErr
 
 mkAssertF :: a -> Maybe a -> a -> ExprF' a
-mkAssertF e m = InL . EAssert e m
+mkAssertF e m = InL . EAssert . Assert e m

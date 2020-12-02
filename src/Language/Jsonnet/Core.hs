@@ -21,7 +21,7 @@ data Core
   | CFun (Bind (Rec [(Var, Embed (Maybe Core))]) Core)
   | CApp Core (Args Core)
   | CLet (Bind (Rec [(Var, Embed Core)]) Core) -- letrec
-  | CObj (Bind Var (Object Core))
+  | CObj [Field Core]
   | CArr [Core]
   | CBinOp BinOp Core Core
   | CUnyOp UnyOp Core

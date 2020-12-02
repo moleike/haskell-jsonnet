@@ -19,4 +19,10 @@ std.assertEqual({ x: 1, a: "x" in self, b: "y" in self }, { x: 1, a: true, b: fa
 std.assertEqual({ x:: 1, a: "x" in self, b: "y" in self }, { a: true, b: false }) &&
 std.assertEqual({ f: "f" in self }, { f: true }) &&
 
+// Object Local
+std.assertEqual({ local foo = 3, local bar(n) = foo + n, x: foo, y: foo + bar(1) }, { x: 3, y: 7 }) &&
+//std.assertEqual({ local foo = bar(3)[1], local bar(n) = [foo, n], x: foo, y: [foo] + bar(3) }, { x: 3, y: [3, 3, 3] }) &&
+
+std.assertEqual({ local foo(x) = self.y + x, x: foo(5), y:: 5 }, { x: 10 }) &&
+
 true

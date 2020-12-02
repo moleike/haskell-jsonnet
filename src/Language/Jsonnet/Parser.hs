@@ -11,6 +11,7 @@ import qualified Control.Monad.Combinators.NonEmpty as NE
 import Control.Monad.Except
 import Data.Char
 import Data.Fix
+import Data.Either
 import Data.Functor
 import Data.Functor.Sum
 import Data.Maybe (fromMaybe)
@@ -229,6 +230,19 @@ function ps expr = Fix <$> annotateLoc (mkFunF <$> ps <*> expr)
 functionP :: Parser Expr'
 functionP = keywordP "function" *> function paramsP exprP
 
+binding = do
+  name <- identifier
+  _ <- symbol "="
+  expr <- exprP
+  pure (name, expr)
+
+localFunc = do
+  name <- identifier
+  ps <- paramsP
+  _ <- symbol "="
+  expr <- function (pure ps) exprP
+  pure (name, expr)
+
 localP :: Parser Expr'
 localP = Fix <$> annotateLoc localExpr
   where
@@ -238,17 +252,6 @@ localP = Fix <$> annotateLoc localExpr
       _ <- symbol ";"
       expr <- exprP
       pure $ mkLocalF bnds expr
-    binding = do
-      name <- identifier
-      _ <- symbol "="
-      expr <- exprP
-      pure (name, expr)
-    localFunc = do
-      name <- identifier
-      ps <- paramsP
-      _ <- symbol "="
-      expr <- function (pure ps) exprP
-      pure (name, expr)
 
 arrayP :: Parser Expr'
 arrayP = Fix <$> annotateLoc array
@@ -259,20 +262,27 @@ arrayP = Fix <$> annotateLoc array
 objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc object
   where
-    object = mkObjectF <$> braces ((try methodP <|> pairP) `sepEndBy` comma)
+    object = do
+      xs <- braces (eitherP localP fieldP `sepEndBy` comma)
+      let (ls, fs) = (lefts xs, rights xs)
+      pure $ mkObjectF fs ls
+    fieldP = try methodP <|> pairP
     pairP = do
       k <- keyP
       h <- sepP
       v <- exprP
-      pure $ KeyValue k v h
+      pure $ Field k v h
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
       ps <- paramsP
       h <- sepP
       v <- function (pure ps) exprP
-      pure $ KeyValue k v h
+      pure $ Field k v h
     sepP = try (symbol "::" $> True) <|> (colon $> False)
+    localP = do
+      _ <- keywordP "local"
+      try binding <|> localFunc
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl

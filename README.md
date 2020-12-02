@@ -28,7 +28,8 @@ stack build
 - Python-style string formatting
 - text blocks 
 - ~~verbatim strings~~
-- object-level locals and asserts
+- ~~object-level locals~~
+- object-level asserts
 - ~~outermost object reference `$`~~
 - ~~keyword parameters~~
 - ~~default arguments~~

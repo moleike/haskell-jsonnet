@@ -29,8 +29,8 @@ desugar =
 zipWithOutermost :: Ann ExprF a -> Ann ExprF (a, Bool)
 zipWithOutermost = annZip . inherit go False
   where
-    go (Fix (AnnF (EObj _) _)) False = (True, True)
-    go (Fix (AnnF (EObj _) _)) True = (False, True)
+    go (Fix (AnnF (EObj {}) _)) False = (True, True)
+    go (Fix (AnnF (EObj {}) _)) True = (False, True)
     go _ x = (False, x)
 
 alg :: AnnF ExprF (SrcSpan, Bool) Core -> Core
@@ -47,16 +47,18 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
       EIfElse c t e -> CIfElse c t e
       EIf c t -> CIfElse c t (CLit Null)
       EArr e -> CArr e
-      EObj e ->
-        if outermost
-          then CLet $ mkLet (("$", self) :| []) (CVar (s2n "$"))
-          else self
+      EObj {..} ->
+        CLet $ mkLet (("self", CObj fields) :| bnds) self
         where
-          self = CObj (mkVar "self" e)
+          bnds =
+            if outermost
+              then (("$", self) : locals)
+              else locals
+          self = CVar (s2n "self")
       ELookup e1 e2 -> CLookup e1 e2
       EIndex e1 e2 -> CLookup e1 e2
       EErr e -> CErr e
-      EAssert c m e ->
+      EAssert (Assert c m e) ->
         CIfElse
           c
           e

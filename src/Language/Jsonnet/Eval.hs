@@ -67,14 +67,7 @@ eval = \case
         (unrec r)
     updateEnv bnds
     eval e1
-  CObj bnd -> mdo
-    (self, e) <- unbind bnd
-    -- tying the knot
-    th <- mkThunk $ do
-      updateEnv [(self, th)]
-      evalObj e
-    updateEnv [(self, th)]
-    force th
+  CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp op e1 e2 -> do
     e1' <- eval e1
@@ -155,13 +148,13 @@ evalFun bnds e = pure $ VFun $ \case
     updateEnv (zip ns vs)
     appDefaults rs e
 
-evalObj :: Object Core -> Eval Value
-evalObj (Object o) =
-  VObj . H.fromList . map mkKey . filter g <$> traverse f o
+evalObj :: [Field Core] -> Eval Value
+evalObj xs =
+  VObj . H.fromList . map mkKey . filter g <$> traverse f xs
   where
     mkKey (VStr k, v, True) = (Hidden k, v)
     mkKey (VStr k, v, False) = (Visible k, v)
-    f KeyValue {..} = do
+    f Field {..} = do
       a <- eval key
       b <- thunk value
       case a of
