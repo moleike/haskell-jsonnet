@@ -150,10 +150,8 @@ evalFun bnds e = pure $ VFun $ \case
 
 evalObj :: [Field Core] -> Eval Value
 evalObj xs =
-  VObj . H.fromList . map mkKey . filter g <$> traverse f xs
+  VObj . H.fromList . g <$> traverse f xs
   where
-    mkKey (VStr k, v, True) = (Hidden k, v)
-    mkKey (VStr k, v, False) = (Visible k, v)
     f Field {..} = do
       a <- eval key
       b <- thunk value
@@ -161,9 +159,11 @@ evalObj xs =
         VStr _ -> pure (a, b, hidden)
         VNull -> pure (a, b, hidden)
         v -> throwInvalidKey v
-    g (k, _, _) = case k of
-      VNull -> False
-      _ -> True
+    g x = do
+      (VStr k, v, h) <- x
+      case h of
+        True -> pure (Hidden k, v)
+        False -> pure (Visible k, v)
 
 evalUnyOp :: UnyOp -> Value -> Eval Value
 evalUnyOp Compl x = inj <$> fmap (complement @Int64) (proj x)
