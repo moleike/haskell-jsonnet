@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.Jsonnet.Syntax where
@@ -14,24 +15,24 @@ import GHC.Generics
 import Language.Jsonnet.Common
 import Text.Show.Deriving
 
-type Name = String
+type Ident = String
 
-type Param a = (Name, Maybe a)
+type Param a = (Ident, Maybe a)
 
 data ExprF a
   = ELit Literal
-  | EIdent Name
+  | EIdent Ident
   | EFun [Param a] a
   | EApply a (Args a)
   | ELocal
-      { bnds :: NonEmpty (Name, a),
+      { bnds :: NonEmpty (Ident, a),
         expr :: a
       }
   | EObj
-     { locals :: [(Name, a)],
-       fields :: [Field a]
-       --asserts :: [Assert a]
-     }
+      { locals :: [(Ident, a)],
+        fields :: [Field a]
+        --asserts :: [Assert a]
+      }
   | EArr [a]
   | EErr a
   | ELookup a a
@@ -47,6 +48,15 @@ data ExprF a
       }
   | EBinOp BinOp a a
   | EUnyOp UnyOp a
+  | EArrComp
+      { expr :: a,
+        comp :: NonEmpty (CompSpec a)
+      }
+  | EObjComp
+      { field :: Field a,
+        locals :: [(Ident, a)],
+        comp :: NonEmpty (CompSpec a)
+      }
   deriving
     ( Show,
       Functor,
@@ -81,7 +91,7 @@ mkStrF = InL . ELit . String . T.pack
 mkBoolF :: Bool -> ExprF' a
 mkBoolF = InL . ELit . Bool
 
-mkIdentF :: Name -> ExprF' a
+mkIdentF :: Ident -> ExprF' a
 mkIdentF = InL . EIdent
 
 mkFunF :: [Param a] -> a -> ExprF' a
@@ -96,7 +106,7 @@ mkIfF c = InL . EIf c
 mkIfElseF :: a -> a -> a -> ExprF' a
 mkIfElseF c a = InL . EIfElse c a
 
-mkLocalF :: NonEmpty (Name, a) -> a -> ExprF' a
+mkLocalF :: NonEmpty (Ident, a) -> a -> ExprF' a
 mkLocalF n = InL . ELocal n
 
 mkLookupF :: a -> a -> ExprF' a
@@ -108,7 +118,7 @@ mkIndexF e = InL . EIndex e
 mkSliceF :: a -> Maybe a -> Maybe a -> Maybe a -> ExprF' a
 mkSliceF e f g = InL . ESlice e f g
 
-mkObjectF :: [Field a] -> [(Name, a)] -> ExprF' a
+mkObjectF :: [Field a] -> [(Ident, a)] -> ExprF' a
 mkObjectF fs ls = InL $ EObj ls fs
 
 mkArrayF :: [a] -> ExprF' a
@@ -119,3 +129,9 @@ mkErrorF = InL . EErr
 
 mkAssertF :: a -> Maybe a -> a -> ExprF' a
 mkAssertF e m = InL . EAssert . Assert e m
+
+mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
+mkArrCompF e = InL . EArrComp e
+
+mkObjCompF :: Field a -> [(Ident, a)] -> NonEmpty (CompSpec a) -> ExprF' a
+mkObjCompF f ls = InL . EObjComp f ls

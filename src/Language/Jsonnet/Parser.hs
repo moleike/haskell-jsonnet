@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Language.Jsonnet.Parser where
 
@@ -10,8 +11,8 @@ import Control.Monad.Combinators.Expr
 import qualified Control.Monad.Combinators.NonEmpty as NE
 import Control.Monad.Except
 import Data.Char
-import Data.Fix
 import Data.Either
+import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
 import Data.Maybe (fromMaybe)
@@ -230,6 +231,15 @@ function ps expr = Fix <$> annotateLoc (mkFunF <$> ps <*> expr)
 functionP :: Parser Expr'
 functionP = keywordP "function" *> function paramsP exprP
 
+forspecP :: Parser (CompSpec Expr')
+forspecP = do
+  _ <- keywordP "for"
+  var <- identifier
+  _ <- keywordP "in"
+  forspec <- exprP
+  ifspec <- optional (keywordP "if" *> exprP)
+  pure CompSpec {..}
+
 binding = do
   name <- identifier
   _ <- symbol "="
@@ -243,27 +253,34 @@ localFunc = do
   expr <- function (pure ps) exprP
   pure (name, expr)
 
+localBndsP = do
+  _ <- keywordP "local"
+  (try binding <|> localFunc) `NE.sepBy1` comma
+
 localP :: Parser Expr'
 localP = Fix <$> annotateLoc localExpr
   where
     localExpr = do
-      _ <- keywordP "local"
-      bnds <- (try binding <|> localFunc) `NE.sepBy1` comma
+      bnds <- localBndsP
       _ <- symbol ";"
       expr <- exprP
       pure $ mkLocalF bnds expr
 
 arrayP :: Parser Expr'
-arrayP = Fix <$> annotateLoc array
+arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
   where
-    array = mkArrayF <$> brackets (exprP `sepEndBy` comma)
+    array = mkArrayF <$> (exprP `sepEndBy` comma)
+    arrayComp = do
+      expr <- exprP
+      comps <- NE.some forspecP
+      return $ mkArrCompF expr comps
 
 --a[start:stop:step]
 objectP :: Parser Expr'
-objectP = Fix <$> annotateLoc object
+objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
   where
     object = do
-      xs <- braces (eitherP localP fieldP `sepEndBy` comma)
+      xs <- eitherP localP fieldP `sepEndBy` comma
       let (ls, fs) = (lefts xs, rights xs)
       pure $ mkObjectF fs ls
     fieldP = try methodP <|> pairP
@@ -283,6 +300,10 @@ objectP = Fix <$> annotateLoc object
     localP = do
       _ <- keywordP "local"
       try binding <|> localFunc
+    objectComp = do
+      expr <- pairP
+      comps <- NE.some forspecP
+      return $ mkObjCompF expr [] comps
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl
@@ -296,7 +317,7 @@ binary ::
 binary name f = InfixL (f <$ (operator name))
   where
     operator sym = try $ symbol sym <* notFollowedBy opChar
-    opChar = oneOf ("!$:~+-&|^=<>*/%" :: [Char]) <?> "operator"
+    opChar = oneOf ("!:~+-&|^=<>*/%" :: [Char]) <?> "operator"
 
 prefix ::
   Text ->

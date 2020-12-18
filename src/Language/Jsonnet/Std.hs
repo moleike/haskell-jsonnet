@@ -8,6 +8,7 @@ module Language.Jsonnet.Std
     toString,
     equals,
     objectHasAll,
+    flattenArrays,
   )
 where
 
@@ -116,7 +117,8 @@ std = VObj $ (Thunk . pure) <$> H.fromList xs
           ("objectHasEx", inj objectHasEx),
           ("objectHas", inj objectHas),
           ("objectHasAll", inj objectHasAll),
-          ("slice", inj slice)
+          ("slice", inj slice),
+          ("flattenArrays", inj flattenArrays)
         ]
 
 toString :: Value -> Eval Text
@@ -292,3 +294,6 @@ objectHas o f = objectHasEx o f False
 
 objectHasAll :: HashMap Key Thunk -> Text -> Bool
 objectHasAll o f = objectHasEx o f True
+
+flattenArrays :: Vector (Vector Thunk) -> Vector Thunk
+flattenArrays = join

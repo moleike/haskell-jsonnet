@@ -10,6 +10,7 @@ module Language.Jsonnet.Common where
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
+import Data.String
 import Data.Text (Text)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
@@ -146,4 +147,32 @@ instance Read1 Assert where
   liftReadsPrec = liftReadsPrecDefault
 
 instance Show1 Assert where
+  liftShowsPrec = liftShowsPrecDefault
+
+data CompSpec a = CompSpec
+  { var :: String,
+    forspec :: a,
+    ifspec :: Maybe a
+  }
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Generic,
+      Generic1,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (CompSpec a)
+
+instance Eq1 CompSpec where
+  liftEq = liftEqDefault
+
+instance Read1 CompSpec where
+  liftReadsPrec = liftReadsPrecDefault
+
+instance Show1 CompSpec where
   liftShowsPrec = liftShowsPrecDefault

@@ -101,4 +101,6 @@ std.assertEqual(std.range(2, 6), [2, 3, 4, 5, 6]) &&
 std.assertEqual(std.range(2, 2), [2]) &&
 std.assertEqual(std.range(2, 1), []) &&
 
+std.assertEqual(std.flattenArrays([[1, 2], [3, 4], [[5, 6], [7, 8]]]), [ 1, 2, 3, 4, [5, 6], [7, 8]]) &&
+
 true

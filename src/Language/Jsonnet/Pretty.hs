@@ -29,6 +29,16 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
 
+ppNumber s
+  | e < 0 || e > 1024 =
+    text
+      $ LT.unpack
+      $ toLazyText
+      $ scientificBuilder s
+  | otherwise = integer (coefficient s * 10 ^ e)
+  where
+    e = base10Exponent s
+
 ppJson :: Int -> JSON.Value -> Doc
 ppJson i =
   \case
@@ -50,15 +60,6 @@ ppJson i =
     ppArray a = encloseSep lbracket rbracket comma xs
       where
         xs = map (ppJson i) (V.toList a)
-    ppNumber s
-      | e < 0 || e > 1024 =
-        text
-          $ LT.unpack
-          $ toLazyText
-          $ scientificBuilder s
-      | otherwise = integer (coefficient s * 10 ^ e)
-      where
-        e = base10Exponent s
     ppString = text . LT.unpack . JSON.encodeToLazyText
 
 instance Pretty JSON.Value where
@@ -101,12 +102,15 @@ instance Pretty EvalError where
       InvalidKey k ->
         text "Invalid key:"
           <+> text (T.unpack k)
+      InvalidIndex k ->
+        text "Invalid index:"
+          <+> text (T.unpack k)
       NoSuchKey k ->
         text "No such key:"
           <+> text (T.unpack k)
       IndexOutOfBounds i ->
         text "Index out of bounds:"
-          <+> int i
+          <+> ppNumber i
       DivByZero ->
         text "Divide by zero exception"
       VarNotFound v ->

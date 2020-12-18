@@ -1,11 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 
 module Language.Jsonnet.Eval.Monad where
 
+import Control.Applicative
 import Control.Arrow
+import Control.Monad (MonadPlus (mzero), join, msum)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.State.Lazy
@@ -35,7 +38,7 @@ newtype Eval a = Eval
       Fresh
     )
 
-type Env = Map Var Thunk
+type Env = Map (Name Core) Thunk
 
 data EvalState = EvalState
   { ctx :: Env,

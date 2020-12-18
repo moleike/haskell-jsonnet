@@ -5,6 +5,7 @@
 
 module Language.Jsonnet.Error where
 
+import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Language.Jsonnet.Parser (ParseError)
 import Language.Jsonnet.Parser.SrcSpan
@@ -13,8 +14,10 @@ import Text.PrettyPrint.ANSI.Leijen (Doc)
 data EvalError
   = TypeMismatch {expected :: Text, actual :: Text}
   | InvalidKey Text
+  | DuplicateKey Text
   | NoSuchKey Text
-  | IndexOutOfBounds Int
+  | InvalidIndex Text
+  | IndexOutOfBounds Scientific
   | DivByZero
   | VarNotFound Text
   | ManifestError ManifestError

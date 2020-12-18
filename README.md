@@ -23,7 +23,7 @@ stack build
 
 ### Language features not yet implemented
 
-- array and object comprehension
+- ~~array and object comprehension~~
 - ~~array slices~~
 - Python-style string formatting
 - text blocks 

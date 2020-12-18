@@ -50,7 +50,8 @@ data Value
   | VStr !Text
   | VArr !(Vector Thunk)
   | VObj !(HashMap Key Thunk)
-  | VClos !(Thunk -> Eval Value)
+  | -- | VObj !Env !(HashMap Key Core)
+    VClos !(Thunk -> Eval Value)
   | VFun !(Args Thunk -> Eval Value)
 
 data Key
@@ -129,6 +130,11 @@ instance HasValue a => HasValue (Vector a) where
   proj (VArr as) = traverse proj' as
   proj v = throwTypeMismatch "array" v
   inj as = VArr $ Thunk . pure . inj <$> as
+
+instance {-# OVERLAPS #-} HasValue (Vector Thunk) where
+  proj (VArr as) = pure as
+  proj v = throwTypeMismatch "array" v
+  inj = VArr
 
 instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
   proj = fmap V.toList . proj
