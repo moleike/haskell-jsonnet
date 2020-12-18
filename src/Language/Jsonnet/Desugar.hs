@@ -75,7 +75,7 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
         where
           maybeNull = fromMaybe (CLit Null)
       EArrComp {expr, comp} -> mkArrComp expr comp
-      EObjComp {field, comp, locals} -> mkObjComp field comp
+      EObjComp {field, comp, locals} -> mkObjComp field comp locals
 
 mkAssert :: Assert Core -> Core
 mkAssert (Assert c m e) =
@@ -94,14 +94,19 @@ mkArrComp expr comp = foldr f (CArr [expr]) comp
     f CompSpec {..} e =
       CComp (ArrC (bind (s2n var) (e, ifspec))) forspec
 
-mkObjComp :: Field Core -> NonEmpty (CompSpec Core) -> Core
-mkObjComp Field {..} comp =
+mkObjComp Field {..} comp locals =
   CComp (ObjC (bind (s2n "arr") (field', Nothing))) arrComp
   where
-    field' = Field (mkLet bnds key) (mkLet bnds value) hidden
+    field' = Field key' value' hidden
     bnds = NE.zip (fmap var comp) xs
+    key' = mkLet bnds key
+    value' = case locals of
+      [] -> mkLet bnds value
+      -- we need to nest the let bindings due to the impl.
+      xs -> mkLet bnds $ mkLet (NE.fromList xs) value
     xs = CLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
-    arrComp = mkArrComp (CArr $ NE.toList $ CVar . s2n . var <$> comp) comp
+    arrComp = mkArrComp arr comp
+    arr = CArr $ NE.toList $ CVar . s2n . var <$> comp
 
 stdFunc :: Text -> Args Core -> Core
 stdFunc f =

@@ -271,7 +271,7 @@ arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
   where
     array = mkArrayF <$> (exprP `sepEndBy` comma)
     arrayComp = do
-      expr <- exprP
+      expr <- exprP <* optional comma
       comps <- NE.some forspecP
       return $ mkArrCompF expr comps
 
@@ -301,9 +301,11 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       _ <- keywordP "local"
       try binding <|> localFunc
     objectComp = do
-      expr <- pairP
+      locals1 <- localP `sepEndBy` comma
+      expr <- pairP <* optional comma
+      locals2 <- localP `sepEndBy` comma
       comps <- NE.some forspecP
-      return $ mkObjCompF expr [] comps
+      return $ mkObjCompF expr (locals1 <> locals2) comps
 
 importP :: Parser Expr'
 importP = Fix <$> annotateLoc importDecl
