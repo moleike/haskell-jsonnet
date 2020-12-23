@@ -15,6 +15,7 @@ where
 import Control.Applicative
 import Control.Monad.Except
 import Control.Monad.State.Lazy
+import Control.Monad.Reader
 import Data.Bifunctor (second)
 import Data.Bits
 import Data.Foldable
@@ -37,6 +38,8 @@ import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std as Std
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
+import Unbound.Generics.LocallyNameless.Bind
+import Debug.Trace
 
 -- an evaluator for the core calculus, based on a
 -- big-step, call-by-need operational semantics, matching
@@ -49,24 +52,22 @@ eval = \case
     eval e
   CLit l -> evalLiteral l
   CVar n -> do
-    env <- gets ctx
+    env <- ask
     v <- liftMaybe (VarNotFound $ T.pack $ name2String n) (M.lookup n env)
     force v
   CFun e -> do
-    (bnds, e1) <- unbind e
-    evalFun (second unembed <$> unrec bnds) e1
+    lunbind e $ \(bnds, e1) ->
+      evalFun (second unembed <$> unrec bnds) e1
   CApp e1 e2 -> eval e1 >>= \v -> evalApp v e2
-  CLet bnd -> mdo
-    (r, e1) <- unbind bnd
-    bnds <-
-      mapM
-        ( \(v, Embed e) -> do
-            updateEnv bnds
-            pure (v, Thunk $ eval e)
-        )
-        (unrec r)
-    updateEnv bnds
-    eval e1
+  CLet bnd -> do
+    lunbind bnd $ \(r, e1) -> mdo
+      bnds <-
+        mapM
+          ( \(v, Embed e) -> do
+              pure (v, Thunk $ extendEnv bnds $ eval e)
+          )
+          (unrec r)
+      extendEnv bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp op e1 e2 -> do
@@ -98,7 +99,12 @@ eval = \case
     evalObjComp cs bnd
 
 thunk :: Core -> Eval Thunk
-thunk = mkThunk . eval
+thunk c = do
+  env <- ask
+  traceShowM (M.keys env)
+  avoids <- getAvoids
+  traceShowM avoids
+  mkThunk (eval c)
 
 evalApp :: Value -> Args Core -> Eval Value
 evalApp (VFun f) as = traverse thunk as >>= f
@@ -116,12 +122,10 @@ appDefaults rs e = do
       bnds <-
         mapM
           ( \(v, e) -> do
-              updateEnv bnds
-              pure (v, Thunk $ eval e)
+              pure (v, Thunk $ extendEnv bnds $ eval e)
           )
           (zip ns $ catMaybes ds)
-      updateEnv bnds
-      eval e
+      extendEnv bnds (eval e)
   where
     (ns, ds) = unzip rs
 
@@ -131,19 +135,16 @@ evalFun bnds e = pure $ VFun $ \case
     case compare (length ns) (length ps) of
       LT -> throwError $ TooManyArgs (length ps)
       EQ -> do
-        updateEnv (zip ns ps)
-        eval e
+        extendEnv (zip ns ps) (eval e)
       GT -> do
-        updateEnv (zip ns ps)
-        appDefaults rs e
+        extendEnv (zip ns ps) (appDefaults rs e)
     where
       rs = drop (length ps) bnds
       (ns, _) = unzip bnds
   Named ps -> do
     (ns, vs) <- unzip <$> buildParams ps bnds
     let rs = filter ((`notElem` ns) . fst) bnds
-    updateEnv (zip ns vs)
-    appDefaults rs e
+    extendEnv (zip ns vs) (appDefaults rs e)
   where
     buildParams as bnds = traverse f as
       where
@@ -181,12 +182,12 @@ evalArrComp cs bnd = do
   where
     comp = eval cs >>= \case
       VArr xs -> forM xs $ \x -> do
-        (n, (e, cond)) <- unbind bnd
-        updateEnv [(n, x)]
-        b <- f cond
-        if b
-          then Just <$> thunk e
-          else pure Nothing
+        lunbind bnd $ \(n, (e, cond)) ->
+          extendEnv [(n, x)] $ do
+            b <- f cond
+            if b
+              then Just <$> thunk e
+              else pure Nothing
       v -> throwTypeMismatch "array" v
     f Nothing = pure True
     f (Just c) = do
@@ -203,12 +204,12 @@ evalObjComp cs bnd = do
   where
     comp = eval cs >>= \case
       VArr xs -> forM xs $ \x -> do
-        (n, (e, cond)) <- unbind bnd
-        updateEnv [(n, x)]
-        b <- f cond
-        if b
-          then evalField e
-          else pure Nothing
+        lunbind bnd $ \(n, (e, cond)) ->
+          extendEnv [(n, x)] $ do
+            b <- f cond
+            if b
+              then evalField e
+              else pure Nothing
       v -> throwTypeMismatch "array" v
     f Nothing = pure True
     f (Just c) = do
@@ -313,7 +314,9 @@ throwDuplicateKey = throwError . DuplicateKey
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}
 
-updateEnv :: MonadState EvalState m => [(Name Core, Thunk)] -> m ()
-updateEnv = modify . flip (foldr f)
+extendEnv :: (MonadReader Env m, LFresh m) => [(Name Core, Thunk)] -> m a -> m a
+extendEnv ns =
+  avoid (AnyName <$> (fst $ unzip ns))
+  . local (flip (foldr f) ns)
   where
-    f (var, th) st@EvalState {..} = st {ctx = M.insert var th ctx}
+    f (var, th) = M.insert var th

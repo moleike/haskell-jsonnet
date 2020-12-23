@@ -8,6 +8,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GADTs #-}
 
 module Language.Jsonnet.Value where
 
@@ -50,8 +51,7 @@ data Value
   | VStr !Text
   | VArr !(Vector Thunk)
   | VObj !(HashMap Key Thunk)
-  | -- | VObj !Env !(HashMap Key Core)
-    VClos !(Thunk -> Eval Value)
+  | VClos !(Thunk -> Eval Value)
   | VFun !(Args Thunk -> Eval Value)
 
 data Key

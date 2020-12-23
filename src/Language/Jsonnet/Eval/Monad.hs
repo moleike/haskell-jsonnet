@@ -12,6 +12,7 @@ import Control.Monad (MonadPlus (mzero), join, msum)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.State.Lazy
+import Control.Monad.Reader
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
 import Language.Jsonnet.Core
@@ -21,7 +22,7 @@ import {-# SOURCE #-} Language.Jsonnet.Value (Thunk)
 import Unbound.Generics.LocallyNameless
 
 newtype Eval a = Eval
-  { unEval :: FreshMT (ExceptT EvalError (StateT EvalState IO)) a
+  { unEval :: LFreshMT (ExceptT EvalError (ReaderT Env (StateT EvalState IO))) a
   }
   deriving
     ( Functor,
@@ -29,30 +30,31 @@ newtype Eval a = Eval
       Monad,
       MonadIO,
       MonadFix,
+      MonadReader Env,
       MonadError EvalError,
       MonadState EvalState,
       MonadThrow,
       MonadCatch,
       MonadMask,
       MonadFail,
-      Fresh
+      LFresh
     )
 
 type Env = Map (Name Core) Thunk
 
 data EvalState = EvalState
-  { ctx :: Env,
-    curSpan :: Maybe SrcSpan
+  { curSpan :: Maybe SrcSpan
   }
 
 emptyState :: EvalState
-emptyState = EvalState M.empty Nothing
+emptyState = EvalState Nothing
 
 runEval ::
   EvalState ->
+  Env ->
   Eval a ->
   ExceptT (EvalError, EvalState) IO a
-runEval st comp = ExceptT $ (`evalStateT` st) $ do
-  res <- runExceptT $ runFreshMT $ unEval comp
+runEval st env comp = ExceptT $ (`evalStateT` st) $ do
+  res <- (`runReaderT` env) $ runExceptT $ runLFreshMT $ unEval comp
   st' <- get
   pure $ left (,st') res

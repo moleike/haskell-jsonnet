@@ -74,13 +74,13 @@ desugar :: Expr -> JsonnetM Core
 desugar = pure . Desugar.desugar
 
 runEval' :: EvalState -> Eval a -> ExceptT Error IO a
-runEval' st = withExceptT mkErr . runEval st
+runEval' st = withExceptT mkErr . runEval st stdlib
   where
     mkErr (e, EvalState {curSpan}) = EvalError e curSpan
+    stdlib = singleton "std" (Thunk $ pure std)
 
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate = JsonnetM . lift . runEval' evalSt . (eval >=> manifest)
   where
-    stdlib = singleton "std" (Thunk $ pure std)
-    evalSt = EvalState {ctx = stdlib, curSpan = Nothing}
+    evalSt = EvalState {curSpan = Nothing}
