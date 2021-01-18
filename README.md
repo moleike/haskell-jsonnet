@@ -39,6 +39,7 @@ stack build
 - `super` keyword
 - ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
 - ~~tailstrict annotation~~
+- ~~stdlib~~
 
 [//]: # "Implementation overview"
 
