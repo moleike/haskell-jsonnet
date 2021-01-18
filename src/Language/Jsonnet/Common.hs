@@ -69,35 +69,14 @@ instance Alpha LogicalOp
 
 instance Alpha UnyOp
 
-data Field a = Field
-  { key :: a,
-    value :: a,
-    hidden :: Bool
-  }
-  deriving
-    ( Eq,
-      Read,
-      Show,
-      Typeable,
-      Generic,
-      Generic1,
-      Functor,
-      Foldable,
-      Traversable
-    )
+data Strictness = Strict | Lazy
+  deriving (Eq, Read, Show, Generic)
 
-instance Alpha a => Alpha (Field a)
+instance Alpha Strictness
 
-instance Eq1 Field where
-  liftEq = liftEqDefault
-
-instance Read1 Field where
-  liftReadsPrec = liftReadsPrecDefault
-
-instance Show1 Field where
-  liftShowsPrec = liftShowsPrecDefault
-
-data Args a = Positional [a] | Named [(String, a)]
+data Args a
+  = Positional [a] Strictness
+  | Named [(String, a)] Strictness
   deriving
     ( Eq,
       Read,

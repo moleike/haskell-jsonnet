@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Language.Jsonnet.Core where
@@ -9,29 +10,37 @@ import Data.String
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import Language.Jsonnet.Common
+import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Unbound.Generics.LocallyNameless
 
 type Param a = (Name a, Embed (Maybe a))
 
-type Fun a = Bind (Rec [Param a]) a
-
-type Let a = Bind (Rec [(Name a, Embed a)]) a
-
-data Comp a
-  = ArrC (Bind (Name a) (a, Maybe a))
-  | ObjC (Bind (Name a) (Field a, Maybe a))
+newtype Fun = Fun (Bind (Rec [Param Core]) Core)
   deriving (Show, Typeable, Generic)
 
-instance (Alpha a, Typeable a) => Alpha (Comp a)
+instance Alpha Fun
+
+newtype Let
+  = Let (Bind (Rec [(Name Core, Embed Core)]) Core)
+  deriving (Show, Typeable, Generic)
+
+instance Alpha Let
+
+data Comp
+  = ArrC (Bind (Name Core) (Core, Maybe Core))
+  | ObjC (Bind (Name Core) (Field Core, Maybe Core))
+  deriving (Show, Typeable, Generic)
+
+instance Alpha Comp
 
 data Core
   = CLoc SrcSpan Core
   | CLit Literal
   | CVar (Name Core)
-  | CFun (Fun Core)
+  | CFun Fun
   | CApp Core (Args Core)
-  | CLet (Let Core) -- letrec
+  | CLet Let
   | CObj [Field Core]
   | CArr [Core]
   | CBinOp BinOp Core Core
@@ -39,7 +48,7 @@ data Core
   | CIfElse Core Core Core
   | CErr Core
   | CLookup Core Core
-  | CComp (Comp Core) Core
+  | CComp Comp Core
   deriving (Show, Typeable, Generic)
 
 instance Alpha Core

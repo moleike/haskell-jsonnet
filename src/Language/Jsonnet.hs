@@ -1,13 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.Jsonnet
   ( JsonnetM,
-    Config (..),
     jsonnet,
+    Config (..),
+    Value (..),
     runJsonnetM,
+    evalStd,
     parse,
     desugar,
     evaluate,
@@ -20,16 +24,18 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
+import qualified Data.Text.IO as T (readFile)
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval (Eval, EvalState (..), eval, runEval)
+import Language.Jsonnet.Eval
 import Language.Jsonnet.Manifest (manifest)
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
+import Debug.Trace
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -49,9 +55,23 @@ newtype JsonnetM a = JsonnetM
     )
 
 data Config = Config
-  { fname :: FilePath
+  { fname :: FilePath,
+    stdlib :: Value
   }
-  deriving (Eq, Show)
+
+
+-- the jsonnet stdlib is written in both jsonnet
+-- and Haskell, here we merge the native with the
+-- interpreted parts
+evalStd :: IO (Either Error Value)
+evalStd = runJsonnetM (Config fp VNull) comp
+  where
+    fp = "stdlib/std.jsonnet"
+    comp = do
+      inp <- liftIO $ T.readFile fp
+      expr <- (parse >=> desugar) inp
+      stdJ <- JsonnetM $ lift $ runEval emptyEnv (eval expr)
+      JsonnetM $ lift $ runEval emptyEnv $ mergeObjects std stdJ
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
 runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
@@ -73,14 +93,8 @@ parse inp =
 desugar :: Expr -> JsonnetM Core
 desugar = pure . Desugar.desugar
 
-runEval' :: EvalState -> Eval a -> ExceptT Error IO a
-runEval' st = withExceptT mkErr . runEval st stdlib
-  where
-    mkErr (e, EvalState {curSpan}) = EvalError e curSpan
-    stdlib = singleton "std" (Thunk $ pure std)
-
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
-evaluate = JsonnetM . lift . runEval' evalSt . (eval >=> manifest)
-  where
-    evalSt = EvalState {curSpan = Nothing}
+evaluate expr = do
+  env <- singleton "std" . TV . pure <$> asks stdlib
+  JsonnetM $ lift $ runEval env ((eval >=> manifest) expr)

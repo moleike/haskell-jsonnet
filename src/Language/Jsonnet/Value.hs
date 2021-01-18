@@ -1,14 +1,7 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+-- |
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE GADTs #-}
 
 module Language.Jsonnet.Value where
 
@@ -17,6 +10,7 @@ import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Monad.State.Lazy
+import Control.Monad.Reader
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.HashMap.Lazy (HashMap)
@@ -37,11 +31,14 @@ import GHC.Generics (Generic)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
+import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Text.PrettyPrint.ANSI.Leijen (Doc, pretty)
 import Unbound.Generics.LocallyNameless
+import {-# SOURCE #-} Language.Jsonnet.Eval (eval, evalClos)
+
 
 -- jsonnet value
 data Value
@@ -49,24 +46,46 @@ data Value
   | VBool !Bool
   | VNum !Scientific
   | VStr !Text
-  | VArr !(Vector Thunk)
-  | VObj !(HashMap Key Thunk)
-  | VClos !(Thunk -> Eval Value)
-  | VFun !(Args Thunk -> Eval Value)
+  | VArr !Array
+  | VObj !Object
+  | VClos !Fun !Env
+  | VFun !(Thunk -> Eval Value)
+  -- | VThunk !Thunk
 
-data Key
-  = Visible Text
-  | Hidden Text
-  deriving (Eq, Generic)
+type Array = Vector Thunk
 
-instance Hashable Key
+type Object = HashMap (O.Key Text) (O.Value Thunk)
 
-newtype Thunk = Thunk {force :: Eval Value}
+instance Hashable (O.Key Text)
+
+--data Thunk = Thunk {force :: Eval Value}
+
+--VThunk !(Either Thunk (Eval Value))
+--data Thunk = Thunk !Env !Core
+
+data Thunk = TC !Env !Core | TV !(Eval Value)
+
+valueType :: Value -> Text
+valueType =
+  \case
+    VNull -> "null"
+    VBool _ -> "boolean"
+    VNum _ -> "number"
+    VStr _ -> "string"
+    VArr _ -> "array"
+    VObj _ -> "object"
+    VClos _ _ -> "function"
+    VFun _ -> "function"
+
+force :: Thunk -> Eval Value
+force = \case
+  TC rho expr -> local (const rho) (eval expr)
+  TV comp -> comp
 
 mkThunk :: MonadIO m => Eval Value -> m Thunk
 mkThunk ev = do
   ref <- liftIO $ newIORef Nothing
-  pure $ Thunk $
+  pure $ TV $
     liftIO (readIORef ref) >>= \case
       Nothing -> do
         v <- ev
@@ -129,7 +148,7 @@ instance HasValue a => HasValue (Maybe a) where
 instance HasValue a => HasValue (Vector a) where
   proj (VArr as) = traverse proj' as
   proj v = throwTypeMismatch "array" v
-  inj as = VArr $ Thunk . pure . inj <$> as
+  inj as = VArr $ TV . pure . inj <$> as
 
 instance {-# OVERLAPS #-} HasValue (Vector Thunk) where
   proj (VArr as) = pure as
@@ -140,41 +159,41 @@ instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
   proj = fmap V.toList . proj
   inj = inj . V.fromList
 
-instance {-# OVERLAPS #-} HasValue (HashMap Key Thunk) where
+instance {-# OVERLAPS #-} HasValue Object where
   proj (VObj o) = pure o
   proj v = throwTypeMismatch "object" v
   inj = VObj
 
-instance HasValue a => HasValue (HashMap Key a) where
-  proj (VObj o) = traverse proj' o
-  proj v = throwTypeMismatch "object" v
-  inj o = VObj $ Thunk . pure . inj <$> o
+--instance HasValue a => HasValue (Object a) where
+--  proj (VObj o) = traverse proj' o
+--  proj v = throwTypeMismatch "object" v
+--  inj o = VObj $ TV . pure . inj <$> o
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
   proj v = throwTypeMismatch "impossible" v
-  inj f = VClos $ \x -> force x >>= fmap (inj . f) . proj
+  inj f = VFun $ \x -> force x >>= fmap (inj . f) . proj
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> c) where
   proj v = throwTypeMismatch "impossible" v
   inj f = inj $ \x -> inj (f x)
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
-  proj (VClos f) = pure $ \x -> do
-    r <- f (Thunk $ pure $ inj x)
-    proj r
   proj (VFun f) = pure $ \x -> do
-    r <- f (Positional [Thunk $ pure $ inj x])
+    r <- f (TV $ pure $ inj x)
+    proj r
+  proj (VClos f env) = pure $ \x -> do
+    r <- evalClos env f $ Positional [TV $ pure $ inj x] Lazy
     proj r
   proj v = throwTypeMismatch "function" v
-  inj f = VClos $ \v -> proj' v >>= fmap inj . f
+  inj f = VFun $ \v -> proj' v >>= fmap inj . f
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
-  proj (VClos f) = pure $ \x y -> do
-    VClos g <- f (Thunk $ pure $ inj x)
-    r <- g (Thunk $ pure $ inj y)
-    proj r
   proj (VFun f) = pure $ \x y -> do
-    r <- f $ Positional [Thunk $ pure $ inj x, Thunk $ pure $ inj y]
+    VFun g <- f (TV $ pure $ inj x)
+    r <- g (TV $ pure $ inj y)
+    proj r
+  proj (VClos f env) = pure $ \x y -> do
+    r <- evalClos env f $ Positional (TV . pure <$> [inj x, inj y]) Lazy
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)
@@ -198,15 +217,3 @@ inj'' ::
   Value ->
   Eval Value
 inj'' f v1 v2 = inj <$> liftA2 f (proj v1) (proj v2)
-
-valueType :: Value -> Text
-valueType =
-  \case
-    VNull -> "null"
-    VBool _ -> "boolean"
-    VNum _ -> "number"
-    VStr _ -> "string"
-    VArr _ -> "array"
-    VObj _ -> "object"
-    VClos _ -> "closure"
-    VFun _ -> "function"

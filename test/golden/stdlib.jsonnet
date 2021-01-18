@@ -11,8 +11,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// This contains some of the tests from google/jsonnet test_suite
+// This file tests functions from the standard library (std.jsonnet and builtins).
 
+// Can capture std from another file.
+std.assertEqual((import 'lib/capture_std_func.libsonnet')().sqrt(4), 2) &&
+
+// Each import has its own std. (not implemented in jsonnet-hs)
+std.assertEqual(
+  //local std = { sqrt: function(x) x };
+  local lib = import 'lib/capture_std.libsonnet';
+  lib.sqrt(4),
+  2
+) &&
+
+// Now, test each std library function in turn.
 
 std.assertEqual(std.makeArray(10, function(i) i + 1), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) &&
 std.assertEqual(std.makeArray(0, function(i) null), []) &&
@@ -67,12 +79,154 @@ assertClose(std.exponent(1), 1) &&
 assertClose(std.mantissa(128), 0.5) &&
 assertClose(std.exponent(128), 8) &&
 
+std.assertEqual(std.clamp(-3, 0, 5), 0) &&
+std.assertEqual(std.clamp(4, 0, 5), 4) &&
+std.assertEqual(std.clamp(7, 0, 5), 5) &&
+
+std.assertEqual(std.type(null), 'null') &&
+std.assertEqual(std.type(true), 'boolean') &&
+std.assertEqual(std.type(false), 'boolean') &&
+std.assertEqual(std.type(0), 'number') &&
+std.assertEqual(std.type(-1e10), 'number') &&
+std.assertEqual(std.type([1, 2, 3]), 'array') &&
+std.assertEqual(std.type([]), 'array') &&
+std.assertEqual(std.type(function(x) x), 'function') &&
+std.assertEqual(std.type({ x: 1, y: 2 }), 'object') &&
+std.assertEqual(std.type({}), 'object') &&
+std.assertEqual(std.type('fail'), 'string') &&
+std.assertEqual(std.type('' + {}), 'string') &&
+
+std.assertEqual(std.isString(''), true) &&
+std.assertEqual(std.isBoolean(true), true) &&
+std.assertEqual(std.isNumber(0), true) &&
+std.assertEqual(std.isObject({}), true) &&
+std.assertEqual(std.isArray([]), true) &&
+std.assertEqual(std.isFunction(function() 0), true) &&
+
+std.assertEqual(std.isString(null), false) &&
+std.assertEqual(std.isBoolean(null), false) &&
+std.assertEqual(std.isNumber(null), false) &&
+std.assertEqual(std.isObject(null), false) &&
+std.assertEqual(std.isArray(null), false) &&
+std.assertEqual(std.isFunction(null), false) &&
+
+std.assertEqual(std.member('foo', 'o'), true) &&
+std.assertEqual(std.member('foo', 'f'), true) &&
+std.assertEqual(std.member('foo', 'x'), false) &&
+std.assertEqual(std.member([], 'o'), false) &&
+std.assertEqual(std.member(['f'], 'o'), false) &&
+std.assertEqual(std.member(['f', 'o', 'o'], 'o'), true) &&
+std.assertEqual(std.member(['f', 'o', 'o'], 'f'), true) &&
+std.assertEqual(std.member(['f', 'o', 'o'], 'g'), false) &&
+
 std.assertEqual(std.count([true, false, false, true, true, true, false], true), 4) &&
 std.assertEqual(std.count([true, false, false, true, true, true, false], false), 3) &&
 
 std.assertEqual(std.filter(function(x) x % 2 == 0, [1, 2, 3, 4]), [2, 4]) &&
 std.assertEqual(std.filter(function(x) false, [1, 2, 3, 4]), []) &&
 std.assertEqual(std.filter(function(x) x, []), []) &&
+
+std.assertEqual(std.objectHas({ x: 1, y: 2 }, 'x'), true) &&
+std.assertEqual(std.objectHas({ x: 1, y: 2 }, 'z'), false) &&
+std.assertEqual(std.objectHas({}, 'z'), false) &&
+
+std.assertEqual(std.length('asdfasdf'), 8) &&
+std.assertEqual(std.length([1, 4, 9, error 'foo']), 4) &&
+std.assertEqual(std.length(function(x, y, z) error 'foo'), 3) &&
+std.assertEqual(std.length({ x: 1, y: 2 }), 2) &&
+std.assertEqual(std.length({ a: 1, b: 2, c: 0 } + { c: 3, d: error 'foo' }), 4) &&
+std.assertEqual(std.length(''), 0) &&
+std.assertEqual(std.length([]), 0) &&
+std.assertEqual(std.length(function() error 'foo'), 0) &&
+std.assertEqual(std.length({}), 0) &&
+
+std.assertEqual(std.objectFields({}), []) &&
+std.assertEqual(std.objectFields({ x: 1, y: 2 }), ['x', 'y']) &&
+std.assertEqual(std.objectFields({ a: 1, b: 2, c: null, d: error 'foo' }), ['a', 'b', 'c', 'd']) &&
+std.assertEqual(std.objectFields({ x: 1 } { x: 1 }), ['x']) &&
+std.assertEqual(std.objectFields({ x: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectFields({ x: 1 } { x::: 1 }), ['x']) &&
+std.assertEqual(std.objectFields({ x:: 1 } { x: 1 }), []) &&
+std.assertEqual(std.objectFields({ x:: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectFields({ x:: 1 } { x::: 1 }), ['x']) &&
+std.assertEqual(std.objectFields({ x::: 1 } { x: 1 }), ['x']) &&
+std.assertEqual(std.objectFields({ x::: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectFields({ x::: 1 } { x::: 1 }), ['x']) &&
+
+std.assertEqual(std.objectValues({}), []) &&
+std.assertEqual(std.objectValues({ x: 1, y: 2 }), [1, 2]) &&
+std.assertEqual(std.objectValues({ x: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x: 1 }), []) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x:: 1 } { x::: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x: 1 }), [1]) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectValues({ x::: 1 } { x::: 1 }), [1]) &&
+
+
+std.assertEqual(std.toString({ a: 1, b: 2 }), '{"a":1,"b":2}') &&
+std.assertEqual(std.toString({}), '{}') &&
+std.assertEqual(std.toString([1, 2]), '[1,2]') &&
+std.assertEqual(std.toString([]), '[]') &&
+std.assertEqual(std.toString(null), 'null') &&
+std.assertEqual(std.toString(true), 'true') &&
+std.assertEqual(std.toString(false), 'false') &&
+std.assertEqual(std.toString('str'), 'str') &&
+std.assertEqual(std.toString(''), '') &&
+std.assertEqual(std.toString([1, 2, 'foo']), '[1,2,"foo"]') &&
+
+std.assertEqual(std.substr('cookie', 1, 3), 'ook') &&
+std.assertEqual(std.substr('cookie', 1, 0), '') &&
+std.assertEqual(std.substr('cookie', 1, 15), 'ookie') &&
+std.assertEqual(std.substr('cookie', 0, 5), 'cooki') &&
+std.assertEqual(std.substr('cookie', 0, 6), 'cookie') &&
+std.assertEqual(std.substr('cookie', 0, 15), 'cookie') &&
+std.assertEqual(std.substr('cookie', 3, 1), 'k') &&
+std.assertEqual(std.substr('cookie', 20, 1), '') &&
+std.assertEqual(std.substr('cookie', 6, 1), '') &&
+
+
+std.assertEqual(std.substr('ąę', 1, 1), 'ę') &&
+
+std.assertEqual(std.startsWith('food', 'foo'), true) &&
+std.assertEqual(std.startsWith('food', 'food'), true) &&
+std.assertEqual(std.startsWith('food', 'foody'), false) &&
+std.assertEqual(std.startsWith('food', 'wat'), false) &&
+
+std.assertEqual(std.endsWith('food', 'ood'), true) &&
+std.assertEqual(std.endsWith('food', 'food'), true) &&
+std.assertEqual(std.endsWith('food', 'omgfood'), false) &&
+std.assertEqual(std.endsWith('food', 'wat'), false) &&
+
+std.assertEqual(std.stripChars(' test test test     ', ' '), 'test test test') &&
+std.assertEqual(std.stripChars('aaabbbbcccc', 'ac'), 'bbbb') &&
+std.assertEqual(std.stripChars('cacabbbbaacc', 'ac'), 'bbbb') &&
+std.assertEqual(std.stripChars('', 'ac'), '') &&
+
+std.assertEqual(std.lstripChars(' test test test     ', ' '), 'test test test     ') &&
+std.assertEqual(std.lstripChars('aaabbbbcccc', 'ac'), 'bbbbcccc') &&
+std.assertEqual(std.lstripChars('cacabbbbaacc', 'ac'), 'bbbbaacc') &&
+std.assertEqual(std.lstripChars('', 'ac'), '') &&
+
+std.assertEqual(std.rstripChars(' test test test     ', ' '), ' test test test') &&
+std.assertEqual(std.rstripChars('aaabbbbcccc', 'ac'), 'aaabbbb') &&
+std.assertEqual(std.rstripChars('cacabbbbaacc', 'ac'), 'cacabbbb') &&
+std.assertEqual(std.rstripChars('', 'ac'), '') &&
+
+std.assertEqual(std.codepoint('a'), 97) &&
+std.assertEqual(std.char(97), 'a') &&
+std.assertEqual(std.codepoint('\u0000'), 0) &&
+std.assertEqual(std.char(0), '\u0000') &&
+
+std.assertEqual(std.strReplace('A cat walked by', 'cat', 'dog'), 'A dog walked by') &&
+std.assertEqual(std.strReplace('cat', 'cat', 'dog'), 'dog') &&
+std.assertEqual(std.strReplace('', 'cat', ''), '') &&
+std.assertEqual(std.strReplace('xoxoxoxox', 'xoxox3xox', 'A'), 'xoxoxoxox') &&
+std.assertEqual(std.strReplace('xoxoxox3xox', 'xoxox3xox', 'A'), 'xoA') &&
+std.assertEqual(std.strReplace('A cat is a cat', 'cat', 'dog'), 'A dog is a dog') &&
+std.assertEqual(std.strReplace('wishyfishyisishy', 'ish', 'and'), 'wandyfandyisandy') &&
 
 std.assertEqual(std.map(function(x) x * x, []), []) &&
 std.assertEqual(std.map(function(x) x * x, [1, 2, 3, 4]), [1, 4, 9, 16]) &&
@@ -82,25 +236,152 @@ std.assertEqual(std.mapWithIndex(function(i, x) x * i, []), []) &&
 std.assertEqual(std.mapWithIndex(function(i, x) x * i, [1, 2, 3, 4]), [0, 2, 6, 12]) &&
 std.assertEqual(std.mapWithIndex(function(i, x) x * i, std.filter(function(x) x > 5, std.range(1, 10))), [0, 7, 16, 27, 40]) &&
 
+std.assertEqual(std.mapWithKey(function(k, o) k + o, {}), {}) &&
+std.assertEqual(std.mapWithKey(function(k, o) k + o, { a: 1, b: 2 }), { a: 'a1', b: 'b2' }) &&
+
 std.assertEqual(std.flatMap(function(x) [x, x], [1, 2, 3]), [1, 1, 2, 2, 3, 3]) &&
 std.assertEqual(std.flatMap(function(x) if x == 2 then [] else [x], [1, 2, 3]), [1, 3]) &&
 std.assertEqual(std.flatMap(function(x) if x == 2 then [] else [x * 3, x * 2], [1, 2, 3]), [3, 2, 9, 6]) &&
 
 std.assertEqual(std.filterMap(function(x) x >= 0, function(x) x * x, [-3, -2, -1, 0, 1, 2, 3]), [0, 1, 4, 9]) &&
 
-std.assertEqual(std.foldl(function(x, y) x + y, [1, 2, 3, 4], 0), 10) &&
+std.assertEqual(std.foldl(function(x, y) [x, y], [], 'foo'), 'foo') &&
+std.assertEqual(std.foldl(function(x, y) [x, y], [1, 2, 3, 4], []), [[[[[], 1], 2], 3], 4]) &&
 
-# folds with nested arrays are not working
-# std.assertEqual(std.foldl(function(x, y) [x, y], [], 'foo'), 'foo') &&
-# std.assertEqual(std.foldl(function(x, y) [x, y], [1, 2, 3, 4], []), [[[[[], 1], 2], 3], 4]) &&
-
-# std.assertEqual(std.foldr(function(x, y) [x, y], [], 'bar'), 'bar') &&
-# std.assertEqual(std.foldr(function(x, y) [x, y], [1, 2, 3, 4], []), [1, [2, [3, [4, []]]]]) &&
+std.assertEqual(std.foldr(function(x, y) [x, y], [], 'bar'), 'bar') &&
+std.assertEqual(std.foldr(function(x, y) [x, y], [1, 2, 3, 4], []), [1, [2, [3, [4, []]]]]) &&
 
 std.assertEqual(std.range(2, 6), [2, 3, 4, 5, 6]) &&
 std.assertEqual(std.range(2, 2), [2]) &&
 std.assertEqual(std.range(2, 1), []) &&
 
-std.assertEqual(std.flattenArrays([[1, 2], [3, 4], [[5, 6], [7, 8]]]), [ 1, 2, 3, 4, [5, 6], [7, 8]]) &&
+std.assertEqual(std.repeat([], 0), []) &&
+std.assertEqual(std.repeat([1], 1), [1]) &&
+std.assertEqual(std.repeat([1, 2], 1), [1, 2]) &&
+std.assertEqual(std.repeat([1], 2), [1, 1]) &&
+std.assertEqual(std.repeat([1, 2], 2), [1, 2, 1, 2]) &&
+std.assertEqual(std.repeat('a', 1), 'a') &&
+std.assertEqual(std.repeat('a', 4), 'aaaa') &&
+std.assertEqual(std.repeat('ab', 4), 'abababab') &&
+std.assertEqual(std.repeat('a', 0), '') &&
+
+std.assertEqual(std.join([], [[1, 2], [3, 4, 5], [6]]), [1, 2, 3, 4, 5, 6]) &&
+std.assertEqual(std.join(['a', 'b'], [[]]), []) &&
+std.assertEqual(std.join(['a', 'b'], []), []) &&
+std.assertEqual(std.join(['a', 'b'], [null, [1, 2], null, [3, 4, 5], [6], null]), [1, 2, 'a', 'b', 3, 4, 5, 'a', 'b', 6]) &&
+std.assertEqual(std.join(['a', 'b'], [[], [1, 2]]), ['a', 'b', 1, 2]) &&
+std.assertEqual(std.join('', [null, '12', null, '345', '6', null]), '123456') &&
+std.assertEqual(std.join('ab', ['']), '') &&
+std.assertEqual(std.join('ab', []), '') &&
+std.assertEqual(std.join('ab', [null, '12', null, '345', '6', null]), '12ab345ab6') &&
+std.assertEqual(std.join('ab', ['', '12']), 'ab12') &&
+std.assertEqual(std.lines(['a', null, 'b']), 'a\nb\n') &&
+
+std.assertEqual(std.flattenArrays([[1, 2, 3], [4, 5, 6], []]), [1, 2, 3, 4, 5, 6]) &&
+
+std.assertEqual(
+  std.manifestIni({
+    main: { a: '1', b: '2' },
+    sections: {
+      s1: { x: '11', y: '22', z: '33' },
+      s2: { p: 'yes', q: '' },
+      empty: {},
+    },
+  }),
+  'a = 1\nb = 2\n[empty]\n[s1]\nx = 11\ny = 22\nz = 33\n[s2]\np = yes\nq = \n'
+) &&
+
+std.assertEqual(
+  std.manifestIni({
+    sections: {
+      s1: { x: '11', y: '22', z: '33' },
+      s2: { p: 'yes', q: '' },
+      empty: {},
+    },
+  }),
+  '[empty]\n[s1]\nx = 11\ny = 22\nz = 33\n[s2]\np = yes\nq = \n'
+) &&
+
+std.assertEqual(
+  std.manifestIni({
+    main: { a: ['1', '2'] },
+    sections: {
+      s2: { p: ['yes', ''] },
+    },
+  }), 'a = 1\na = 2\n[s2]\np = yes\np = \n'
+) &&
+
+
+std.assertEqual(std.escapeStringJson('hello'), '"hello"') &&
+std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
+std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
+std.assertEqual(std.escapeStringBash("he\"l'lo"), "'he\"l'\"'\"'lo'") &&
+std.assertEqual(std.escapeStringDollars('The path is ${PATH}.'), 'The path is $${PATH}.') &&
+std.assertEqual(std.escapeStringJson('!~'), '"!~"') &&
+
+std.assertEqual(std.manifestPython({
+  x: 'test',
+  y: [],
+  z: ['foo', 'bar'],
+  n: 1,
+  a: true,
+  b: false,
+  c: null,
+  o: { f1: 'foo', f2: 'bar' },
+}), '{%s}' % std.join(', ', [
+  '"a": True',
+  '"b": False',
+  '"c": None',
+  '"n": 1',
+  '"o": {"f1": "foo", "f2": "bar"}',
+  '"x": "test"',
+  '"y": []',
+  '"z": ["foo", "bar"]',
+])) &&
+
+std.assertEqual(std.manifestPythonVars({
+  x: 'test',
+  y: [],
+  z: ['foo', 'bar'],
+  n: 1,
+  a: true,
+  b: false,
+  c: null,
+  o: { f1: 'foo', f2: 'bar' },
+}), std.join('\n', [
+  'a = True',
+  'b = False',
+  'c = None',
+  'n = 1',
+  'o = {"f1": "foo", "f2": "bar"}',
+  'x = "test"',
+  'y = []',
+  'z = ["foo", "bar"]',
+  '',
+])) &&
+
+std.assertEqual(
+  std.manifestXmlJsonml(
+    ['f', {}, ' ', ['g', 'inside'], 'nope', ['h', { attr: 'yolo' }, ['x', { attr: 'otter' }]]]
+  ),
+  '<f> <g>inside</g>nope<h attr="yolo"><x attr="otter"></x></h></f>'
+) &&
+
+
+std.assertEqual(std.base64('Hello World!'), 'SGVsbG8gV29ybGQh') &&
+std.assertEqual(std.base64('Hello World'), 'SGVsbG8gV29ybGQ=') &&
+std.assertEqual(std.base64('Hello Worl'), 'SGVsbG8gV29ybA==') &&
+std.assertEqual(std.base64(''), '') &&
+
+std.assertEqual(std.base64Decode('SGVsbG8gV29ybGQh'), 'Hello World!') &&
+std.assertEqual(std.base64Decode('SGVsbG8gV29ybGQ='), 'Hello World') &&
+std.assertEqual(std.base64Decode('SGVsbG8gV29ybA=='), 'Hello Worl') &&
+std.assertEqual(std.base64Decode(''), '') &&
+
+std.assertEqual(std.reverse([]), []) &&
+std.assertEqual(std.reverse([1]), [1]) &&
+std.assertEqual(std.reverse([1, 2]), [2, 1]) &&
+std.assertEqual(std.reverse([1, 2, 3]), [3, 2, 1]) &&
+std.assertEqual(std.reverse([[1, 2, 3]]), [[1, 2, 3]]) &&
 
 true

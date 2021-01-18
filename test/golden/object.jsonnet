@@ -11,6 +11,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+std.assertEqual({ x: 1, y:2 }, { y:2, x: 1 }) &&
 std.assertEqual({}, {}) &&
 std.assertEqual({ 'x': 1 }, { 'x': 1 }) &&
 std.assertEqual({ '': 1 }, { '': 1 }) &&

@@ -1,2 +1,2 @@
-Assertion failed: 1 != 2
-    ./test/golden/error.sanity.jsonnet:14:1,14:16
+Runtime error: Assertion failed. 1 != 2
+    stdlib/std.jsonnet:807:13,807:50

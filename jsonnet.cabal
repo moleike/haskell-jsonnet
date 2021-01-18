@@ -40,6 +40,7 @@ library
     , Language.Jsonnet.Value
     , Language.Jsonnet.Std
     , Language.Jsonnet.Manifest
+    , Language.Jsonnet.Object
   hs-source-dirs:
       src
   build-depends:

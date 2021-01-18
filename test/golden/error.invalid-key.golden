@@ -1,2 +1,2 @@
 Invalid key: number
-    ./test/golden/error.invalid-key.jsonnet:4:4,4:9
+    stdlib/std.jsonnet:235:7,235:17

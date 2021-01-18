@@ -13,6 +13,7 @@ import Data.Scientific (Scientific)
 import qualified Data.Text as T
 import GHC.Generics
 import Language.Jsonnet.Common
+import Language.Jsonnet.Object
 import Text.Show.Deriving
 
 type Ident = String
@@ -66,7 +67,7 @@ data ExprF a
       Generic1
     )
 
-deriveShow1 ''ExprF
+--deriveShow1 ''ExprF
 
 newtype Import = Import FilePath
   deriving (Show, Eq)

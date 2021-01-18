@@ -15,6 +15,7 @@ import Data.Either
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
+import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -23,6 +24,7 @@ import Data.Void
 import GHC.IO.Exception hiding (IOError)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
+import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
@@ -141,7 +143,7 @@ escapeAscii = do
   char '\\'
   choice
     [ char '\"' $> '\"',
-      char '\'' $> '\'', -- this is specific to jsonnet
+      char '\'' $> '\'', -- this one is jsonnet specific
       char '\\' $> '\\',
       char '/' $> '/',
       char 'n' $> '\n',
@@ -153,7 +155,7 @@ escapeAscii = do
 
 escapeUnicode :: Parser Char
 escapeUnicode = do
-  string "\\u"
+  _ <- string "\\u"
   hex <- ("0x" ++) <$> count 4 hexDigitChar
   pure (chr $ read hex)
 
@@ -240,12 +242,14 @@ forspecP = do
   ifspec <- optional (keywordP "if" *> exprP)
   pure CompSpec {..}
 
+binding :: Parser (String, Expr')
 binding = do
   name <- identifier
   _ <- symbol "="
   expr <- exprP
   pure (name, expr)
 
+localFunc :: Parser (String, Expr')
 localFunc = do
   name <- identifier
   ps <- paramsP
@@ -253,6 +257,7 @@ localFunc = do
   expr <- function (pure ps) exprP
   pure (name, expr)
 
+localBndsP :: Parser (NonEmpty (String, Expr'))
 localBndsP = do
   _ <- keywordP "local"
   (try binding <|> localFunc) `NE.sepBy1` comma
@@ -275,7 +280,6 @@ arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
       comps <- NE.some forspecP
       return $ mkArrCompF expr comps
 
---a[start:stop:step]
 objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
   where
@@ -288,15 +292,18 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       k <- keyP
       h <- sepP
       v <- exprP
-      pure $ Field k v h
+      pure $ Field (Key k) (Value v h)
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       k <- unquoted
       ps <- paramsP
       h <- sepP
       v <- function (pure ps) exprP
-      pure $ Field k v h
-    sepP = try (symbol "::" $> True) <|> (colon $> False)
+      pure $ Field (Key k) (Value v h)
+    sepP =
+      try (symbol ":::" $> Forced)
+        <|> try (symbol "::" $> Hidden)
+        <|> (symbol ":" $> Visible)
     localP = do
       _ <- keywordP "local"
       try binding <|> localFunc
@@ -316,10 +323,10 @@ binary ::
   Text ->
   (Expr' -> Expr' -> Expr') ->
   Operator Parser Expr'
-binary name f = InfixL (f <$ (operator name))
+binary name f = InfixL (f <$ operator name)
   where
     operator sym = try $ symbol sym <* notFollowedBy opChar
-    opChar = oneOf ("!:~+-&|^=<>*/%" :: [Char]) <?> "operator"
+    opChar = oneOf (":~+&|^=<>*/%" :: [Char]) <?> "operator"
 
 prefix ::
   Text ->
@@ -354,7 +361,8 @@ opTable =
       binary "%" (mkBinOp (Arith Mod))
     ],
     [ binary "+" (mkBinOp (Arith Add)),
-      binary "-" (mkBinOp (Arith Sub))
+      binary "-" (mkBinOp (Arith Sub)),
+      Postfix postfixObjectMerge
     ],
     [ binary ">>" (mkBinOp (Bitwise ShiftR)),
       binary "<<" (mkBinOp (Bitwise ShiftL))
@@ -375,33 +383,51 @@ opTable =
     [binary "||" (mkBinOp (Logical LOr))]
   ]
 
+-- | shorthand syntax for object composition:
+-- when the right-hand side is an object literal the '+'
+-- operator can be elided.
+postfixObjectMerge :: Parser (Expr' -> Expr')
+postfixObjectMerge = flip (mkBinOp (Arith Add)) <$> objectP
+
 -- | application, indexing and lookup: e(...) e[...] e.f
 -- all have the same precedence (the highest)
 postfixOperators :: Parser (Expr' -> Expr')
 postfixOperators =
   foldr1 (flip (.))
     <$> some
-      ( apply
-          <|> try slice
-          <|> index
-          <|> lookup
+      ( applyP
+          <|> try sliceP
+          <|> indexP
+          <|> lookupP
       )
-  where
-    apply = flip mkApply <$> argsP
-    index = flip mkIndex <$> brackets exprP
-    lookup = flip mkLookup <$> (symbol "." *> unquoted)
-    slice = brackets $ do
-      start <- optional exprP <* colon
-      end <- optional exprP <* colon
-      step <- optional exprP
-      pure $ mkSlice start end step
 
-argsP :: Parser (Args Expr')
-argsP = try (parens named) <|> parens posal
+indexP :: Parser (Expr' -> Expr')
+indexP = flip mkIndex <$> brackets exprP
+
+lookupP :: Parser (Expr' -> Expr')
+lookupP = flip mkLookup <$> (symbol "." *> unquoted)
+
+-- we are currenly parsing either positional or named arguments,
+-- but we should actually allow to have postional arguments followed
+-- by named arguments (like Python)
+applyP :: Parser (Expr' -> Expr')
+applyP = flip mkApply <$> argsP
   where
-    posal = Positional <$> (exprP `sepBy` comma)
-    named = Named <$> (args `sepBy` comma)
-    args = (,) <$> identifier <*> (symbol "=" *> exprP)
+    argsP :: Parser (Args Expr')
+    argsP = try named <|> posal
+      where
+        named = Named <$> parens (args `sepBy` comma) <*> tailstrict
+        posal = Positional <$> parens (exprP `sepBy` comma) <*> tailstrict
+        args = (,) <$> identifier <*> (symbol "=" *> exprP)
+        tailstrict = option Lazy (keywordP "tailstrict" $> Strict)
+
+-- there are missing cases here, e.g. expr[a:b]
+sliceP :: Parser (Expr' -> Expr')
+sliceP = brackets $ do
+  start <- optional exprP <* colon
+  end <- optional exprP
+  step <- optional (colon *> exprP)
+  pure $ mkSlice start end step
 
 primP :: Parser Expr'
 primP =

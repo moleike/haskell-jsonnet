@@ -5,15 +5,21 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 
 module Language.Jsonnet.Eval
   ( eval,
+    evalClos,
+    mergeObjects,
     module Language.Jsonnet.Eval.Monad,
   )
 where
 
+import Data.Aeson.Text
 import Control.Applicative
 import Control.Monad.Except
+import Data.Text.Lazy (toStrict)
 import Control.Monad.State.Lazy
 import Control.Monad.Reader
 import Data.Bifunctor (second)
@@ -30,8 +36,10 @@ import qualified Data.Text as T
 import Data.Vector ((!?))
 import qualified Data.Vector as V
 import Language.Jsonnet.Common
+import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
+import Language.Jsonnet.Manifest
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
@@ -55,21 +63,33 @@ eval = \case
     env <- ask
     v <- liftMaybe (VarNotFound $ T.pack $ name2String n) (M.lookup n env)
     force v
-  CFun e -> do
-    lunbind e $ \(bnds, e1) ->
-      evalFun (second unembed <$> unrec bnds) e1
-  CApp e1 e2 -> eval e1 >>= \v -> evalApp v e2
-  CLet bnd -> do
-    lunbind bnd $ \(r, e1) -> mdo
-      bnds <-
-        mapM
-          ( \(v, Embed e) -> do
-              pure (v, Thunk $ extendEnv bnds $ eval e)
-          )
-          (unrec r)
-      extendEnv bnds (eval e1)
+  CFun f -> VClos f <$> ask
+  CApp e es -> do
+    vs <- evalArgs es
+    eval e >>= \case
+      VClos f rho -> evalClos rho f vs
+      v@(VFun _) -> foldlM f v vs
+        where
+          f (VFun g) v = g v
+          f v _ = throwTypeMismatch "function" v
+      v -> throwTypeMismatch "function" v
+  CLet (Let bnd) -> mdo
+    (r, e1) <- unbind bnd
+    bnds <-
+      mapM
+        ( \(v, Embed e) -> do
+            th <- mkThunk $ extendEnv bnds $ eval e
+            pure (v, th)
+        )
+        (unrec r)
+    extendEnv bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
+
+  CBinOp (Logical op) e1 e2 -> do
+    e1' <- thunk e1
+    e2' <- thunk e2
+    evalLogical op e1' e2'
   CBinOp op e1 e2 -> do
     e1' <- eval e1
     e2' <- eval e2
@@ -81,15 +101,16 @@ eval = \case
     v1 <- eval e1
     v2 <- eval e2
     evalLookup v1 v2
-  CIfElse c e1 e2 -> eval c >>= \case
-    VBool b ->
-      if b
-        then eval e1
-        else eval e2
-    v -> throwTypeMismatch "bool" v
+  CIfElse c e1 e2 -> do
+    eval c >>= \case
+      VBool b ->
+        if b
+          then eval e1
+          else eval e2
+      v -> throwTypeMismatch "bool" v
   CErr e ->
     ( eval
-        >=> Std.toString
+        >=> toString
         >=> throwError . RuntimeError
     )
       e
@@ -99,20 +120,25 @@ eval = \case
     evalObjComp cs bnd
 
 thunk :: Core -> Eval Thunk
-thunk c = do
-  env <- ask
-  traceShowM (M.keys env)
-  avoids <- getAvoids
-  traceShowM avoids
-  mkThunk (eval c)
+thunk e = ask >>= \rho ->
+  mkThunk $ local (const rho) $ eval e
 
-evalApp :: Value -> Args Core -> Eval Value
-evalApp (VFun f) as = traverse thunk as >>= f
-evalApp v@(VClos _) (Positional ps) = foldlM f v ps
-  where
-    f (VClos c) e = thunk e >>= c
-    f v _ = throwTypeMismatch "function" v
-evalApp v _ = throwTypeMismatch "function" v
+extendEnv :: [(Name Core, Thunk)] -> Eval a -> Eval a
+extendEnv ns = local (M.union $ M.fromList ns)
+
+evalArgs :: Args Core -> Eval (Args Thunk)
+evalArgs = \case
+  as@(Named _ Lazy) -> traverse thunk as
+  as@(Positional _ Lazy) -> traverse thunk as
+  as -> traverse f as
+    where
+    f = eval >=> pure . TV . pure
+
+evalClos :: Env -> Fun -> Args Thunk -> Eval Value
+evalClos rho (Fun f) vs = do
+  (bnds, e) <- unbind f
+  let xs = second unembed <$> unrec bnds
+  local (const rho) $ evalFun xs e vs
 
 appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
 appDefaults rs e = do
@@ -122,26 +148,25 @@ appDefaults rs e = do
       bnds <-
         mapM
           ( \(v, e) -> do
-              pure (v, Thunk $ extendEnv bnds $ eval e)
+            th <- mkThunk $ extendEnv bnds $ eval e
+            pure (v, th)
           )
           (zip ns $ catMaybes ds)
       extendEnv bnds (eval e)
   where
     (ns, ds) = unzip rs
 
-evalFun :: [(Name Core, Maybe Core)] -> Core -> Eval Value
-evalFun bnds e = pure $ VFun $ \case
-  Positional ps -> do
+--evalFun :: [(Name Core, Maybe Core)] -> Core -> Eval Value
+evalFun bnds e = \case
+  Positional ps _ -> do
     case compare (length ns) (length ps) of
       LT -> throwError $ TooManyArgs (length ps)
-      EQ -> do
-        extendEnv (zip ns ps) (eval e)
-      GT -> do
-        extendEnv (zip ns ps) (appDefaults rs e)
+      EQ -> extendEnv (zip ns ps) (eval e)
+      GT -> extendEnv (zip ns ps) (appDefaults rs e)
     where
       rs = drop (length ps) bnds
       (ns, _) = unzip bnds
-  Named ps -> do
+  Named ps _ -> do
     (ns, vs) <- unzip <$> buildParams ps bnds
     let rs = filter ((`notElem` ns) . fst) bnds
     extendEnv (zip ns vs) (appDefaults rs e)
@@ -154,23 +179,57 @@ evalFun bnds e = pure $ VFun $ \case
           Just n -> pure (n, b)
         g a = find ((a ==) . name2String) ns
 
+-- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
+-- this is a trivial implementaton and it does not address object
+-- composition. In particular, 'self' is not late bound.
+mergeObjects :: Value -> Value -> Eval Value
+mergeObjects (VObj xs) (VObj ys) = do
+  let f a b | O.hidden a && O.visible b = a
+            | otherwise = b
+      zs = H.unionWith f xs ys
+      fs = VObj $ H.map
+        ( fmap $ \case
+            TC rho e -> TC (M.insert "self" (TV $ pure fs) rho) e
+            v@(TV {}) -> v
+        )
+        zs
+  pure fs
 
-evalObj :: [Field Core] -> Eval Value
-evalObj xs =
-  VObj . H.fromList
-    . catMaybes
-    <$> traverse evalField xs
+--evalObj :: [O.Field Core] -> Eval Value
+--evalObj xs =
+--  VObj . H.fromList
+--    . catMaybes
+--    <$> traverse evalField xs
 
-evalField :: Field Core -> Eval (Maybe (Key, Thunk))
-evalField Field {..} = do
-  a <- eval key
-  b <- thunk value
-  case a of
-    VStr k -> pure $ Just $ case hidden of
-      True -> (Hidden k, b)
-      False -> (Visible k, b)
+evalObj :: [O.Field Core] -> Eval Value
+evalObj xs = mdo
+  env <- ask
+  fs <-
+    catMaybes <$> mapM
+      ( \(O.Field key value) -> do
+        k <- evalKey key
+        v <- pure $ TC (M.insert "self" (self fs) env) <$> value
+        case k of
+          Just k -> pure $ Just (k, v)
+          _      -> pure Nothing
+      )
+      xs
+  pure $ VObj $ H.fromList $ fs
+  where
+    self = TV . pure . VObj . H.fromList
+
+evalKey :: O.Key Core -> Eval (Maybe (O.Key Text))
+evalKey (O.Key key) =
+  eval key >>= \case
+    VStr k -> pure $ Just (O.Key k)
     VNull -> pure Nothing
     v -> throwInvalidKey v
+
+evalField :: O.Field Core -> Eval (Maybe (O.Key Text, O.Value Thunk))
+evalField (O.Field key value) = do
+  a <- evalKey key
+  b <- ask >>= \rho -> pure (TC rho <$> value)
+  pure $ (,b) <$> a
 
 evalArrComp ::
   Core ->
@@ -182,21 +241,22 @@ evalArrComp cs bnd = do
   where
     comp = eval cs >>= \case
       VArr xs -> forM xs $ \x -> do
-        lunbind bnd $ \(n, (e, cond)) ->
-          extendEnv [(n, x)] $ do
-            b <- f cond
-            if b
-              then Just <$> thunk e
-              else pure Nothing
+        (n, (e, cond)) <- unbind bnd
+        extendEnv [(n, x)] $ do
+          b <- f cond
+          if b
+            then Just <$> thunk e
+            else pure Nothing
       v -> throwTypeMismatch "array" v
-    f Nothing = pure True
-    f (Just c) = do
-      vb <- eval c
-      proj vb
+      where
+        f Nothing = pure True
+        f (Just c) = do
+          vb <- eval c
+          proj vb
 
 evalObjComp ::
   Core ->
-  Bind (Name Core) (Field Core, Maybe Core) ->
+  Bind (Name Core) (O.Field Core, Maybe Core) ->
   Eval Value
 evalObjComp cs bnd = do
   xs <- comp
@@ -204,12 +264,12 @@ evalObjComp cs bnd = do
   where
     comp = eval cs >>= \case
       VArr xs -> forM xs $ \x -> do
-        lunbind bnd $ \(n, (e, cond)) ->
-          extendEnv [(n, x)] $ do
-            b <- f cond
-            if b
-              then evalField e
-              else pure Nothing
+        (n, (e, cond)) <- unbind bnd
+        extendEnv [(n, x)] $ do
+          b <- f cond
+          if b
+            then evalField e
+            else pure Nothing
       v -> throwTypeMismatch "array" v
     f Nothing = pure True
     f (Just c) = do
@@ -223,14 +283,14 @@ evalUnyOp Minus x = inj <$> fmap (negate @Double) (proj x)
 evalUnyOp Plus x = inj <$> fmap (id @Double) (proj x)
 
 evalBinOp :: BinOp -> Value -> Value -> Eval Value
-evalBinOp In s o = evalBin Std.objectHasAll o s
+evalBinOp In s o = evalBin (\o s -> Std.objectHasEx o s True) o s
 evalBinOp (Arith Add) x@(VStr _) y = inj <$> append x y
 evalBinOp (Arith Add) x y@(VStr _) = inj <$> append x y
 evalBinOp (Arith Add) x@(VArr _) y@(VArr _) = evalBin ((V.++) @Thunk) x y
+evalBinOp (Arith Add) x@(VObj _) y@(VObj _) = mergeObjects x y
 evalBinOp (Arith op) x y = evalArith op x y
 evalBinOp (Comp op) x y = evalComp op x y
 evalBinOp (Bitwise op) x y = evalBitwise op x y
-evalBinOp (Logical op) x y = evalLogical op x y
 
 evalArith :: ArithOp -> Value -> Value -> Eval Value
 evalArith Add n1 n2 = evalBin ((+) @Double) n1 n2
@@ -246,12 +306,18 @@ evalComp Lt n1 n2 = evalBin ((<) @Double) n1 n2
 evalComp Gt n1 n2 = evalBin ((>) @Double) n1 n2
 evalComp Le n1 n2 = evalBin ((<=) @Double) n1 n2
 evalComp Ge n1 n2 = evalBin ((>=) @Double) n1 n2
-evalComp Eq n1 n2 = VBool <$> Std.equals n1 n2
-evalComp Ne n1 n2 = VBool . not <$> Std.equals n1 n2
 
-evalLogical :: LogicalOp -> Value -> Value -> Eval Value
-evalLogical LAnd = evalBin (&&)
-evalLogical LOr = evalBin (||)
+evalLogical :: LogicalOp -> Thunk -> Thunk -> Eval Value
+evalLogical LAnd e1 e2 = do
+  force e1 >>= \case
+    VBool True -> force e2 >>= \x -> inj <$> fmap (id @Bool) (proj x)
+    VBool False -> pure (VBool False)
+    v -> throwTypeMismatch "boolean" v
+evalLogical LOr e1 e2 = do
+  force e1 >>= \case
+    VBool False -> force e2 >>= \x -> inj <$> fmap (id @Bool) (proj x)
+    VBool True -> pure (VBool True)
+    v -> throwTypeMismatch "boolean" v
 
 evalBitwise :: BitwiseOp -> Value -> Value -> Eval Value
 evalBitwise And = evalBin ((.&.) @Int64)
@@ -267,7 +333,7 @@ evalLookup (VArr a) (VNum i)
 evalLookup (VArr _) _ =
   throwError (InvalidIndex $ "array index was not integer")
 evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey s) (H.lookup (Visible s) o <|> H.lookup (Hidden s) o) >>= force
+  liftMaybe (NoSuchKey s) (H.lookup (O.Key s) o) >>= force . O.value
 evalLookup (VStr s) (VNum i) | isInteger i = do
   liftMaybe (IndexOutOfBounds i) (f =<< bounded)
   where
@@ -285,8 +351,8 @@ evalLiteral :: Literal -> Eval Value
 evalLiteral = \case
   Null -> pure VNull
   Bool b -> pure $ VBool b
-  String b -> pure $ VStr b
-  Number b -> pure $ VNum b
+  String s -> pure $ VStr s
+  Number n -> pure $ VNum n
 
 liftMaybe :: MonadError e m => e -> Maybe a -> m a
 liftMaybe e =
@@ -303,7 +369,7 @@ evalBin ::
 evalBin = inj''
 
 append :: Value -> Value -> Eval Text
-append v1 v2 = T.append <$> Std.toString v1 <*> Std.toString v2
+append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 throwInvalidKey :: MonadError EvalError m => Value -> m a
 throwInvalidKey = throwError . InvalidKey . valueType
@@ -314,9 +380,6 @@ throwDuplicateKey = throwError . DuplicateKey
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}
 
-extendEnv :: (MonadReader Env m, LFresh m) => [(Name Core, Thunk)] -> m a -> m a
-extendEnv ns =
-  avoid (AnyName <$> (fst $ unzip ns))
-  . local (flip (foldr f) ns)
-  where
-    f (var, th) = M.insert var th
+toString :: Value -> Eval Text
+toString (VStr s) = pure s
+toString v = toStrict . encodeToLazyText <$> manifest v

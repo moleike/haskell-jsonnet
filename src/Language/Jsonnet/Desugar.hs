@@ -17,6 +17,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
+import Language.Jsonnet.Object
 import Language.Jsonnet.Core
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
@@ -45,19 +46,29 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
       EFun ps e -> mkFun ps e
       EApply e es -> CApp e es
       ELocal bnds e -> mkLet bnds e
+      -- operator % is overloaded for both modulo and string formatting
+      EBinOp (Arith Mod) e1 e2 ->
+        stdFunc "mod" (Positional [e1, e2] Lazy)
+      EBinOp (Comp Eq) e1 e2 ->
+        stdFunc "equals" (Positional [e1, e2] Lazy)
+      EBinOp (Comp Ne) e1 e2 ->
+        CUnyOp LNot (stdFunc "equals" (Positional [e1, e2] Lazy))
       EBinOp op e1 e2 -> CBinOp op e1 e2
       EUnyOp op e -> CUnyOp op e
       EIfElse c t e -> CIfElse c t e
       EIf c t -> CIfElse c t (CLit Null)
       EArr e -> CArr e
       EObj {..} ->
-        mkLet (("self", CObj fields) :| bnds) self
+        --mkLet (("self", CObj fields) :| bnds) self
+        case bnds of
+          [] -> fs
+          xs -> mkLet (NE.fromList xs) fs
         where
           bnds =
             if outermost
-              then (("$", self) : locals)
+              then (("$", fs) : locals)
               else locals
-          self = CVar (s2n "self")
+          fs = CObj fields
       ELookup e1 e2 -> CLookup e1 e2
       EIndex e1 e2 -> CLookup e1 e2
       EErr e -> CErr e
@@ -66,11 +77,12 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
         stdFunc
           "slice"
           ( Positional
-              [ maybeNull start,
+              [ expr,
+                maybeNull start,
                 maybeNull end,
-                maybeNull step,
-                expr
+                maybeNull step
               ]
+              Lazy
           )
         where
           maybeNull = fromMaybe (CLit Null)
@@ -94,16 +106,16 @@ mkArrComp expr comp = foldr f (CArr [expr]) comp
     f CompSpec {..} e =
       CComp (ArrC (bind (s2n var) (e, ifspec))) forspec
 
-mkObjComp Field {..} comp locals =
+mkObjComp (Field key value) comp locals =
   CComp (ObjC (bind (s2n "arr") (field', Nothing))) arrComp
   where
-    field' = Field key' value' hidden
+    field' = Field key' value'
     bnds = NE.zip (fmap var comp) xs
-    key' = mkLet bnds key
+    key' = mkLet bnds <$> key
     value' = case locals of
-      [] -> mkLet bnds value
+      [] -> mkLet bnds <$> value
       -- we need to nest the let bindings due to the impl.
-      xs -> mkLet bnds $ mkLet (NE.fromList xs) value
+      xs -> mkLet bnds . mkLet (NE.fromList xs) <$> value
     xs = CLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
     arrComp = mkArrComp arr comp
     arr = CArr $ NE.toList $ CVar . s2n . var <$> comp
@@ -117,7 +129,7 @@ stdFunc f =
     )
 
 mkFun ps e =
-  CFun $
+  CFun $ Fun $
     bind
       ( rec $
           fmap
@@ -129,7 +141,7 @@ mkFun ps e =
       e
 
 mkLet bnds e =
-  CLet $
+  CLet $ Let $
     bind
       ( rec $
           toList

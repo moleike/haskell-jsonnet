@@ -25,7 +25,7 @@ stack build
 
 - ~~array and object comprehension~~
 - ~~array slices~~
-- Python-style string formatting
+- ~~Python-style string formatting~~
 - text blocks 
 - ~~verbatim strings~~
 - ~~object-level locals~~
@@ -35,9 +35,10 @@ stack build
 - ~~default arguments~~
 - top-level arguments
 - external variables
-- object composition (merging objects and `super` keyword)
+- ~~object composition (merging objects)~~
+- `super` keyword
 - ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
-- tailstrict annotation
+- ~~tailstrict annotation~~
 
 [//]: # "Implementation overview"
 
