@@ -182,7 +182,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) whe
     r <- f (TV $ pure $ inj x)
     proj r
   proj (VClos f env) = pure $ \x -> do
-    r <- evalClos env f $ Args [Pos $ TV $ pure $ inj x] Lazy
+    r <- evalClos env f $ [Pos $ TV $ pure $ inj x]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = VFun $ \v -> proj' v >>= fmap inj . f
@@ -193,7 +193,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
     r <- g (TV $ pure $ inj y)
     proj r
   proj (VClos f env) = pure $ \x y -> do
-    r <- evalClos env f $ Args (Pos . TV . pure <$> [inj x, inj y]) Lazy
+    r <- evalClos env f $ Pos . TV . pure <$> [inj x, inj y]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)

@@ -7,4 +7,4 @@ import {-# SOURCE #-} Language.Jsonnet.Value (Thunk, Value)
 
 eval :: Core -> Eval Value
 
-evalClos :: Env -> Fun -> Args Thunk -> Eval Value
+evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value

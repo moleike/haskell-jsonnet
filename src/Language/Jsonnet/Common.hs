@@ -89,7 +89,10 @@ data Arg a = Pos a | Named String a
 
 instance Alpha a => Alpha (Arg a)
 
-data Args a = Args [Arg a] Strictness
+data Args a = Args
+  { args :: [Arg a],
+    strictness :: Strictness
+  }
   deriving
     ( Eq,
       Read,

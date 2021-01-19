@@ -70,7 +70,7 @@ eval = \case
       VClos f rho -> evalClos rho f vs
       v@(VFun _) -> foldlM f v vs
         where
-          f (VFun g) v = g v
+          f (VFun g) (Pos v) = g v
           f v _ = throwTypeMismatch "function" v
       v -> throwTypeMismatch "function" v
   CLet (Let bnd) -> mdo
@@ -126,14 +126,14 @@ thunk e = ask >>= \rho ->
 extendEnv :: [(Name Core, Thunk)] -> Eval a -> Eval a
 extendEnv ns = local (M.union $ M.fromList ns)
 
-evalArgs :: Args Core -> Eval (Args Thunk)
+evalArgs :: Args Core -> Eval [Arg Thunk]
 evalArgs = \case
-  as@(Args _ Lazy) -> traverse thunk as
-  as@(Args _ Strict) -> traverse f as
+  as@(Args _ Lazy) -> args <$> traverse thunk as
+  as@(Args _ Strict) -> args <$> traverse f as
     where
     f = eval >=> pure . TV . pure
 
-evalClos :: Env -> Fun -> Args Thunk -> Eval Value
+evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) vs = do
   (bnds, e) <- unbind f
   let xs = second unembed <$> unrec bnds
@@ -155,8 +155,7 @@ appDefaults rs e = do
   where
     (ns, ds) = unzip rs
 
---evalFun :: [(Name Core, Maybe Core)] -> Core -> Eval Value
-evalFun bnds e (Args args _) = do
+evalFun bnds e args = do
   if length ps > length bnds
     then throwError $ TooManyArgs (length args)
     else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
@@ -184,41 +183,6 @@ evalFun bnds e (Args args _) = do
                  Nothing -> throwError $ BadParam $ T.pack a
                  Just n -> pure (n, b)
                g a = find ((a ==) . name2String) ns
-
-  --Positional ps _ -> do
-  --  case compare (length ns) (length ps) of
-  --    LT -> throwError $ TooManyArgs (length ps)
-  --    EQ -> extendEnv (zip ns ps) (eval e)
-  --    GT -> extendEnv (zip ns ps) (appDefaults rs e)
-  --  where
-  --    rs = drop (length ps) bnds
-  --    (ns, _) = unzip bnds
-  --Named ps _ -> do
-  --  (ns, vs) <- unzip <$> buildParams ps bnds
-  --  let rs = filter ((`notElem` ns) . fst) bnds
-  --  extendEnv (zip ns vs) (appDefaults rs e)
-  --where
-  --  buildParams as bnds = traverse f as
-  --    where
-  --      ns = fst $ unzip bnds
-  --      f (a, b) = case g a of
-  --        Nothing -> throwError $ BadParam $ T.pack a
-  --        Just n -> pure (n, b)
-  --      g a = find ((a ==) . name2String) ns
-
--- bnds [a, b=2, c=4]
--- span (1, 2, c=3) --> ([1, 2], [c=3])
--- if length as > length bnds
--- then too many args
--- else -> drop (length as) bnds --> rs c=4
--- evalNamed bs rs --> case bs of
---   [] -> appDefaults rs
---   xs -> buildParams xs rs
-
--- divide params into positional and named
---
--- drop length of span in bnds
--- the remaining bnds are used to check the named params
 
 -- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
 mergeObjects :: Value -> Value -> Eval Value
