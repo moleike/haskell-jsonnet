@@ -128,9 +128,8 @@ extendEnv ns = local (M.union $ M.fromList ns)
 
 evalArgs :: Args Core -> Eval (Args Thunk)
 evalArgs = \case
-  as@(Named _ Lazy) -> traverse thunk as
-  as@(Positional _ Lazy) -> traverse thunk as
-  as -> traverse f as
+  as@(Args _ Lazy) -> traverse thunk as
+  as@(Args _ Strict) -> traverse f as
     where
     f = eval >=> pure . TV . pure
 
@@ -157,31 +156,71 @@ appDefaults rs e = do
     (ns, ds) = unzip rs
 
 --evalFun :: [(Name Core, Maybe Core)] -> Core -> Eval Value
-evalFun bnds e = \case
-  Positional ps _ -> do
-    case compare (length ns) (length ps) of
-      LT -> throwError $ TooManyArgs (length ps)
-      EQ -> extendEnv (zip ns ps) (eval e)
-      GT -> extendEnv (zip ns ps) (appDefaults rs e)
-    where
-      rs = drop (length ps) bnds
-      (ns, _) = unzip bnds
-  Named ps _ -> do
-    (ns, vs) <- unzip <$> buildParams ps bnds
-    let rs = filter ((`notElem` ns) . fst) bnds
-    extendEnv (zip ns vs) (appDefaults rs e)
-  where
-    buildParams as bnds = traverse f as
-      where
-        ns = fst $ unzip bnds
-        f (a, b) = case g a of
-          Nothing -> throwError $ BadParam $ T.pack a
-          Just n -> pure (n, b)
-        g a = find ((a ==) . name2String) ns
+evalFun bnds e (Args args _) = do
+  if length ps > length bnds
+    then throwError $ TooManyArgs (length args)
+    else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
+  where isPos = \case
+          Pos _ -> True
+          _ -> False
+        (ps, ns) = span isPos args
+        ps' = fmap (\(Pos a) -> a) ps
+        (names, _) = unzip bnds
+        bnds' = drop (length ps) bnds
+        evalNamedArgs ns bnds = do
+         ns' <- forM ns $ \case
+           Named n v -> pure (n, v)
+           -- TODO this belongs to static checking
+           -- which is not implemented yet
+           Pos a -> throwError $ BadParam "positional after named parameter"
+         (names, vs) <- unzip <$> buildParams ns' bnds
+         let rs = filter ((`notElem` names) . fst) bnds
+         extendEnv (zip names vs) (appDefaults rs e)
+         where
+           buildParams as bnds = traverse f as
+             where
+               ns = fst $ unzip bnds
+               f (a, b) = case g a of
+                 Nothing -> throwError $ BadParam $ T.pack a
+                 Just n -> pure (n, b)
+               g a = find ((a ==) . name2String) ns
+
+  --Positional ps _ -> do
+  --  case compare (length ns) (length ps) of
+  --    LT -> throwError $ TooManyArgs (length ps)
+  --    EQ -> extendEnv (zip ns ps) (eval e)
+  --    GT -> extendEnv (zip ns ps) (appDefaults rs e)
+  --  where
+  --    rs = drop (length ps) bnds
+  --    (ns, _) = unzip bnds
+  --Named ps _ -> do
+  --  (ns, vs) <- unzip <$> buildParams ps bnds
+  --  let rs = filter ((`notElem` ns) . fst) bnds
+  --  extendEnv (zip ns vs) (appDefaults rs e)
+  --where
+  --  buildParams as bnds = traverse f as
+  --    where
+  --      ns = fst $ unzip bnds
+  --      f (a, b) = case g a of
+  --        Nothing -> throwError $ BadParam $ T.pack a
+  --        Just n -> pure (n, b)
+  --      g a = find ((a ==) . name2String) ns
+
+-- bnds [a, b=2, c=4]
+-- span (1, 2, c=3) --> ([1, 2], [c=3])
+-- if length as > length bnds
+-- then too many args
+-- else -> drop (length as) bnds --> rs c=4
+-- evalNamed bs rs --> case bs of
+--   [] -> appDefaults rs
+--   xs -> buildParams xs rs
+
+-- divide params into positional and named
+--
+-- drop length of span in bnds
+-- the remaining bnds are used to check the named params
 
 -- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
--- this is a trivial implementaton and it does not address object
--- composition. In particular, 'self' is not late bound.
 mergeObjects :: Value -> Value -> Eval Value
 mergeObjects (VObj xs) (VObj ys) = do
   let f a b | O.hidden a && O.visible b = a

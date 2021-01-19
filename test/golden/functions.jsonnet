@@ -43,8 +43,8 @@ std.assertEqual({ g: 3, f(a=[self.g, b[1]], b=[a[0], 2]): [a, b] }.f(),
 local url(host, port=80, protocol='http', url='%s://%s:%d/' % [protocol, host, port]) = url;
 
 std.assertEqual(url('myhost'), 'http://myhost:80/') &&
-//std.assertEqual(url('mybucket', 8080, protocol='gs'), 'gs://mybucket:8080/') &&
-//std.assertEqual(url(null, url='wat'), 'wat') &&
+std.assertEqual(url('mybucket', 8080, protocol='gs'), 'gs://mybucket:8080/') &&
+std.assertEqual(url(null, url='wat'), 'wat') &&
 
 local test(a=error 'Need a', alt="'" + a + "'") = alt;
 std.assertEqual(test(a='Q'), "'Q'") &&

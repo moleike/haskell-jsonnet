@@ -1250,127 +1250,127 @@ limitations under the License.
     std.makeArray(l, function(i) arr[l - i - 1]),
 
   // Merge-sort for long arrays and naive quicksort for shorter ones
-  #sort(arr, keyF=id)::
-  #  local quickSort(arr, keyF=id) =
-  #    local l = std.length(arr);
-  #    if std.length(arr) <= 1 then
-  #      arr
-  #    else
-  #      local pos = 0;
-  #      local pivot = keyF(arr[pos]);
-  #      local rest = std.makeArray(l - 1, function(i) if i < pos then arr[i] else arr[i + 1]);
-  #      local left = std.filter(function(x) keyF(x) < pivot, rest);
-  #      local right = std.filter(function(x) keyF(x) >= pivot, rest);
-  #      quickSort(left, keyF) + [arr[pos]] + quickSort(right, keyF);
+  sort(arr, keyF=id)::
+    local quickSort(arr, keyF=id) =
+      local l = std.length(arr);
+      if std.length(arr) <= 1 then
+        arr
+      else
+        local pos = 0;
+        local pivot = keyF(arr[pos]);
+        local rest = std.makeArray(l - 1, function(i) if i < pos then arr[i] else arr[i + 1]);
+        local left = std.filter(function(x) keyF(x) < pivot, rest);
+        local right = std.filter(function(x) keyF(x) >= pivot, rest);
+        quickSort(left, keyF) + [arr[pos]] + quickSort(right, keyF);
 
-  #  local merge(a, b) =
-  #    local la = std.length(a), lb = std.length(b);
-  #    local aux(i, j, prefix) =
-  #      if i == la then
-  #        prefix + b[j:]
-  #      else if j == lb then
-  #        prefix + a[i:]
-  #      else
-  #        if keyF(a[i]) <= keyF(b[j]) then
-  #          aux(i + 1, j, prefix + [a[i]]) tailstrict
-  #        else
-  #          aux(i, j + 1, prefix + [b[j]]) tailstrict;
-  #    aux(0, 0, []);
+    local merge(a, b) =
+      local la = std.length(a), lb = std.length(b);
+      local aux(i, j, prefix) =
+        if i == la then
+          prefix + b[j:]
+        else if j == lb then
+          prefix + a[i:]
+        else
+          if keyF(a[i]) <= keyF(b[j]) then
+            aux(i + 1, j, prefix + [a[i]]) tailstrict
+          else
+            aux(i, j + 1, prefix + [b[j]]) tailstrict;
+      aux(0, 0, []);
 
-  #  local l = std.length(arr);
-  #  if std.length(arr) <= 30 then
-  #    quickSort(arr, keyF=keyF)
-  #  else
-  #    local mid = std.floor(l / 2);
-  #    local left = arr[:mid], right = arr[mid:];
-  #    merge(std.sort(left, keyF=keyF), std.sort(right, keyF=keyF)),
+    local l = std.length(arr);
+    if std.length(arr) <= 30 then
+      quickSort(arr, keyF=keyF)
+    else
+      local mid = std.floor(l / 2);
+      local left = arr[:mid], right = arr[mid:];
+      merge(std.sort(left, keyF=keyF), std.sort(right, keyF=keyF)),
 
-  #uniq(arr, keyF=id)::
-  #  local f(a, b) =
-  #    if std.length(a) == 0 then
-  #      [b]
-  #    else if keyF(a[std.length(a) - 1]) == keyF(b) then
-  #      a
-  #    else
-  #      a + [b];
-  #  std.foldl(f, arr, []),
+  uniq(arr, keyF=id)::
+    local f(a, b) =
+      if std.length(a) == 0 then
+        [b]
+      else if keyF(a[std.length(a) - 1]) == keyF(b) then
+        a
+      else
+        a + [b];
+    std.foldl(f, arr, []),
 
-  #set(arr, keyF=id)::
-  #  std.uniq(std.sort(arr, keyF), keyF),
+  set(arr, keyF=id)::
+    std.uniq(std.sort(arr, keyF), keyF),
 
-  #setMember(x, arr, keyF=id)::
-  #  // TODO(dcunnin): Binary chop for O(log n) complexity
-  #  std.length(std.setInter([x], arr, keyF)) > 0,
+  setMember(x, arr, keyF=id)::
+    // TODO(dcunnin): Binary chop for O(log n) complexity
+    std.length(std.setInter([x], arr, keyF)) > 0,
 
-  #setUnion(a, b, keyF=id)::
-  #  // NOTE: order matters, values in `a` win
-  #  local aux(a, b, i, j, acc) =
-  #    if i >= std.length(a) then
-  #      acc + b[j:]
-  #    else if j >= std.length(b) then
-  #      acc + a[i:]
-  #    else
-  #      local ak = keyF(a[i]);
-  #      local bk = keyF(b[j]);
-  #      if ak == bk then
-  #        aux(a, b, i + 1, j + 1, acc + [a[i]]) tailstrict
-  #      else if ak < bk then
-  #        aux(a, b, i + 1, j, acc + [a[i]]) tailstrict
-  #      else
-  #        aux(a, b, i, j + 1, acc + [b[j]]) tailstrict;
-  #  aux(a, b, 0, 0, []),
+  setUnion(a, b, keyF=id)::
+    // NOTE: order matters, values in `a` win
+    local aux(a, b, i, j, acc) =
+      if i >= std.length(a) then
+        acc + b[j:]
+      else if j >= std.length(b) then
+        acc + a[i:]
+      else
+        local ak = keyF(a[i]);
+        local bk = keyF(b[j]);
+        if ak == bk then
+          aux(a, b, i + 1, j + 1, acc + [a[i]]) tailstrict
+        else if ak < bk then
+          aux(a, b, i + 1, j, acc + [a[i]]) tailstrict
+        else
+          aux(a, b, i, j + 1, acc + [b[j]]) tailstrict;
+    aux(a, b, 0, 0, []),
 
-  #setInter(a, b, keyF=id)::
-  #  local aux(a, b, i, j, acc) =
-  #    if i >= std.length(a) || j >= std.length(b) then
-  #      acc
-  #    else
-  #      if keyF(a[i]) == keyF(b[j]) then
-  #        aux(a, b, i + 1, j + 1, acc + [a[i]]) tailstrict
-  #      else if keyF(a[i]) < keyF(b[j]) then
-  #        aux(a, b, i + 1, j, acc) tailstrict
-  #      else
-  #        aux(a, b, i, j + 1, acc) tailstrict;
-  #  aux(a, b, 0, 0, []) tailstrict,
+  setInter(a, b, keyF=id)::
+    local aux(a, b, i, j, acc) =
+      if i >= std.length(a) || j >= std.length(b) then
+        acc
+      else
+        if keyF(a[i]) == keyF(b[j]) then
+          aux(a, b, i + 1, j + 1, acc + [a[i]]) tailstrict
+        else if keyF(a[i]) < keyF(b[j]) then
+          aux(a, b, i + 1, j, acc) tailstrict
+        else
+          aux(a, b, i, j + 1, acc) tailstrict;
+    aux(a, b, 0, 0, []) tailstrict,
 
-  #setDiff(a, b, keyF=id)::
-  #  local aux(a, b, i, j, acc) =
-  #    if i >= std.length(a) then
-  #      acc
-  #    else if j >= std.length(b) then
-  #      acc + a[i:]
-  #    else
-  #      if keyF(a[i]) == keyF(b[j]) then
-  #        aux(a, b, i + 1, j + 1, acc) tailstrict
-  #      else if keyF(a[i]) < keyF(b[j]) then
-  #        aux(a, b, i + 1, j, acc + [a[i]]) tailstrict
-  #      else
-  #        aux(a, b, i, j + 1, acc) tailstrict;
-  #  aux(a, b, 0, 0, []) tailstrict,
+  setDiff(a, b, keyF=id)::
+    local aux(a, b, i, j, acc) =
+      if i >= std.length(a) then
+        acc
+      else if j >= std.length(b) then
+        acc + a[i:]
+      else
+        if keyF(a[i]) == keyF(b[j]) then
+          aux(a, b, i + 1, j + 1, acc) tailstrict
+        else if keyF(a[i]) < keyF(b[j]) then
+          aux(a, b, i + 1, j, acc + [a[i]]) tailstrict
+        else
+          aux(a, b, i, j + 1, acc) tailstrict;
+    aux(a, b, 0, 0, []) tailstrict,
 
-  #mergePatch(target, patch)::
-  #  if std.isObject(patch) then
-  #    local target_object =
-  #      if std.isObject(target) then target else {};
+  mergePatch(target, patch)::
+    if std.isObject(patch) then
+      local target_object =
+        if std.isObject(target) then target else {};
 
-  #    local target_fields =
-  #      if std.isObject(target_object) then std.objectFields(target_object) else [];
+      local target_fields =
+        if std.isObject(target_object) then std.objectFields(target_object) else [];
 
-  #    local null_fields = [k for k in std.objectFields(patch) if patch[k] == null];
-  #    local both_fields = std.setUnion(target_fields, std.objectFields(patch));
+      local null_fields = [k for k in std.objectFields(patch) if patch[k] == null];
+      local both_fields = std.setUnion(target_fields, std.objectFields(patch));
 
-  #    {
-  #      [k]:
-  #        if !std.objectHas(patch, k) then
-  #          target_object[k]
-  #        else if !std.objectHas(target_object, k) then
-  #          std.mergePatch(null, patch[k]) tailstrict
-  #        else
-  #          std.mergePatch(target_object[k], patch[k]) tailstrict
-  #      for k in std.setDiff(both_fields, null_fields)
-  #    }
-  #  else
-  #    patch,
+      {
+        [k]:
+          if !std.objectHas(patch, k) then
+            target_object[k]
+          else if !std.objectHas(target_object, k) then
+            std.mergePatch(null, patch[k]) tailstrict
+          else
+            std.mergePatch(target_object[k], patch[k]) tailstrict
+        for k in std.setDiff(both_fields, null_fields)
+      }
+    else
+      patch,
 
   objectFields(o)::
     std.objectFieldsEx(o, false),

@@ -74,9 +74,22 @@ data Strictness = Strict | Lazy
 
 instance Alpha Strictness
 
-data Args a
-  = Positional [a] Strictness
-  | Named [(String, a)] Strictness
+data Arg a = Pos a | Named String a
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Generic,
+      Generic1,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (Arg a)
+
+data Args a = Args [Arg a] Strictness
   deriving
     ( Eq,
       Read,
@@ -90,15 +103,6 @@ data Args a
     )
 
 instance Alpha a => Alpha (Args a)
-
-instance Eq1 Args where
-  liftEq = liftEqDefault
-
-instance Read1 Args where
-  liftReadsPrec = liftReadsPrecDefault
-
-instance Show1 Args where
-  liftShowsPrec = liftShowsPrecDefault
 
 data Assert a = Assert
   { cond :: a,

@@ -48,11 +48,11 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
       ELocal bnds e -> mkLet bnds e
       -- operator % is overloaded for both modulo and string formatting
       EBinOp (Arith Mod) e1 e2 ->
-        stdFunc "mod" (Positional [e1, e2] Lazy)
+        stdFunc "mod" (Args [Pos e1, Pos e2] Lazy)
       EBinOp (Comp Eq) e1 e2 ->
-        stdFunc "equals" (Positional [e1, e2] Lazy)
+        stdFunc "equals" (Args [Pos e1, Pos e2] Lazy)
       EBinOp (Comp Ne) e1 e2 ->
-        CUnyOp LNot (stdFunc "equals" (Positional [e1, e2] Lazy))
+        CUnyOp LNot (stdFunc "equals" (Args [Pos e1, Pos e2] Lazy))
       EBinOp op e1 e2 -> CBinOp op e1 e2
       EUnyOp op e -> CUnyOp op e
       EIfElse c t e -> CIfElse c t e
@@ -76,11 +76,11 @@ alg (AnnF f (a, b)) = go b $ CLoc a <$> f
       ESlice {..} ->
         stdFunc
           "slice"
-          ( Positional
-              [ expr,
-                maybeNull start,
-                maybeNull end,
-                maybeNull step
+          ( Args
+              [ Pos expr,
+                Pos $ maybeNull start,
+                Pos $ maybeNull end,
+                Pos $ maybeNull step
               ]
               Lazy
           )

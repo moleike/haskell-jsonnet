@@ -16,7 +16,6 @@ import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
 import Data.List.NonEmpty (NonEmpty)
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -407,18 +406,17 @@ indexP = flip mkIndex <$> brackets exprP
 lookupP :: Parser (Expr' -> Expr')
 lookupP = flip mkLookup <$> (symbol "." *> unquoted)
 
--- we are currenly parsing either positional or named arguments,
--- but we should actually allow to have postional arguments followed
--- by named arguments (like Python)
+-- arguments are many postional followed by many named
+-- just like Python
 applyP :: Parser (Expr' -> Expr')
 applyP = flip mkApply <$> argsP
   where
     argsP :: Parser (Args Expr')
-    argsP = try named <|> posal
+    argsP = Args <$> parens (args `sepBy` comma) <*> tailstrict
       where
-        named = Named <$> parens (args `sepBy` comma) <*> tailstrict
-        posal = Positional <$> parens (exprP `sepBy` comma) <*> tailstrict
-        args = (,) <$> identifier <*> (symbol "=" *> exprP)
+        args = try named <|> posal
+        posal = Pos <$> exprP
+        named = Named <$> identifier <*> (symbol "=" *> exprP)
         tailstrict = option Lazy (keywordP "tailstrict" $> Strict)
 
 -- there are missing cases here, e.g. expr[a:b]
