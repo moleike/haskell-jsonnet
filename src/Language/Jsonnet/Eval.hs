@@ -61,7 +61,7 @@ eval = \case
   CLit l -> evalLiteral l
   CVar n -> do
     env <- ask
-    v <- liftMaybe (VarNotFound $ T.pack $ name2String n) (M.lookup n env)
+    v <- liftMaybe (VarNotFound (AnyName n)) (M.lookup n env)
     force v
   CFun f -> VClos f <$> ask
   CApp e es -> do
@@ -142,7 +142,7 @@ evalClos rho (Fun f) vs = do
 appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
 appDefaults rs e = do
   case findIndex isNothing ds of
-    Just x -> throwError $ ParamNotBound (T.pack $ name2String $ ns !! x)
+    Just x -> throwError $ ParamNotBound (AnyName $ ns !! x)
     Nothing -> mdo
       bnds <-
         mapM

@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Language.Jsonnet.Parser (ParseError)
 import Language.Jsonnet.Parser.SrcSpan
 import Text.PrettyPrint.ANSI.Leijen (Doc)
+import Unbound.Generics.LocallyNameless (AnyName)
 
 data EvalError
   = TypeMismatch {expected :: Text, actual :: Text}
@@ -19,11 +20,11 @@ data EvalError
   | InvalidIndex Text
   | IndexOutOfBounds Scientific
   | DivByZero
-  | VarNotFound Text
+  | VarNotFound AnyName
   | ManifestError ManifestError
   | AssertionFailed Doc
   | TooManyArgs Int
-  | ParamNotBound Text
+  | ParamNotBound AnyName
   | BadParam Text
   | StdError Doc
   | RuntimeError Text

@@ -115,7 +115,7 @@ instance Pretty EvalError where
         text "Divide by zero exception"
       VarNotFound v ->
         text "Variable"
-          <+> squotes (text $ T.unpack v)
+          <+> squotes (text $ show v)
           <+> text "is not defined"
       ManifestError e ->
         text "Manifest error:"
@@ -129,7 +129,7 @@ instance Pretty EvalError where
           <+> text (T.unpack e)
       ParamNotBound s ->
         text "Parameter not bound:"
-          <+> text (T.unpack s)
+          <+> text (show s)
       BadParam s ->
         text "Function has no parameter"
           <+> text (T.unpack s)
