@@ -30,8 +30,7 @@ std.assertEqual(std.length(test_chinese), 1) &&
 
 std.assertEqual('Ā', 'Ā') &&
 
-# verbatim strings not implemented yet
-# std.assertEqual(@"\u0100", '\\u0100') &&
-# std.assertEqual(@"Ā", 'Ā') &&
+std.assertEqual(@"\u0100", '\\u0100') &&
+std.assertEqual(@"Ā", 'Ā') &&
 
 true
