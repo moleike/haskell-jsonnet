@@ -30,12 +30,12 @@ stack build
 - ~~verbatim strings~~
 - ~~object-level locals~~
 - object-level asserts
-- ~~outermost object reference `$`~~
 - ~~keyword parameters~~
 - ~~default arguments~~
 - top-level arguments
 - external variables
 - ~~object composition (merging objects)~~
+- ~~outermost object reference `$`~~
 - `super` keyword
 - overriding deeply nested fields (`+:` field syntax)
 - ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
