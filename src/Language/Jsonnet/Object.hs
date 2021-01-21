@@ -1,9 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveGeneric #-}
--- |
 
+-- |
 module Language.Jsonnet.Object where
 
 import Data.Typeable (Typeable)
@@ -23,7 +23,7 @@ data Visibility
 
 instance Alpha Visibility
 
-newtype Key a = Key { key :: a }
+newtype Key a = Key {key :: a}
   deriving
     ( Eq,
       Read,
@@ -38,7 +38,7 @@ newtype Key a = Key { key :: a }
 
 instance Alpha a => Alpha (Key a)
 
-data Value a = Value { value :: a, visibility :: Visibility }
+data Value a = Value {value :: a, visibility :: Visibility}
   deriving
     ( Eq,
       Read,
@@ -61,7 +61,6 @@ forced _ = False
 
 hidden (Value _ Hidden) = True
 hidden _ = False
-
 
 data Field a = Field !(Key a) !(Value a)
   deriving

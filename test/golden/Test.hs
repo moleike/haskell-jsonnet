@@ -1,11 +1,12 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 module Main where
 
 import Control.Monad
 import qualified Data.ByteString.Lazy as LBS
+import Data.IORef
 import qualified Data.Text as T
 import qualified Data.Text.IO as T (readFile)
 import Data.Text.Lazy
@@ -18,7 +19,6 @@ import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
 import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
 import Text.PrettyPrint.ANSI.Leijen (Pretty, pretty)
-import Data.IORef
 
 main :: IO ()
 main = goldenTests >>= defaultMain

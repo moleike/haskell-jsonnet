@@ -1,16 +1,16 @@
--- |
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- |
 module Language.Jsonnet.Value where
 
 import Control.Applicative
 import Control.Arrow
 import Control.Monad.Except
 import Control.Monad.IO.Class
-import Control.Monad.State.Lazy
 import Control.Monad.Reader
+import Control.Monad.State.Lazy
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.HashMap.Lazy (HashMap)
@@ -31,14 +31,13 @@ import GHC.Generics (Generic)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
-import qualified Language.Jsonnet.Object as O
+import {-# SOURCE #-} Language.Jsonnet.Eval (eval, evalClos)
 import Language.Jsonnet.Eval.Monad
+import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Text.PrettyPrint.ANSI.Leijen (Doc, pretty)
 import Unbound.Generics.LocallyNameless
-import {-# SOURCE #-} Language.Jsonnet.Eval (eval, evalClos)
-
 
 -- jsonnet value
 data Value
@@ -50,8 +49,8 @@ data Value
   | VObj !Object
   | VClos !Fun !Env
   | VFun !(Thunk -> Eval Value)
-  -- | VThunk !Thunk
 
+-- | VThunk !Thunk
 type Array = Vector Thunk
 
 type Object = HashMap (O.Key Text) (O.Value Thunk)

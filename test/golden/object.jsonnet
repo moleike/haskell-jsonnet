@@ -18,9 +18,9 @@ std.assertEqual({ '': 1 }, { '': 1 }) &&
 std.assertEqual({ x: 1, y: 2 }.y, 2) &&
 std.assertEqual({ x: 1, y: 2 }["y"], 2) &&
 std.assertEqual({ x: error "foo", y: 2 }.y, 2) &&
-// FIXME object composition not implemented
-//std.assertEqual({ x: 1, y: 2 } + { z: 3 }, { x: 1, y: 2, z: 3 }) &&
-//std.assertEqual({ x: 1, y: 2 } + { y: 3 }, { x: 1, y: 3 }) &&
+std.assertEqual({ x: 1, y: 2 } + { z: 3 }, { x: 1, y: 2, z: 3 }) &&
+std.assertEqual({ x: 1, y: 2 } + { y: 3 }, { x: 1, y: 3 }) &&
+// FIXME +: not implemented
 //std.assertEqual({ x: 1, y: 2 } + { y+: 3 }, { x: 1, y: 5 }) &&
 //std.assertEqual({ a: { x: 1 }, b: { x: 2 } } + { a+: { y: 3 }, b: { x: 3 } }, { a: { x: 1, y: 3 }, b: { x: 3 } }) &&
 

@@ -1,6 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
 
 -- |
 module Language.Jsonnet.Manifest where
@@ -11,12 +11,12 @@ import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.Text (Text)
 import Data.Vector (Vector)
+import Debug.Trace
+import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Value
-import Language.Jsonnet.Common
 import qualified Language.Jsonnet.Object as O
-import Debug.Trace
+import Language.Jsonnet.Value
 
 manifest :: Value -> Eval JSON.Value
 manifest =

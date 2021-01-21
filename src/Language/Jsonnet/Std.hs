@@ -7,12 +7,9 @@
 module Language.Jsonnet.Std
   ( std,
     objectHasEx,
-    flattenArrays,
   )
 where
 
-import Prelude hiding (length)
-import qualified Prelude as P (length)
 import Control.Monad.Except
 import qualified Data.ByteString as B
 import qualified Data.HashMap.Lazy as H
@@ -22,17 +19,19 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Vector (Vector)
 import Data.Word
-import Language.Jsonnet.Error
 import Language.Jsonnet.Core (Fun (Fun))
+import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Value
 import qualified Language.Jsonnet.Object as O
+import Language.Jsonnet.Value
 import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
+import qualified Prelude as P (length)
+import Prelude hiding (length)
 
 -- The native subset of Jsonnet standard library
 std :: Value
-std = VObj $ (fmap (TV . pure))  <$> H.fromList xs
+std = VObj $ (fmap (TV . pure)) <$> H.fromList xs
   where
     xs :: [(O.Key Text, O.Value Value)]
     xs =
@@ -72,12 +71,12 @@ primitiveEquals (VBool a) (VBool b) = pure (a == b)
 primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
 primitiveEquals _ _ =
-    throwError
-      ( StdError
-          $ text
-          $ T.unpack
-          $ "primitiveEquals operates on primitive types"
-      )
+  throwError
+    ( StdError
+        $ text
+        $ T.unpack
+        $ "primitiveEquals operates on primitive types"
+    )
 
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o True = sort (O.key <$> H.keys o) -- all fields
@@ -105,6 +104,3 @@ length = \case
 
 makeArray :: Int -> (Int -> Eval Value) -> Eval [Value]
 makeArray n f = traverse f [0 .. n - 1]
-
-flattenArrays :: Vector (Vector Thunk) -> Vector Thunk
-flattenArrays = join

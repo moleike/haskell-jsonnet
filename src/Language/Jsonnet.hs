@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Language.Jsonnet
   ( JsonnetM,
@@ -25,6 +25,7 @@ import qualified Data.Aeson as JSON
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import qualified Data.Text.IO as T (readFile)
+import Debug.Trace
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
@@ -35,7 +36,6 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
-import Debug.Trace
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -58,7 +58,6 @@ data Config = Config
   { fname :: FilePath,
     stdlib :: Value
   }
-
 
 -- the jsonnet stdlib is written in both jsonnet
 -- and Haskell, here we merge the native with the

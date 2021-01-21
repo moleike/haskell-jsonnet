@@ -4,9 +4,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TupleSections #-}
 
 module Language.Jsonnet.Eval
   ( eval,
@@ -16,12 +16,11 @@ module Language.Jsonnet.Eval
   )
 where
 
-import Data.Aeson.Text
 import Control.Applicative
 import Control.Monad.Except
-import Data.Text.Lazy (toStrict)
-import Control.Monad.State.Lazy
 import Control.Monad.Reader
+import Control.Monad.State.Lazy
+import Data.Aeson.Text
 import Data.Bifunctor (second)
 import Data.Bits
 import Data.Foldable
@@ -33,21 +32,22 @@ import Data.Maybe (catMaybes, isNothing)
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Vector ((!?))
+import Data.Text.Lazy (toStrict)
+import Data.Vector ((!?), Vector)
 import qualified Data.Vector as V
+import Debug.Trace
 import Language.Jsonnet.Common
-import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
-import Language.Jsonnet.Manifest
 import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Manifest
+import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std as Std
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Bind
-import Debug.Trace
 
 -- an evaluator for the core calculus, based on a
 -- big-step, call-by-need operational semantics, matching
@@ -85,7 +85,6 @@ eval = \case
     extendEnv bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
-
   CBinOp (Logical op) e1 e2 -> do
     e1' <- thunk e1
     e2' <- thunk e2
@@ -131,7 +130,7 @@ evalArgs = \case
   as@(Args _ Lazy) -> args <$> traverse thunk as
   as@(Args _ Strict) -> args <$> traverse f as
     where
-    f = eval >=> pure . TV . pure
+      f = eval >=> pure . TV . pure
 
 evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) vs = do
@@ -147,8 +146,8 @@ appDefaults rs e = do
       bnds <-
         mapM
           ( \(v, e) -> do
-            th <- mkThunk $ extendEnv bnds $ eval e
-            pure (v, th)
+              th <- mkThunk $ extendEnv bnds $ eval e
+              pure (v, th)
           )
           (zip ns $ catMaybes ds)
       extendEnv bnds (eval e)
@@ -159,64 +158,63 @@ evalFun bnds e args = do
   if length ps > length bnds
     then throwError $ TooManyArgs (length args)
     else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
-  where isPos = \case
-          Pos _ -> True
-          _ -> False
-        (ps, ns) = span isPos args
-        ps' = fmap (\(Pos a) -> a) ps
-        (names, _) = unzip bnds
-        bnds' = drop (length ps) bnds
-        evalNamedArgs ns bnds = do
-         ns' <- forM ns $ \case
-           Named n v -> pure (n, v)
-           -- TODO this belongs to static checking
-           -- which is not implemented yet
-           Pos a -> throwError $ BadParam "positional after named parameter"
-         (names, vs) <- unzip <$> buildParams ns' bnds
-         let rs = filter ((`notElem` names) . fst) bnds
-         extendEnv (zip names vs) (appDefaults rs e)
-         where
-           buildParams as bnds = traverse f as
-             where
-               ns = fst $ unzip bnds
-               f (a, b) = case g a of
-                 Nothing -> throwError $ BadParam $ T.pack a
-                 Just n -> pure (n, b)
-               g a = find ((a ==) . name2String) ns
+  where
+    isPos = \case
+      Pos _ -> True
+      _ -> False
+    (ps, ns) = span isPos args
+    ps' = fmap (\(Pos a) -> a) ps
+    (names, _) = unzip bnds
+    bnds' = drop (length ps) bnds
+    evalNamedArgs ns bnds = do
+      ns' <- forM ns $ \case
+        Named n v -> pure (n, v)
+        -- TODO this belongs to static checking
+        -- which is not implemented yet
+        Pos a -> throwError $ BadParam "positional after named parameter"
+      (names, vs) <- unzip <$> buildParams ns' bnds
+      let rs = filter ((`notElem` names) . fst) bnds
+      extendEnv (zip names vs) (appDefaults rs e)
+      where
+        buildParams as bnds = traverse f as
+          where
+            ns = fst $ unzip bnds
+            f (a, b) = case g a of
+              Nothing -> throwError $ BadParam $ T.pack a
+              Just n -> pure (n, b)
+            g a = find ((a ==) . name2String) ns
 
 -- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
 mergeObjects :: Value -> Value -> Eval Value
 mergeObjects (VObj xs) (VObj ys) = do
-  let f a b | O.hidden a && O.visible b = a
-            | otherwise = b
+  let f a b
+        | O.hidden a && O.visible b = a
+        | otherwise = b
       zs = H.unionWith f xs ys
-      fs = VObj $ H.map
-        ( fmap $ \case
-            TC rho e -> TC (M.insert "self" (TV $ pure fs) rho) e
-            v@(TV {}) -> v
-        )
-        zs
+      fs =
+        VObj $
+          H.map
+            ( fmap $ \case
+                TC rho e -> TC (M.insert "self" (TV $ pure fs) rho) e
+                v@(TV {}) -> v
+            )
+            zs
   pure fs
-
---evalObj :: [O.Field Core] -> Eval Value
---evalObj xs =
---  VObj . H.fromList
---    . catMaybes
---    <$> traverse evalField xs
 
 evalObj :: [O.Field Core] -> Eval Value
 evalObj xs = mdo
   env <- ask
   fs <-
-    catMaybes <$> mapM
-      ( \(O.Field key value) -> do
-        k <- evalKey key
-        v <- pure $ TC (M.insert "self" (self fs) env) <$> value
-        case k of
-          Just k -> pure $ Just (k, v)
-          _      -> pure Nothing
-      )
-      xs
+    catMaybes
+      <$> mapM
+        ( \(O.Field key value) -> do
+            k <- evalKey key
+            v <- pure $ TC (M.insert "self" (self fs) env) <$> value
+            case k of
+              Just k -> pure $ Just (k, v)
+              _ -> pure Nothing
+        )
+        xs
   pure $ VObj $ H.fromList $ fs
   where
     self = TV . pure . VObj . H.fromList
@@ -240,7 +238,7 @@ evalArrComp ::
   Eval Value
 evalArrComp cs bnd = do
   xs <- comp
-  inj' Std.flattenArrays $ VArr $ V.mapMaybe id xs
+  inj' flattenArrays $ VArr $ V.mapMaybe id xs
   where
     comp = eval cs >>= \case
       VArr xs -> forM xs $ \x -> do
@@ -386,3 +384,6 @@ updateSpan sp st = st {curSpan = Just sp}
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
 toString v = toStrict . encodeToLazyText <$> manifest v
+
+flattenArrays :: Vector (Vector Thunk) -> Vector Thunk
+flattenArrays = join
