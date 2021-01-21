@@ -37,6 +37,7 @@ stack build
 - external variables
 - ~~object composition (merging objects)~~
 - `super` keyword
+- overriding deeply nested fields (`+:` field syntax)
 - ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
 - ~~tailstrict annotation~~
 - ~~stdlib~~
