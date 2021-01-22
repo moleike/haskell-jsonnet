@@ -21,16 +21,13 @@ data EvalError
   | IndexOutOfBounds Scientific
   | DivByZero
   | VarNotFound AnyName
-  | ManifestError ManifestError
   | AssertionFailed Doc
   | TooManyArgs Int
   | ParamNotBound AnyName
   | BadParam Text
   | StdError Doc
   | RuntimeError Text
-  deriving (Show)
-
-newtype ManifestError = NotAJsonValue Text
+  | ManifestError Text
   deriving (Show)
 
 data Error

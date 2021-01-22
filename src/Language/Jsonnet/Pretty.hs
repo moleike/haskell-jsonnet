@@ -85,11 +85,6 @@ instance Pretty ParseError where
       <+> pretty f
       <+> parens (text desc)
 
-instance Pretty ManifestError where
-  pretty (NotAJsonValue e) =
-    text "Not a JSON value:"
-      <+> text (T.unpack e)
-
 instance Pretty EvalError where
   pretty =
     \case
@@ -117,9 +112,6 @@ instance Pretty EvalError where
         text "Variable"
           <+> squotes (text $ show v)
           <+> text "is not defined"
-      ManifestError e ->
-        text "Manifest error:"
-          <+> pretty e
       AssertionFailed e ->
         text "Assertion failed:"
           <+> e
@@ -133,6 +125,9 @@ instance Pretty EvalError where
       BadParam s ->
         text "Function has no parameter"
           <+> text (T.unpack s)
+      ManifestError e ->
+        text "Manifest error:"
+          <+> text (T.unpack e)
 
 instance Pretty Error where
   pretty =
