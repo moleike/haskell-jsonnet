@@ -1,2 +1,2 @@
-Invalid key: number
+Runtime error: invalid key: number
     stdlib/std.jsonnet:235:7,235:17

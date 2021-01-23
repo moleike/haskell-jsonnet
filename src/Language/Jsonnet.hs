@@ -22,23 +22,23 @@ import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
+import Data.Functor.Identity
+import Data.Functor.Sum
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import qualified Data.Text.IO as T (readFile)
 import Debug.Trace
+import qualified Language.Jsonnet.Check as Check
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import qualified Language.Jsonnet.Check as Check
 import Language.Jsonnet.Manifest (manifest)
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
-import Data.Functor.Sum
-import Data.Functor.Identity
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -84,7 +84,6 @@ jsonnet conf = runJsonnetM conf . interpret
 interpret :: Text -> JsonnetM JSON.Value
 interpret = parse >=> check >=> desugar >=> evaluate
 
-
 parse :: Text -> JsonnetM Expr
 parse inp =
   asks fname >>= JsonnetM . lift . withExceptT ParserError . go
@@ -95,10 +94,11 @@ parse inp =
 
 check :: Expr -> JsonnetM Expr
 check expr = do
-  _ <- JsonnetM
-    $ lift
-    $ withExceptT CheckError
-    $ Check.check expr
+  _ <-
+    JsonnetM
+      $ lift
+      $ withExceptT CheckError
+      $ Check.check expr
   pure expr
 
 desugar :: Expr -> JsonnetM Core

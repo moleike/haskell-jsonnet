@@ -1,31 +1,45 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+
 -- |
 module Language.Jsonnet.Check where
 
-import Language.Jsonnet.Core
-import Language.Jsonnet.Syntax
-import Language.Jsonnet.Error
-import Unbound.Generics.LocallyNameless
 import Control.Monad.Except
-import Data.Functor.Identity
-import Language.Jsonnet.Annotate
-import Language.Jsonnet.Parser.SrcSpan
 import Data.Fix
+import Data.Functor.Identity
 import Data.List
+import qualified Data.List.NonEmpty as NE
+import Language.Jsonnet.Annotate
+import Language.Jsonnet.Common
+import Language.Jsonnet.Core
+import Language.Jsonnet.Error
+import Language.Jsonnet.Parser.SrcSpan
+import Language.Jsonnet.Syntax
+import Unbound.Generics.LocallyNameless
 
 type Check = ExceptT CheckError IO
 
 check :: Ann ExprF SrcSpan -> Check ()
 check = foldFixM alg
   where
-    alg (AnnF f a)= case f of
+    alg (AnnF f a) = case f of
+      ELocal bnds _ -> checkLocal (NE.toList $ fst <$> bnds) a
       EFun ps _ -> checkFun (fst <$> ps) a
-      EApply _ es -> pure ()
-      ELocal bnds _ -> pure ()
+      EApply _ (Args as _) -> checkApply as a
       _ -> pure ()
-    checkFun names a = case f names of
+    checkLocal names a = case dups names of
       [] -> pure ()
-      (xs: _) -> throwError $ DuplicateParam (Just a) (head xs)
+      (xs : _) -> throwError $ DuplicateBinding (Just a) (head xs)
+    checkFun names a = case dups names of
+      [] -> pure ()
+      (xs : _) -> throwError $ DuplicateParam (Just a) (head xs)
+    checkApply args a = case f args of
+      [] -> pure ()
+      (x : _) -> throwError $ PosAfterNamedParam (Just a)
       where
-        f = filter ((> 1) . length) . group . sort
+        f args = filter isPos ns
+        isPos = \case
+          Pos _ -> True
+          _ -> False
+        (ps, ns) = span isPos args
+    dups = filter ((> 1) . length) . group . sort

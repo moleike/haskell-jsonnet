@@ -156,7 +156,7 @@ appDefaults rs e = do
 
 evalFun bnds e args = do
   if length ps > length bnds
-    then throwError $ TooManyArgs (length args)
+    then throwError $ TooManyArgs (length bnds)
     else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
   where
     isPos = \case
@@ -169,9 +169,6 @@ evalFun bnds e args = do
     evalNamedArgs ns bnds = do
       ns' <- forM ns $ \case
         Named n v -> pure (n, v)
-        -- TODO this belongs to static checking
-        -- which is not implemented yet
-        Pos a -> throwError $ BadParam "positional after named parameter"
       (names, vs) <- unzip <$> buildParams ns' bnds
       let rs = filter ((`notElem` names) . fst) bnds
       extendEnv (zip names vs) (appDefaults rs e)

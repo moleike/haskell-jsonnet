@@ -89,58 +89,69 @@ instance Pretty CheckError where
     \case
       DuplicateParam sp e ->
         text "duplicate parameter"
-          <+> text e
+          <+> squotes (text e)
           <$$> indent 4 (pretty sp)
- 
+      DuplicateBinding sp e ->
+        text "duplicate local var"
+          <+> squotes (text e)
+          <$$> indent 4 (pretty sp)
+      PosAfterNamedParam sp ->
+        text "positional after named argument"
+          <$$> indent 4 (pretty sp)
+
 instance Pretty EvalError where
   pretty =
     \case
       TypeMismatch {..} ->
-        text "Type mismatch:"
+        text "type mismatch:"
           <+> text "expected"
           <+> text (T.unpack expected)
           <+> text "but got"
           <+> text (T.unpack actual)
       InvalidKey k ->
-        text "Invalid key:"
+        text "invalid key:"
           <+> text (T.unpack k)
       InvalidIndex k ->
-        text "Invalid index:"
+        text "invalid index:"
           <+> text (T.unpack k)
       NoSuchKey k ->
-        text "No such key:"
+        text "no such key:"
           <+> text (T.unpack k)
       IndexOutOfBounds i ->
-        text "Index out of bounds:"
+        text "index out of bounds:"
           <+> ppNumber i
       DivByZero ->
-        text "Divide by zero exception"
+        text "divide by zero exception"
       VarNotFound v ->
-        text "Variable"
+        text "variable"
           <+> squotes (text $ show v)
           <+> text "is not defined"
       AssertionFailed e ->
-        text "Assertion failed:"
-          <+> e
+        text "assertion failed:" <+> e
       StdError e -> e
-      RuntimeError e ->
-        text "Runtime error:"
-          <+> text (T.unpack e)
+      RuntimeError e -> text (T.unpack e)
       ParamNotBound s ->
-        text "Parameter not bound:"
+        text "parameter not bound:"
           <+> text (show s)
       BadParam s ->
-        text "Function has no parameter"
+        text "function has no parameter"
           <+> text (T.unpack s)
       ManifestError e ->
-        text "Manifest error:"
+        text "manifest error:"
           <+> text (T.unpack e)
+      TooManyArgs n ->
+        text "too many args, function has"
+          <+> int n
+          <+> "parameter(s)"
 
 instance Pretty Error where
   pretty =
     \case
-      EvalError e sp -> pretty e <$$> indent 4 (pretty sp)
+      EvalError e sp ->
+        text "Runtime error:"
+          <+> pretty e
+          <$$> indent 4 (pretty sp)
       ParserError e -> pretty e
       CheckError e ->
         text "Static error:"
-        <+> pretty e
+          <+> pretty e

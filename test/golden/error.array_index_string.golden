@@ -1,2 +1,2 @@
-Invalid index: array index was not integer
+Runtime error: invalid index: array index was not integer
     ./test/golden/error.array_index_string.jsonnet:14:1,15:1

@@ -7,11 +7,11 @@ module Language.Jsonnet.Error where
 
 import Data.Scientific (Scientific)
 import Data.Text (Text)
+import Data.Void (Void)
 import Language.Jsonnet.Parser.SrcSpan
+import Text.Megaparsec (ParseErrorBundle)
 import Text.PrettyPrint.ANSI.Leijen (Doc)
 import Unbound.Generics.LocallyNameless (AnyName)
-import Text.Megaparsec (ParseErrorBundle)
-import Data.Void (Void)
 
 data EvalError
   = TypeMismatch {expected :: Text, actual :: Text}
@@ -38,7 +38,7 @@ data ParserError
 
 data CheckError
   = NotFound (Maybe SrcSpan) String
-  | PosAfterNamedParam (Maybe SrcSpan) String
+  | PosAfterNamedParam (Maybe SrcSpan)
   | DuplicateParam (Maybe SrcSpan) String
   | DuplicateBinding (Maybe SrcSpan) String
   | SelfOutOfBounds (Maybe SrcSpan)
