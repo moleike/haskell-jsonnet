@@ -11,6 +11,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as T (readFile)
 import Data.Text.Lazy
 import Data.Text.Lazy.Encoding (encodeUtf8)
+import Control.Monad.Except
 import Language.Jsonnet
 import Language.Jsonnet.Error
 import Language.Jsonnet.Pretty ()
@@ -35,7 +36,7 @@ run conf = do
 goldenTests :: IO TestTree
 goldenTests = do
   jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
-  evalStd >>= \case
+  runExceptT evalStd >>= \case
     Left err -> error (show $ pretty err)
     Right stdlib -> do
       return $

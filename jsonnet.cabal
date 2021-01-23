@@ -30,6 +30,7 @@ library
     , Language.Jsonnet.Syntax
     , Language.Jsonnet.Syntax.Annotated
     , Language.Jsonnet.Core
+    , Language.Jsonnet.Check
     , Language.Jsonnet.Desugar
     , Language.Jsonnet.Annotate
     , Language.Jsonnet.Common
@@ -99,6 +100,7 @@ test-suite jsonnet-test
       base
     , ansi-wl-pprint
     , jsonnet
+    , mtl
     , text
     , filepath
     , bytestring

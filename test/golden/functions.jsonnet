@@ -11,8 +11,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-std.assertEqual((function(x) x * x)(5), 5 * 5) &&
-
 // Correct self binding from within a function.
 std.assertEqual({ x: 1, y: { x: 0, y: function() self.x }.y() }, { x: 1, y: 0 }) &&
 

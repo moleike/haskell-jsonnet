@@ -30,12 +30,15 @@ import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
+import qualified Language.Jsonnet.Check as Check
 import Language.Jsonnet.Manifest (manifest)
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Std
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
+import Data.Functor.Sum
+import Data.Functor.Identity
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -62,15 +65,15 @@ data Config = Config
 -- the jsonnet stdlib is written in both jsonnet
 -- and Haskell, here we merge the native with the
 -- interpreted parts
-evalStd :: IO (Either Error Value)
-evalStd = runJsonnetM (Config fp VNull) comp
+evalStd :: ExceptT Error IO Value
+evalStd = do
+  inp <- liftIO $ T.readFile fp
+  expr <- withExceptT ParserError (Parser.parse fp inp)
+  expr' <- withExceptT ParserError (Parser.resolveImports fp expr)
+  stdJ <- runEval emptyEnv (eval (Desugar.desugar expr'))
+  runEval emptyEnv $ mergeObjects std stdJ
   where
     fp = "stdlib/std.jsonnet"
-    comp = do
-      inp <- liftIO $ T.readFile fp
-      expr <- (parse >=> desugar) inp
-      stdJ <- JsonnetM $ lift $ runEval emptyEnv (eval expr)
-      JsonnetM $ lift $ runEval emptyEnv $ mergeObjects std stdJ
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
 runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
@@ -79,7 +82,8 @@ jsonnet :: Config -> Text -> IO (Either Error JSON.Value)
 jsonnet conf = runJsonnetM conf . interpret
 
 interpret :: Text -> JsonnetM JSON.Value
-interpret = parse >=> desugar >=> evaluate
+interpret = parse >=> check >=> desugar >=> evaluate
+
 
 parse :: Text -> JsonnetM Expr
 parse inp =
@@ -89,8 +93,16 @@ parse inp =
       ast <- Parser.parse fp inp
       Parser.resolveImports fp ast
 
+check :: Expr -> JsonnetM Expr
+check expr = do
+  _ <- JsonnetM
+    $ lift
+    $ withExceptT CheckError
+    $ Check.check expr
+  pure expr
+
 desugar :: Expr -> JsonnetM Core
-desugar = pure . Desugar.desugar
+desugar expr = pure (Desugar.desugar expr)
 
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value

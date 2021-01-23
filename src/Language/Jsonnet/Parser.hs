@@ -23,6 +23,7 @@ import Data.Void
 import GHC.IO.Exception hiding (IOError)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
+import Language.Jsonnet.Error
 import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
@@ -36,13 +37,8 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
 
-data ParseError
-  = ParseError (ParseErrorBundle Text Void)
-  | ImportError IOError (Maybe SrcSpan)
-  deriving (Eq, Show)
-
 parse ::
-  MonadError ParseError m =>
+  MonadError ParserError m =>
   FilePath ->
   Text ->
   m Expr'
@@ -52,7 +48,7 @@ parse fp inp =
     $ runParser (sc *> exprP <* eof) fp inp
 
 resolveImports ::
-  (MonadError ParseError m, MonadIO m) =>
+  (MonadError ParserError m, MonadIO m) =>
   FilePath ->
   Expr' ->
   m Expr

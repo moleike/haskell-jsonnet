@@ -24,14 +24,6 @@ forget (Fix (AnnF f _)) = Fix $ fmap forget f
 attrib :: Ann f a -> a
 attrib (Fix (AnnF _ a)) = a
 
-synthetise :: Functor f => (f a -> a) -> Fix f -> Ann f a
-synthetise g = go
-  where
-    go (Fix f) = Fix $ AnnF x (h x)
-      where
-        x = fmap go f
-        h = g . fmap attrib
-
 inherit :: Functor f => (Fix f -> a -> (b, a)) -> a -> Fix f -> Ann f b
 inherit h root = go root
   where

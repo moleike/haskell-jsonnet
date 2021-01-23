@@ -19,7 +19,6 @@ import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import qualified Data.Vector as V
 import GHC.IO.Exception (IOException (..))
 import Language.Jsonnet.Error
-import Language.Jsonnet.Parser (ParseError (..))
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
@@ -78,13 +77,21 @@ instance Pretty SrcSpan where
           <> colon
           <> (int . unPos . sourceColumn) pos
 
-instance Pretty ParseError where
+instance Pretty ParserError where
   pretty (ParseError e) = pretty (errorBundlePretty e)
   pretty (ImportError (IOError _ _ _ desc _ f) sp) =
     text "Parse error:"
       <+> pretty f
       <+> parens (text desc)
 
+instance Pretty CheckError where
+  pretty =
+    \case
+      DuplicateParam sp e ->
+        text "duplicate parameter"
+          <+> text e
+          <$$> indent 4 (pretty sp)
+ 
 instance Pretty EvalError where
   pretty =
     \case
@@ -134,3 +141,6 @@ instance Pretty Error where
     \case
       EvalError e sp -> pretty e <$$> indent 4 (pretty sp)
       ParserError e -> pretty e
+      CheckError e ->
+        text "Static error:"
+        <+> pretty e
