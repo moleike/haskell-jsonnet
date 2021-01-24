@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
 
 module Language.Jsonnet.Eval.Monad where
@@ -10,8 +10,8 @@ module Language.Jsonnet.Eval.Monad where
 import Control.Arrow
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
+import Control.Monad.RWS.Strict
 import Control.Monad.Reader
-import Control.Monad.State.Lazy
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
 import Language.Jsonnet.Core
@@ -20,8 +20,15 @@ import Language.Jsonnet.Parser.SrcSpan
 import {-# SOURCE #-} Language.Jsonnet.Value (Thunk)
 import Unbound.Generics.LocallyNameless
 
+instance (Monoid w, Fresh m) => Fresh (RWST r w s m) where
+  fresh = lift . fresh
+
 newtype Eval a = Eval
-  { unEval :: FreshMT (ReaderT Env (ExceptT EvalError (StateT EvalState IO))) a
+  { unEval ::
+      ExceptT
+        EvalError
+        (RWST Env () EvalState (FreshMT IO))
+        a
   }
   deriving
     ( Functor,
@@ -29,6 +36,7 @@ newtype Eval a = Eval
       Monad,
       MonadIO,
       MonadFix,
+      MonadWriter (),
       MonadReader Env,
       MonadError EvalError,
       MonadState EvalState,
@@ -51,14 +59,9 @@ data EvalState = EvalState
 emptyState :: EvalState
 emptyState = EvalState Nothing
 
-runEval ::
-  Env ->
-  Eval a ->
-  ExceptT Error IO a
-runEval env comp =
-  withExceptT mkErr $ ExceptT $ (`evalStateT` emptyState) $ do
-    res <- runExceptT $ (`runReaderT` env) $ runFreshMT $ unEval comp
-    st' <- get
-    pure $ left (,st') res
+runEval :: Env -> Eval a -> ExceptT Error IO a
+runEval env = mapExceptT f . unEval
   where
-    mkErr (e, EvalState {curSpan}) = EvalError e curSpan
+    f comp = do
+      (a, s, _) <- runFreshMT $ runRWST comp env emptyState
+      pure $ left (`EvalError` (curSpan s)) a

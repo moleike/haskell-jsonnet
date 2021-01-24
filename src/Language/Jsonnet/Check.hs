@@ -17,25 +17,25 @@ import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Unbound.Generics.LocallyNameless
 
-type Check = ExceptT CheckError IO
+type Check = ExceptT Error IO
 
 check :: Ann ExprF SrcSpan -> Check ()
 check = foldFixM alg
   where
-    alg (AnnF f a) = case f of
-      ELocal bnds _ -> checkLocal (NE.toList $ fst <$> bnds) a
-      EFun ps _ -> checkFun (fst <$> ps) a
-      EApply _ (Args as _) -> checkApply as a
+    alg (AnnF f a) = withExceptT (`CheckError` (Just a)) $ case f of
+      ELocal bnds _ -> checkLocal (NE.toList $ fst <$> bnds)
+      EFun ps _ -> checkFun (fst <$> ps)
+      EApply _ (Args as _) -> checkApply as
       _ -> pure ()
-    checkLocal names a = case dups names of
+    checkLocal names = case dups names of
       [] -> pure ()
-      (xs : _) -> throwError $ DuplicateBinding (Just a) (head xs)
-    checkFun names a = case dups names of
+      (xs : _) -> throwError $ DuplicateBinding (head xs)
+    checkFun names = case dups names of
       [] -> pure ()
-      (xs : _) -> throwError $ DuplicateParam (Just a) (head xs)
-    checkApply args a = case f args of
+      (xs : _) -> throwError $ DuplicateParam (head xs)
+    checkApply args = case f args of
       [] -> pure ()
-      (x : _) -> throwError $ PosAfterNamedParam (Just a)
+      (x : _) -> throwError $ PosAfterNamedParam
       where
         f args = filter isPos ns
         isPos = \case

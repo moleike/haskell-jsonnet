@@ -13,6 +13,12 @@ import Text.Megaparsec (ParseErrorBundle)
 import Text.PrettyPrint.ANSI.Leijen (Doc)
 import Unbound.Generics.LocallyNameless (AnyName)
 
+data Error
+  = ParserError ParserError
+  | CheckError CheckError (Maybe SrcSpan)
+  | EvalError EvalError (Maybe SrcSpan)
+  deriving (Show)
+
 data EvalError
   = TypeMismatch {expected :: Text, actual :: Text}
   | InvalidKey Text
@@ -37,15 +43,8 @@ data ParserError
   deriving (Eq, Show)
 
 data CheckError
-  = NotFound (Maybe SrcSpan) String
-  | PosAfterNamedParam (Maybe SrcSpan)
-  | DuplicateParam (Maybe SrcSpan) String
-  | DuplicateBinding (Maybe SrcSpan) String
-  | SelfOutOfBounds (Maybe SrcSpan)
+  = DuplicateParam String
+  | PosAfterNamedParam
+  | DuplicateBinding String
   deriving (Show)
 
-data Error
-  = ParserError ParserError
-  | CheckError CheckError
-  | EvalError EvalError (Maybe SrcSpan)
-  deriving (Show)

@@ -87,17 +87,14 @@ instance Pretty ParserError where
 instance Pretty CheckError where
   pretty =
     \case
-      DuplicateParam sp e ->
+      DuplicateParam e ->
         text "duplicate parameter"
           <+> squotes (text e)
-          <$$> indent 4 (pretty sp)
-      DuplicateBinding sp e ->
+      DuplicateBinding e ->
         text "duplicate local var"
           <+> squotes (text e)
-          <$$> indent 4 (pretty sp)
-      PosAfterNamedParam sp ->
+      PosAfterNamedParam ->
         text "positional after named argument"
-          <$$> indent 4 (pretty sp)
 
 instance Pretty EvalError where
   pretty =
@@ -152,6 +149,7 @@ instance Pretty Error where
           <+> pretty e
           <$$> indent 4 (pretty sp)
       ParserError e -> pretty e
-      CheckError e ->
+      CheckError e sp ->
         text "Static error:"
           <+> pretty e
+          <$$> indent 4 (pretty sp)

@@ -352,12 +352,6 @@ evalLiteral = \case
   String s -> pure $ VStr s
   Number n -> pure $ VNum n
 
-liftMaybe :: MonadError e m => e -> Maybe a -> m a
-liftMaybe e =
-  \case
-    Nothing -> throwError e
-    Just a -> pure a
-
 evalBin ::
   (HasValue a, HasValue b, HasValue c) =>
   (a -> b -> c) ->
@@ -369,10 +363,10 @@ evalBin = inj''
 append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
-throwInvalidKey :: MonadError EvalError m => Value -> m a
+throwInvalidKey :: Value -> Eval a
 throwInvalidKey = throwError . InvalidKey . valueType
 
-throwDuplicateKey :: MonadError EvalError m => Text -> m a
+throwDuplicateKey :: Text -> Eval a
 throwDuplicateKey = throwError . DuplicateKey
 
 updateSpan :: SrcSpan -> EvalState -> EvalState
@@ -384,3 +378,9 @@ toString v = toStrict . encodeToLazyText <$> manifest v
 
 flattenArrays :: Vector (Vector Thunk) -> Vector Thunk
 flattenArrays = join
+
+liftMaybe :: EvalError -> Maybe a -> Eval a
+liftMaybe e =
+  \case
+    Nothing -> throwError e
+    Just a -> pure a

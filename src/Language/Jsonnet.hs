@@ -97,7 +97,6 @@ check expr = do
   _ <-
     JsonnetM
       $ lift
-      $ withExceptT CheckError
       $ Check.check expr
   pure expr
 
@@ -108,4 +107,6 @@ desugar expr = pure (Desugar.desugar expr)
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
   env <- singleton "std" . TV . pure <$> asks stdlib
-  JsonnetM $ lift $ runEval env ((eval >=> manifest) expr)
+  JsonnetM
+    $ lift
+    $ runEval env ((eval >=> manifest) expr)
