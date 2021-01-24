@@ -27,8 +27,8 @@ manifest =
     VStr s -> pure $ JSON.String s
     VArr a -> JSON.Array <$> forceArray a
     VObj o -> JSON.Object <$> forceObject o
-    VClos {} -> throwError (ManifestError "function")
-    VFun _ -> throwError (ManifestError "function")
+    VClos {} -> throwE (ManifestError "function")
+    VFun _ -> throwE (ManifestError "function")
 
 forceArray :: Vector Thunk -> Eval (Vector JSON.Value)
 forceArray = traverse (force >=> manifest)

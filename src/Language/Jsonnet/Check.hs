@@ -29,10 +29,10 @@ check = foldFixM alg
       _ -> pure ()
     checkLocal names a = case dups names of
       [] -> pure ()
-      (xs : _) -> throwError $ DuplicateBinding (Just a) (head xs)
+      (xs : _) -> throwError $ DuplicateBinding (head xs) (Just a)
     checkFun names a = case dups names of
       [] -> pure ()
-      (xs : _) -> throwError $ DuplicateParam (Just a) (head xs)
+      (xs : _) -> throwError $ DuplicateParam (head xs) (Just a)
     checkApply args a = case f args of
       [] -> pure ()
       (x : _) -> throwError $ PosAfterNamedParam (Just a)

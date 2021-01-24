@@ -110,7 +110,7 @@ eval = \case
   CErr e ->
     ( eval
         >=> toString
-        >=> throwError . RuntimeError
+        >=> throwE . RuntimeError
     )
       e
   CComp (ArrC bnd) cs -> do
@@ -141,7 +141,7 @@ evalClos rho (Fun f) vs = do
 appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
 appDefaults rs e = do
   case findIndex isNothing ds of
-    Just x -> throwError $ ParamNotBound (AnyName $ ns !! x)
+    Just x -> throwE $ ParamNotBound (AnyName $ ns !! x)
     Nothing -> mdo
       bnds <-
         mapM
@@ -156,7 +156,7 @@ appDefaults rs e = do
 
 evalFun bnds e args = do
   if length ps > length bnds
-    then throwError $ TooManyArgs (length bnds)
+    then throwE $ TooManyArgs (length bnds)
     else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
   where
     isPos = \case
@@ -177,7 +177,7 @@ evalFun bnds e args = do
           where
             ns = fst $ unzip bnds
             f (a, b) = case g a of
-              Nothing -> throwError $ BadParam $ T.pack a
+              Nothing -> throwE $ BadParam $ T.pack a
               Just n -> pure (n, b)
             g a = find ((a ==) . name2String) ns
 
@@ -294,9 +294,9 @@ evalArith :: ArithOp -> Value -> Value -> Eval Value
 evalArith Add n1 n2 = evalBin ((+) @Double) n1 n2
 evalArith Sub n1 n2 = evalBin ((-) @Double) n1 n2
 evalArith Mul n1 n2 = evalBin ((*) @Double) n1 n2
-evalArith Div (VNum _) (VNum 0) = throwError DivByZero
+evalArith Div (VNum _) (VNum 0) = throwE DivByZero
 evalArith Div n1 n2 = evalBin ((/) @Double) n1 n2
-evalArith Mod (VNum _) (VNum 0) = throwError DivByZero
+evalArith Mod (VNum _) (VNum 0) = throwE DivByZero
 evalArith Mod n1 n2 = evalBin (mod @Int64) n1 n2
 
 evalComp :: CompOp -> Value -> Value -> Eval Value
@@ -329,7 +329,7 @@ evalLookup (VArr a) (VNum i)
   | isInteger i =
     liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i) >>= force
 evalLookup (VArr _) _ =
-  throwError (InvalidIndex $ "array index was not integer")
+  throwE (InvalidIndex $ "array index was not integer")
 evalLookup (VObj o) (VStr s) =
   liftMaybe (NoSuchKey s) (H.lookup (O.Key s) o) >>= force . O.value
 evalLookup (VStr s) (VNum i) | isInteger i = do
@@ -342,7 +342,7 @@ evalLookup (VStr s) (VNum i) | isInteger i = do
           then Nothing
           else Just i'
 evalLookup (VStr _) _ =
-  throwError (InvalidIndex $ "string index was not integer")
+  throwE (InvalidIndex $ "string index was not integer")
 evalLookup v _ = throwTypeMismatch "array/object/string" v
 
 evalLiteral :: Literal -> Eval Value
@@ -352,10 +352,10 @@ evalLiteral = \case
   String s -> pure $ VStr s
   Number n -> pure $ VNum n
 
-liftMaybe :: MonadError e m => e -> Maybe a -> m a
+liftMaybe :: (Maybe SrcSpan -> EvalError) -> Maybe a -> Eval a
 liftMaybe e =
   \case
-    Nothing -> throwError e
+    Nothing -> throwE e
     Just a -> pure a
 
 evalBin ::
@@ -369,11 +369,11 @@ evalBin = inj''
 append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
-throwInvalidKey :: MonadError EvalError m => Value -> m a
-throwInvalidKey = throwError . InvalidKey . valueType
+throwInvalidKey :: Value -> Eval a
+throwInvalidKey = throwE . InvalidKey . valueType
 
-throwDuplicateKey :: MonadError EvalError m => Text -> m a
-throwDuplicateKey = throwError . DuplicateKey
+throwDuplicateKey :: Text -> Eval a
+throwDuplicateKey = throwE . DuplicateKey
 
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}

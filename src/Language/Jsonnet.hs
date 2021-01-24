@@ -70,8 +70,8 @@ evalStd = do
   inp <- liftIO $ T.readFile fp
   expr <- withExceptT ParserError (Parser.parse fp inp)
   expr' <- withExceptT ParserError (Parser.resolveImports fp expr)
-  stdJ <- runEval emptyEnv (eval (Desugar.desugar expr'))
-  runEval emptyEnv $ mergeObjects std stdJ
+  stdJ <- withExceptT EvalError $ runEval emptyEnv (eval (Desugar.desugar expr'))
+  withExceptT EvalError $ runEval emptyEnv $ mergeObjects std stdJ
   where
     fp = "stdlib/std.jsonnet"
 
@@ -108,4 +108,7 @@ desugar expr = pure (Desugar.desugar expr)
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
   env <- singleton "std" . TV . pure <$> asks stdlib
-  JsonnetM $ lift $ runEval env ((eval >=> manifest) expr)
+  JsonnetM
+    $ lift
+    $ withExceptT EvalError
+    $ runEval env ((eval >=> manifest) expr)

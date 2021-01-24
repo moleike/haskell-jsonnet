@@ -199,9 +199,9 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)
 
-throwTypeMismatch :: MonadError EvalError m => Text -> Value -> m a
+throwTypeMismatch :: Text -> Value -> Eval a
 throwTypeMismatch expected =
-  throwError
+  throwE
     . TypeMismatch expected
     . valueType
 

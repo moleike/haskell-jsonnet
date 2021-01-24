@@ -87,11 +87,11 @@ instance Pretty ParserError where
 instance Pretty CheckError where
   pretty =
     \case
-      DuplicateParam sp e ->
+      DuplicateParam e sp ->
         text "duplicate parameter"
           <+> squotes (text e)
           <$$> indent 4 (pretty sp)
-      DuplicateBinding sp e ->
+      DuplicateBinding e sp ->
         text "duplicate local var"
           <+> squotes (text e)
           <$$> indent 4 (pretty sp)
@@ -102,56 +102,66 @@ instance Pretty CheckError where
 instance Pretty EvalError where
   pretty =
     \case
-      TypeMismatch {..} ->
+      TypeMismatch expected actual sp ->
         text "type mismatch:"
           <+> text "expected"
           <+> text (T.unpack expected)
           <+> text "but got"
           <+> text (T.unpack actual)
-      InvalidKey k ->
+          <$$> indent 4 (pretty sp)
+      InvalidKey k sp ->
         text "invalid key:"
           <+> text (T.unpack k)
-      InvalidIndex k ->
+          <$$> indent 4 (pretty sp)
+      InvalidIndex k sp ->
         text "invalid index:"
           <+> text (T.unpack k)
-      NoSuchKey k ->
+          <$$> indent 4 (pretty sp)
+      NoSuchKey k sp ->
         text "no such key:"
           <+> text (T.unpack k)
-      IndexOutOfBounds i ->
+          <$$> indent 4 (pretty sp)
+      IndexOutOfBounds i sp ->
         text "index out of bounds:"
           <+> ppNumber i
-      DivByZero ->
+          <$$> indent 4 (pretty sp)
+      DivByZero sp ->
         text "divide by zero exception"
-      VarNotFound v ->
+          <$$> indent 4 (pretty sp)
+      VarNotFound v sp ->
         text "variable"
           <+> squotes (text $ show v)
           <+> text "is not defined"
-      AssertionFailed e ->
-        text "assertion failed:" <+> e
-      StdError e -> e
-      RuntimeError e -> text (T.unpack e)
-      ParamNotBound s ->
+          <$$> indent 4 (pretty sp)
+      AssertionFailed e sp ->
+        text "assertion failed:"
+          <+> e
+          <$$> indent 4 (pretty sp)
+      StdError e sp -> e <$$> indent 4 (pretty sp)
+      RuntimeError e sp ->
+        text (T.unpack e)
+          <$$> indent 4 (pretty sp)
+      ParamNotBound s sp ->
         text "parameter not bound:"
           <+> text (show s)
-      BadParam s ->
+          <$$> indent 4 (pretty sp)
+      BadParam s sp ->
         text "function has no parameter"
           <+> text (T.unpack s)
-      ManifestError e ->
+          <$$> indent 4 (pretty sp)
+      ManifestError e sp ->
         text "manifest error:"
           <+> text (T.unpack e)
-      TooManyArgs n ->
+          <$$> indent 4 (pretty sp)
+      TooManyArgs n sp ->
         text "too many args, function has"
           <+> int n
           <+> "parameter(s)"
+          <$$> indent 4 (pretty sp)
 
 instance Pretty Error where
   pretty =
     \case
-      EvalError e sp ->
-        text "Runtime error:"
-          <+> pretty e
-          <$$> indent 4 (pretty sp)
+      EvalError e -> text "Runtime error:" <+> pretty e
       ParserError e -> pretty e
-      CheckError e ->
-        text "Static error:"
-          <+> pretty e
+      CheckError e -> text "Static error:" <+> pretty e
