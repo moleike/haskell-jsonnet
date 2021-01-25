@@ -9,7 +9,7 @@ For an introduction to the language itself, see the [tutorial][tutorial] or lang
 [tutorial]: https://jsonnet.org/learning/tutorial.html
 [reference]: https://jsonnet.org/ref/language.html
 
-### Build
+## Build
 
 Using the [stack][stack] build tool:
 
