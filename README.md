@@ -20,7 +20,9 @@ stack build
 ```
 [stack]: https://docs.haskellstack.org/en/stable/README
 
-| Language features                                                        | ✅ |
+## Progress
+
+| Features                                                                 | |
 |--------------------------------------------------------------------------|---|
 | array and object comprehension                                           | ✅ |
 | array slices                                                             | ✅ |
