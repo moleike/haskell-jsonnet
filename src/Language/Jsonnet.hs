@@ -68,8 +68,8 @@ data Config = Config
 evalStd :: ExceptT Error IO Value
 evalStd = do
   inp <- liftIO $ T.readFile fp
-  expr <- withExceptT ParserError (Parser.parse fp inp)
-  expr' <- withExceptT ParserError (Parser.resolveImports fp expr)
+  expr <- Parser.parse fp inp
+  expr' <- Parser.resolveImports fp expr
   stdJ <- runEval emptyEnv (eval (Desugar.desugar expr'))
   runEval emptyEnv $ mergeObjects std stdJ
   where
@@ -86,7 +86,7 @@ interpret = parse >=> check >=> desugar >=> evaluate
 
 parse :: Text -> JsonnetM Expr
 parse inp =
-  asks fname >>= JsonnetM . lift . withExceptT ParserError . go
+  asks fname >>= JsonnetM . lift . go
   where
     go fp = do
       ast <- Parser.parse fp inp

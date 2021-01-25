@@ -38,17 +38,17 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = Parsec Void Text
 
 parse ::
-  MonadError ParserError m =>
+  MonadError Error m =>
   FilePath ->
   Text ->
   m Expr'
 parse fp inp =
   liftEither
-    $ left ParseError
+    $ left (ParserError . ParseError)
     $ runParser (sc *> exprP <* eof) fp inp
 
 resolveImports ::
-  (MonadError ParserError m, MonadIO m) =>
+  (MonadError Error m, MonadIO m) =>
   FilePath ->
   Expr' ->
   m Expr
@@ -61,7 +61,7 @@ resolveImports fp = foldFixM go
         =<< readImportFile fp' a
     readImportFile fp' a = do
       inp <- readFile' fp'
-      liftEither $ left (flip ImportError (Just a)) inp
+      liftEither $ left (ParserError . flip ImportError (Just a)) inp
       where
         readFile' =
           liftIO
