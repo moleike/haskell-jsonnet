@@ -22,6 +22,8 @@ stack build
 
 ## Progress
 
+Below is listed the implementation status of the main language features:
+
 | Features                                                                 | |
 |--------------------------------------------------------------------------|---|
 | array and object comprehension                                           | ✅ |
