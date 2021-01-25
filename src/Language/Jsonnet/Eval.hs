@@ -177,7 +177,7 @@ evalFun bnds e args = do
           where
             ns = fst $ unzip bnds
             f (a, b) = case g a of
-              Nothing -> throwError $ BadParam $ T.pack a
+              Nothing -> throwError $ BadParam (AnyName (s2n a :: Name Core))
               Just n -> pure (n, b)
             g a = find ((a ==) . name2String) ns
 

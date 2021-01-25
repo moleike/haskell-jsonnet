@@ -132,7 +132,7 @@ instance Pretty EvalError where
           <+> text (show s)
       BadParam s ->
         text "function has no parameter"
-          <+> text (T.unpack s)
+          <+> squotes (text $ show s)
       ManifestError e ->
         text "manifest error:"
           <+> text (T.unpack e)

@@ -31,7 +31,7 @@ data EvalError
   | AssertionFailed Doc
   | TooManyArgs Int
   | ParamNotBound AnyName
-  | BadParam Text
+  | BadParam AnyName
   | StdError Doc
   | RuntimeError Text
   | ManifestError Text
