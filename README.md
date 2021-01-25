@@ -20,27 +20,25 @@ stack build
 ```
 [stack]: https://docs.haskellstack.org/en/stable/README
 
-
-### Language features not yet implemented
-
-- ~~array and object comprehension~~
-- ~~array slices~~
-- ~~Python-style string formatting~~
-- text blocks 
-- ~~verbatim strings~~
-- ~~object-level locals~~
-- object-level asserts
-- ~~keyword parameters~~
-- ~~default arguments~~
-- top-level arguments
-- external variables
-- ~~object composition (merging objects)~~
-- ~~outermost object reference `$`~~
-- `super` keyword
-- overriding deeply nested fields (`+:` field syntax)
-- ~~hidden fields~~ ([@CristhianMotoche](https://github.com/CristhianMotoche))
-- ~~tailstrict annotation~~
-- ~~stdlib~~
+| Language features                                                        | ✅ |
+|--------------------------------------------------------------------------|---|
+| array and object comprehension                                           | ✅ |
+| array slices                                                             | ✅ |
+| Python-style string formatting                                           | ✅ |
+| text blocks                                                              | ❌ |
+| verbatim strings                                                         | ✅ |
+| object-level locals                                                      | ✅ |
+| object-level asserts                                                     | ❌ |
+| keyword parameters                                                       | ✅ |
+| default arguments                                                        | ✅ |
+| top-level arguments                                                      | ❌ |
+| external variables                                                       | ❌ |
+| object composition (merging objects)                                     | ✅ |
+| outermost object reference `$`                                           | ✅ |
+| `super` keyword                                                          | ❌ |
+| overriding deeply nested fields (`+:` field syntax)                      | ❌ |
+| hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) | ✅ |
+| tailstrict annotation                                                    | ✅ |
 
 [//]: # "Implementation overview"
 
