@@ -11,7 +11,6 @@ import Data.Void (Void)
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec (ParseErrorBundle)
 import Text.PrettyPrint.ANSI.Leijen (Doc)
-import Unbound.Generics.LocallyNameless (AnyName)
 
 data Error
   = ParserError ParserError
@@ -21,20 +20,20 @@ data Error
 
 data EvalError
   = TypeMismatch {expected :: Text, actual :: Text}
-  | InvalidKey Text
-  | DuplicateKey Text
-  | NoSuchKey Text
-  | InvalidIndex Text
+  | InvalidKey Doc
+  | DuplicateKey Doc
+  | NoSuchKey Doc
+  | InvalidIndex Doc
   | IndexOutOfBounds Scientific
   | DivByZero
-  | VarNotFound AnyName
+  | VarNotFound Doc
   | AssertionFailed Doc
   | TooManyArgs Int
-  | ParamNotBound AnyName
-  | BadParam AnyName
+  | ParamNotBound Doc
+  | BadParam Doc
   | StdError Doc
-  | RuntimeError Text
-  | ManifestError Text
+  | RuntimeError Doc
+  | ManifestError Doc
   deriving (Show)
 
 data ParserError
@@ -47,4 +46,3 @@ data CheckError
   | PosAfterNamedParam
   | DuplicateBinding String
   deriving (Show)
-

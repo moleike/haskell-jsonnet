@@ -33,7 +33,7 @@ import Data.Scientific (isInteger, toBoundedInteger)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Lazy (toStrict)
-import Data.Vector ((!?), Vector)
+import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
 import Language.Jsonnet.Common
@@ -46,6 +46,7 @@ import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std as Std
 import Language.Jsonnet.Value
+import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Bind
 
@@ -61,7 +62,7 @@ eval = \case
   CLit l -> evalLiteral l
   CVar n -> do
     env <- ask
-    v <- liftMaybe (VarNotFound (AnyName n)) (M.lookup n env)
+    v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n env)
     force v
   CFun f -> VClos f <$> ask
   CApp e es -> do
@@ -110,7 +111,7 @@ eval = \case
   CErr e ->
     ( eval
         >=> toString
-        >=> throwError . RuntimeError
+        >=> throwError . RuntimeError . pretty
     )
       e
   CComp (ArrC bnd) cs -> do
@@ -119,8 +120,9 @@ eval = \case
     evalObjComp cs bnd
 
 thunk :: Core -> Eval Thunk
-thunk e = ask >>= \rho ->
-  mkThunk $ local (const rho) $ eval e
+thunk e =
+  ask >>= \rho ->
+    mkThunk $ local (const rho) $ eval e
 
 extendEnv :: [(Name Core, Thunk)] -> Eval a -> Eval a
 extendEnv ns = local (M.union $ M.fromList ns)
@@ -141,7 +143,7 @@ evalClos rho (Fun f) vs = do
 appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
 appDefaults rs e = do
   case findIndex isNothing ds of
-    Just x -> throwError $ ParamNotBound (AnyName $ ns !! x)
+    Just x -> throwError $ ParamNotBound (pretty $ ns !! x)
     Nothing -> mdo
       bnds <-
         mapM
@@ -177,7 +179,7 @@ evalFun bnds e args = do
           where
             ns = fst $ unzip bnds
             f (a, b) = case g a of
-              Nothing -> throwError $ BadParam (AnyName (s2n a :: Name Core))
+              Nothing -> throwError $ BadParam (pretty a)
               Just n -> pure (n, b)
             g a = find ((a ==) . name2String) ns
 
@@ -237,15 +239,16 @@ evalArrComp cs bnd = do
   xs <- comp
   inj' flattenArrays $ VArr $ V.mapMaybe id xs
   where
-    comp = eval cs >>= \case
-      VArr xs -> forM xs $ \x -> do
-        (n, (e, cond)) <- unbind bnd
-        extendEnv [(n, x)] $ do
-          b <- f cond
-          if b
-            then Just <$> thunk e
-            else pure Nothing
-      v -> throwTypeMismatch "array" v
+    comp =
+      eval cs >>= \case
+        VArr xs -> forM xs $ \x -> do
+          (n, (e, cond)) <- unbind bnd
+          extendEnv [(n, x)] $ do
+            b <- f cond
+            if b
+              then Just <$> thunk e
+              else pure Nothing
+        v -> throwTypeMismatch "array" v
       where
         f Nothing = pure True
         f (Just c) = do
@@ -260,15 +263,16 @@ evalObjComp cs bnd = do
   xs <- comp
   pure $ VObj $ H.fromList $ catMaybes $ V.toList xs
   where
-    comp = eval cs >>= \case
-      VArr xs -> forM xs $ \x -> do
-        (n, (e, cond)) <- unbind bnd
-        extendEnv [(n, x)] $ do
-          b <- f cond
-          if b
-            then evalField e
-            else pure Nothing
-      v -> throwTypeMismatch "array" v
+    comp =
+      eval cs >>= \case
+        VArr xs -> forM xs $ \x -> do
+          (n, (e, cond)) <- unbind bnd
+          extendEnv [(n, x)] $ do
+            b <- f cond
+            if b
+              then evalField e
+              else pure Nothing
+        v -> throwTypeMismatch "array" v
     f Nothing = pure True
     f (Just c) = do
       vb <- eval c
@@ -331,7 +335,7 @@ evalLookup (VArr a) (VNum i)
 evalLookup (VArr _) _ =
   throwError (InvalidIndex $ "array index was not integer")
 evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey s) (H.lookup (O.Key s) o) >>= force . O.value
+  liftMaybe (NoSuchKey (pretty s)) (H.lookup (O.Key s) o) >>= force . O.value
 evalLookup (VStr s) (VNum i) | isInteger i = do
   liftMaybe (IndexOutOfBounds i) (f =<< bounded)
   where
@@ -364,10 +368,7 @@ append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 throwInvalidKey :: Value -> Eval a
-throwInvalidKey = throwError . InvalidKey . valueType
-
-throwDuplicateKey :: Text -> Eval a
-throwDuplicateKey = throwError . DuplicateKey
+throwInvalidKey = throwError . InvalidKey . pretty . valueType
 
 updateSpan :: SrcSpan -> EvalState -> EvalState
 updateSpan sp st = st {curSpan = Just sp}

@@ -129,27 +129,29 @@ stdFunc f =
     )
 
 mkFun ps e =
-  CFun $ Fun $
-    bind
-      ( rec $
-          fmap
-            ( \(n, a) ->
-                (s2n n, Embed a)
-            )
-            ps
-      )
-      e
+  CFun $
+    Fun $
+      bind
+        ( rec $
+            fmap
+              ( \(n, a) ->
+                  (s2n n, Embed a)
+              )
+              ps
+        )
+        e
 
 mkLet bnds e =
-  CLet $ Let $
-    bind
-      ( rec $
-          toList
-            ( fmap
-                ( \(n, a) ->
-                    (s2n n, Embed a)
-                )
-                bnds
-            )
-      )
-      e
+  CLet $
+    Let $
+      bind
+        ( rec $
+            toList
+              ( fmap
+                  ( \(n, a) ->
+                      (s2n n, Embed a)
+                  )
+                  bnds
+              )
+        )
+        e

@@ -43,9 +43,9 @@ parse ::
   Text ->
   m Expr'
 parse fp inp =
-  liftEither
-    $ left (ParserError . ParseError)
-    $ runParser (sc *> exprP <* eof) fp inp
+  liftEither $
+    left (ParserError . ParseError) $
+      runParser (sc *> exprP <* eof) fp inp
 
 resolveImports ::
   (MonadError Error m, MonadIO m) =>
@@ -106,9 +106,9 @@ annotateLoc p = do
 identifier :: Parser String
 identifier = do
   ident <- p
-  when (ident `elem` reservedKeywords)
-    $ fail
-    $ "Keyword " <> ident <> " cannot be an identifier."
+  when (ident `elem` reservedKeywords) $
+    fail $
+      "Keyword " <> ident <> " cannot be an identifier."
   pure ident
   where
     p =

@@ -26,7 +26,7 @@ import Data.Scientific (Scientific, fromFloatDigits, toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import Data.Vector ((!?), Vector)
+import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
 import GHC.Generics (Generic)
@@ -86,13 +86,14 @@ force = \case
 mkThunk :: MonadIO m => Eval Value -> m Thunk
 mkThunk ev = do
   ref <- liftIO $ newIORef Nothing
-  pure $ TV $
-    liftIO (readIORef ref) >>= \case
-      Nothing -> do
-        v <- ev
-        liftIO $ writeIORef ref $ Just v
-        pure v
-      Just v -> pure v
+  pure $
+    TV $
+      liftIO (readIORef ref) >>= \case
+        Nothing -> do
+          v <- ev
+          liftIO $ writeIORef ref $ Just v
+          pure v
+        Just v -> pure v
 
 proj' :: HasValue a => Thunk -> Eval a
 proj' = force >=> proj

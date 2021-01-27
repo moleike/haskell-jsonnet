@@ -26,8 +26,8 @@ import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Value
 import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
-import qualified Prelude as P (length)
 import Prelude hiding (length)
+import qualified Prelude as P (length)
 
 -- The native subset of Jsonnet standard library
 std :: Value
@@ -72,10 +72,10 @@ primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
 primitiveEquals _ _ =
   throwError
-    ( StdError
-        $ text
-        $ T.unpack
-        $ "primitiveEquals operates on primitive types"
+    ( StdError $
+        text $
+          T.unpack $
+            "primitiveEquals operates on primitive types"
     )
 
 objectFieldsEx :: Object -> Bool -> [Text]
@@ -95,11 +95,11 @@ length = \case
     pure $ P.length (unrec ps)
   v ->
     throwError
-      ( StdError
-          $ text
-          $ T.unpack
-          $ "length operates on strings, objects, functions and arrays, got "
-            <> valueType v
+      ( StdError $
+          text $
+            T.unpack $
+              "length operates on strings, objects, functions and arrays, got "
+                <> valueType v
       )
 
 makeArray :: Int -> (Int -> Eval Value) -> Eval [Value]

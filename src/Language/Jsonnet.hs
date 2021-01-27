@@ -95,9 +95,9 @@ parse inp =
 check :: Expr -> JsonnetM Expr
 check expr = do
   _ <-
-    JsonnetM
-      $ lift
-      $ Check.check expr
+    JsonnetM $
+      lift $
+        Check.check expr
   pure expr
 
 desugar :: Expr -> JsonnetM Core
@@ -107,6 +107,6 @@ desugar expr = pure (Desugar.desugar expr)
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
   env <- singleton "std" . TV . pure <$> asks stdlib
-  JsonnetM
-    $ lift
-    $ runEval env ((eval >=> manifest) expr)
+  JsonnetM $
+    lift $
+      runEval env ((eval >=> manifest) expr)
