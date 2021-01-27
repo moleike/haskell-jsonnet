@@ -1,4 +1,4 @@
-# jsonnet-hs
+# haskell-jsonnet
 
 [![Actions Status](https://github.com/moleike/jsonnet-hs/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-hs/actions) [![Join the chat at https://gitter.im/jsonnet-hs/community](https://badges.gitter.im/jsonnet-hs/community.svg)](https://gitter.im/jsonnet-hs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 

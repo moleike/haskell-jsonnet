@@ -16,7 +16,7 @@ limitations under the License.
 // Can capture std from another file.
 std.assertEqual((import 'lib/capture_std_func.libsonnet')().sqrt(4), 2) &&
 
-// Each import has its own std. (not implemented in jsonnet-hs)
+// Each import has its own std. (not implemented in haskell-jsonnet)
 std.assertEqual(
   //local std = { sqrt: function(x) x };
   local lib = import 'lib/capture_std.libsonnet';
