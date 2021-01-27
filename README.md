@@ -2,8 +2,9 @@
 
 [![Actions Status](https://github.com/moleike/jsonnet-hs/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-hs/actions) [![Join the chat at https://gitter.im/jsonnet-hs/community](https://badges.gitter.im/jsonnet-hs/community.svg)](https://gitter.im/jsonnet-hs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-A Haskell implementation of the [Jsonnet][jsonnet] configuration language. 
+This is an (unofficial) Haskell implementation of the [Jsonnet][jsonnet] configuration language.
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
+Tested against the same test suite used in the C++ and Go implementations.
 
 [jsonnet]: https://jsonnet.org/
 [tutorial]: https://jsonnet.org/learning/tutorial.html
