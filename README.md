@@ -4,7 +4,7 @@
 
 This is an (unofficial) Haskell implementation of the [Jsonnet][jsonnet] configuration language.
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
-Tested against the same test suite used in the C++ and Go implementations.
+We are using the same test suite used in the C++ and Go implementations (which is very comprehensive).
 
 [jsonnet]: https://jsonnet.org/
 [tutorial]: https://jsonnet.org/learning/tutorial.html
@@ -23,27 +23,25 @@ stack build
 
 ## Progress
 
-Below is listed the implementation status of the main language features:
+Here is the implementation status of the main language features:
 
-| Features                                                                 | |
-|--------------------------------------------------------------------------|---|
-| array and object comprehension                                           | ✅ |
-| array slices                                                             | ✅ |
-| Python-style string formatting                                           | ✅ |
-| text blocks                                                              | ❌ |
-| verbatim strings                                                         | ✅ |
-| object-level locals                                                      | ✅ |
-| object-level asserts                                                     | ❌ |
-| keyword parameters                                                       | ✅ |
-| default arguments                                                        | ✅ |
-| top-level arguments                                                      | ❌ |
-| external variables                                                       | ❌ |
-| object composition (merging objects)                                     | ✅ |
-| outermost object reference `$`                                           | ✅ |
-| `super` keyword                                                          | ❌ |
-| overriding deeply nested fields (`+:` field syntax)                      | ❌ |
-| hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) | ✅ |
-| tailstrict annotation                                                    | ✅ |
+- [X] array and object comprehension
+- [X] array slices
+- [X] Python-style string formatting                                           
+- [X] text blocks                                                              
+- [X] verbatim strings                                                         
+- [X] object-level locals                                                      
+- [ ] object-level asserts                                                     
+- [X] keyword parameters                                                       
+- [X] default arguments                                                        
+- [ ] top-level arguments                                                      
+- [ ] external variables                                                       
+- [X] object composition (`self` and merging objects)
+- [X] outermost object reference `$`                                           
+- [ ] `super` keyword
+- [ ] overriding deeply nested fields (`+:` field syntax)                      
+- [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
+- [X] tailstrict annotation                                                    
 
 [//]: # "Implementation overview"
 
