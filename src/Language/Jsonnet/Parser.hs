@@ -443,7 +443,6 @@ applyP = flip mkApply <$> argsP
         named = Named <$> identifier <*> (symbol "=" *> exprP)
         tailstrict = option Lazy (keywordP "tailstrict" $> Strict)
 
--- there are missing cases here, e.g. expr[a:b]
 sliceP :: Parser (Expr' -> Expr')
 sliceP = brackets $ do
   start <- optional exprP <* colon
@@ -492,35 +491,3 @@ reservedKeywords =
     "then",
     "true"
   ]
-
-pComplexItem :: Parser (String, [String])
-pComplexItem = L.indentBlock scn p
-  where
-    p = do
-      header <- pItem
-      return (L.IndentMany Nothing (return . (header,)) pLineFold)
-
-pLineFold :: Parser String
-pLineFold = L.lineFold scn $ \sc' ->
-  let ps = some (alphaNumChar <|> char '-') `sepBy1` try sc'
-   in concat <$> ps
-
-scn = L.space space1 empty empty
-
-pItem :: Parser String
-pItem = lexeme (some (alphaNumChar <|> char '-')) <?> "list item"
-  where
-    lexeme :: Parser a -> Parser a
-    lexeme = L.lexeme sc
-    sc = L.space (void $ some (char ' ' <|> char '\t')) empty empty
-
---  "  foo\n    bar\n  baz" -> ["foo\n", "  bar\n", "baz\n"]
-foo :: Parser String
-foo = skipCount 5 ws >> ps
-  where
-    ps = some (alphaNumChar <|> char '-' <|> spaceChar)
-    ws = oneOf [' ', '\t']
-
-lineFold :: Parser () -> (Parser () -> Parser a) -> Parser a
-lineFold sc action =
-  sc >> L.indentLevel >>= action . void . L.indentGuard sc GT
