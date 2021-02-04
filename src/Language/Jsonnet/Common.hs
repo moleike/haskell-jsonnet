@@ -14,6 +14,7 @@ import Data.String
 import Data.Text (Text)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
+import Language.Jsonnet.Parser.SrcSpan
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
@@ -162,3 +163,12 @@ instance Read1 CompSpec where
 
 instance Show1 CompSpec where
   liftShowsPrec = liftShowsPrecDefault
+
+-- this is just my current workaround to report
+-- better error messages; we collect the source spans
+-- at call site, but reporting a bunch of locations
+-- doesn't seem very heplful either
+type CallStack = [SrcSpan]
+
+data Backtrace = Backtrace (Maybe CallStack)
+  deriving (Show)

@@ -49,22 +49,14 @@ data Value
   | VStr !Text
   | VArr !Array
   | VObj !Object
-  | VClos !Fun !Env
+  | VClos !Fun !Ctx
   | VFun !(Thunk -> Eval Value)
 
--- | VThunk !Thunk
 type Array = Vector Thunk
 
 type Object = HashMap (O.Key Text) (O.Value Thunk)
 
 instance Hashable (O.Key Text)
-
---data Thunk = Thunk {force :: Eval Value}
-
---VThunk !(Either Thunk (Eval Value))
---data Thunk = Thunk !Env !Core
-
-data Thunk = TC !Env !Core | TV !(Eval Value)
 
 valueType :: Value -> Text
 valueType =
@@ -78,10 +70,15 @@ valueType =
     VClos _ _ -> "function"
     VFun _ -> "function"
 
+data Thunk = TC !Ctx !Core | TV !(Eval Value)
+
 force :: Thunk -> Eval Value
 force = \case
-  TC rho expr -> local (const rho) (eval expr)
+  TC rho expr -> withCtx rho (eval expr)
   TV comp -> comp
+
+mkThunk' :: Value -> Thunk
+mkThunk' = TV . pure
 
 mkThunk :: MonadIO m => Eval Value -> m Thunk
 mkThunk ev = do
@@ -150,7 +147,7 @@ instance HasValue a => HasValue (Maybe a) where
 instance HasValue a => HasValue (Vector a) where
   proj (VArr as) = traverse proj' as
   proj v = throwTypeMismatch "array" v
-  inj as = VArr $ TV . pure . inj <$> as
+  inj as = VArr $ mkThunk' . inj <$> as
 
 instance {-# OVERLAPS #-} HasValue (Vector Thunk) where
   proj (VArr as) = pure as
@@ -169,7 +166,7 @@ instance {-# OVERLAPS #-} HasValue Object where
 --instance HasValue a => HasValue (Object a) where
 --  proj (VObj o) = traverse proj' o
 --  proj v = throwTypeMismatch "object" v
---  inj o = VObj $ TV . pure . inj <$> o
+--  inj o = VObj $ mkThunk' . inj <$> o
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
   proj v = throwTypeMismatch "impossible" v
@@ -181,28 +178,28 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
   proj (VFun f) = pure $ \x -> do
-    r <- f (TV $ pure $ inj x)
+    r <- f (mkThunk' $ inj x)
     proj r
-  proj (VClos f env) = pure $ \x -> do
-    r <- evalClos env f $ [Pos $ TV $ pure $ inj x]
+  proj (VClos f rho) = pure $ \x -> do
+    r <- evalClos rho f $ [Pos $ mkThunk' $ inj x]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = VFun $ \v -> proj' v >>= fmap inj . f
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
   proj (VFun f) = pure $ \x y -> do
-    VFun g <- f (TV $ pure $ inj x)
-    r <- g (TV $ pure $ inj y)
+    VFun g <- f (mkThunk' $ inj x)
+    r <- g (mkThunk' $ inj y)
     proj r
   proj (VClos f env) = pure $ \x y -> do
-    r <- evalClos env f $ Pos . TV . pure <$> [inj x, inj y]
+    r <- evalClos env f $ Pos . mkThunk' <$> [inj x, inj y]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)
 
 throwTypeMismatch :: Text -> Value -> Eval a
 throwTypeMismatch expected =
-  throwError
+  throwE
     . TypeMismatch expected
     . valueType
 

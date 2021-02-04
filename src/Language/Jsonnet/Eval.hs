@@ -1,12 +1,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Language.Jsonnet.Eval
   ( eval,
@@ -56,15 +56,14 @@ import Unbound.Generics.LocallyNameless.Bind
 
 eval :: Core -> Eval Value
 eval = \case
-  CLoc sp e -> do
-    modify $ updateSpan sp
-    eval e
+  CLoc sp e@CApp {} -> extendStack sp (eval e)
+  CLoc sp e -> updateSpan sp >> eval e
   CLit l -> evalLiteral l
   CVar n -> do
-    env <- ask
+    env <- asks ctx
     v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n env)
     force v
-  CFun f -> VClos f <$> ask
+  CFun f -> VClos f <$> (asks ctx)
   CApp e es -> do
     vs <- evalArgs es
     eval e >>= \case
@@ -79,11 +78,11 @@ eval = \case
     bnds <-
       mapM
         ( \(v, Embed e) -> do
-            th <- mkThunk $ extendEnv bnds $ eval e
+            th <- mkThunk $ extendCtx' bnds $ eval e
             pure (v, th)
         )
         (unrec r)
-    extendEnv bnds (eval e1)
+    extendCtx' bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp (Logical op) e1 e2 -> do
@@ -111,7 +110,7 @@ eval = \case
   CErr e ->
     ( eval
         >=> toString
-        >=> throwError . RuntimeError . pretty
+        >=> throwE . RuntimeError . pretty
     )
       e
   CComp (ArrC bnd) cs -> do
@@ -121,45 +120,52 @@ eval = \case
 
 thunk :: Core -> Eval Thunk
 thunk e =
-  ask >>= \rho ->
-    mkThunk $ local (const rho) $ eval e
+  asks ctx >>= \rho ->
+    mkThunk $ withCtx rho (eval e)
 
-extendEnv :: [(Name Core, Thunk)] -> Eval a -> Eval a
-extendEnv ns = local (M.union $ M.fromList ns)
+extendCtx' :: [(Name Core, Thunk)] -> Eval a -> Eval a
+extendCtx' = extendCtx . M.fromList
+
+extendStack :: SrcSpan -> Eval a -> Eval a
+extendStack sp =
+  local
+    ( \env@Env {callStack} ->
+        env {callStack = sp : callStack}
+    )
 
 evalArgs :: Args Core -> Eval [Arg Thunk]
 evalArgs = \case
   as@(Args _ Lazy) -> args <$> traverse thunk as
   as@(Args _ Strict) -> args <$> traverse f as
     where
-      f = eval >=> pure . TV . pure
+      f = eval >=> pure . mkThunk'
 
-evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
+evalClos :: Ctx -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) vs = do
   (bnds, e) <- unbind f
   let xs = second unembed <$> unrec bnds
-  local (const rho) $ evalFun xs e vs
+  withCtx rho (evalFun xs e vs)
 
 appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
 appDefaults rs e = do
   case findIndex isNothing ds of
-    Just x -> throwError $ ParamNotBound (pretty $ ns !! x)
+    Just x -> throwE $ ParamNotBound (pretty $ ns !! x)
     Nothing -> mdo
       bnds <-
         mapM
           ( \(v, e) -> do
-              th <- mkThunk $ extendEnv bnds $ eval e
+              th <- mkThunk $ extendCtx' bnds $ eval e
               pure (v, th)
           )
           (zip ns $ catMaybes ds)
-      extendEnv bnds (eval e)
+      extendCtx' bnds (eval e)
   where
     (ns, ds) = unzip rs
 
 evalFun bnds e args = do
   if length ps > length bnds
-    then throwError $ TooManyArgs (length bnds)
-    else extendEnv (zip names ps') $ evalNamedArgs ns bnds'
+    then throwE $ TooManyArgs (length bnds)
+    else extendCtx' (zip names ps') $ evalNamedArgs ns bnds'
   where
     isPos = \case
       Pos _ -> True
@@ -173,13 +179,13 @@ evalFun bnds e args = do
         Named n v -> pure (n, v)
       (names, vs) <- unzip <$> buildParams ns' bnds
       let rs = filter ((`notElem` names) . fst) bnds
-      extendEnv (zip names vs) (appDefaults rs e)
+      extendCtx' (zip names vs) (appDefaults rs e)
       where
         buildParams as bnds = traverse f as
           where
             ns = fst $ unzip bnds
             f (a, b) = case g a of
-              Nothing -> throwError $ BadParam (pretty a)
+              Nothing -> throwE $ BadParam (pretty a)
               Just n -> pure (n, b)
             g a = find ((a ==) . name2String) ns
 
@@ -194,7 +200,7 @@ mergeObjects (VObj xs) (VObj ys) = do
         VObj $
           H.map
             ( fmap $ \case
-                TC rho e -> TC (M.insert "self" (TV $ pure fs) rho) e
+                TC rho e -> TC (M.insert "self" (mkThunk' fs) rho) e
                 v@(TV {}) -> v
             )
             zs
@@ -202,7 +208,7 @@ mergeObjects (VObj xs) (VObj ys) = do
 
 evalObj :: [O.Field Core] -> Eval Value
 evalObj xs = mdo
-  env <- ask
+  env <- asks ctx
   fs <-
     catMaybes
       <$> mapM
@@ -216,7 +222,7 @@ evalObj xs = mdo
         xs
   pure $ VObj $ H.fromList $ fs
   where
-    self = TV . pure . VObj . H.fromList
+    self = mkThunk' . VObj . H.fromList
 
 evalKey :: O.Key Core -> Eval (Maybe (O.Key Text))
 evalKey (O.Key key) =
@@ -228,7 +234,7 @@ evalKey (O.Key key) =
 evalField :: O.Field Core -> Eval (Maybe (O.Key Text, O.Value Thunk))
 evalField (O.Field key value) = do
   a <- evalKey key
-  b <- ask >>= \rho -> pure (TC rho <$> value)
+  b <- asks ctx >>= \rho -> pure (TC rho <$> value)
   pure $ (,b) <$> a
 
 evalArrComp ::
@@ -243,7 +249,7 @@ evalArrComp cs bnd = do
       eval cs >>= \case
         VArr xs -> forM xs $ \x -> do
           (n, (e, cond)) <- unbind bnd
-          extendEnv [(n, x)] $ do
+          extendCtx' [(n, x)] $ do
             b <- f cond
             if b
               then Just <$> thunk e
@@ -267,7 +273,7 @@ evalObjComp cs bnd = do
       eval cs >>= \case
         VArr xs -> forM xs $ \x -> do
           (n, (e, cond)) <- unbind bnd
-          extendEnv [(n, x)] $ do
+          extendCtx' [(n, x)] $ do
             b <- f cond
             if b
               then evalField e
@@ -298,9 +304,9 @@ evalArith :: ArithOp -> Value -> Value -> Eval Value
 evalArith Add n1 n2 = evalBin ((+) @Double) n1 n2
 evalArith Sub n1 n2 = evalBin ((-) @Double) n1 n2
 evalArith Mul n1 n2 = evalBin ((*) @Double) n1 n2
-evalArith Div (VNum _) (VNum 0) = throwError DivByZero
+evalArith Div (VNum _) (VNum 0) = throwE DivByZero
 evalArith Div n1 n2 = evalBin ((/) @Double) n1 n2
-evalArith Mod (VNum _) (VNum 0) = throwError DivByZero
+evalArith Mod (VNum _) (VNum 0) = throwE DivByZero
 evalArith Mod n1 n2 = evalBin (mod @Int64) n1 n2
 
 evalComp :: CompOp -> Value -> Value -> Eval Value
@@ -333,7 +339,7 @@ evalLookup (VArr a) (VNum i)
   | isInteger i =
     liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i) >>= force
 evalLookup (VArr _) _ =
-  throwError (InvalidIndex $ "array index was not integer")
+  throwE (InvalidIndex $ "array index was not integer")
 evalLookup (VObj o) (VStr s) =
   liftMaybe (NoSuchKey (pretty s)) (H.lookup (O.Key s) o) >>= force . O.value
 evalLookup (VStr s) (VNum i) | isInteger i = do
@@ -346,7 +352,7 @@ evalLookup (VStr s) (VNum i) | isInteger i = do
           then Nothing
           else Just i'
 evalLookup (VStr _) _ =
-  throwError (InvalidIndex $ "string index was not integer")
+  throwE (InvalidIndex $ "string index was not integer")
 evalLookup v _ = throwTypeMismatch "array/object/string" v
 
 evalLiteral :: Literal -> Eval Value
@@ -368,10 +374,10 @@ append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 throwInvalidKey :: Value -> Eval a
-throwInvalidKey = throwError . InvalidKey . pretty . valueType
+throwInvalidKey = throwE . InvalidKey . pretty . valueType
 
-updateSpan :: SrcSpan -> EvalState -> EvalState
-updateSpan sp st = st {curSpan = Just sp}
+updateSpan :: SrcSpan -> Eval ()
+updateSpan sp = modify $ \st -> st {curSpan = Just sp}
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
@@ -383,5 +389,5 @@ flattenArrays = join
 liftMaybe :: EvalError -> Maybe a -> Eval a
 liftMaybe e =
   \case
-    Nothing -> throwError e
+    Nothing -> throwE e
     Just a -> pure a

@@ -8,6 +8,7 @@ module Language.Jsonnet.Error where
 import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Data.Void (Void)
+import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec (ParseErrorBundle)
 import Text.PrettyPrint.ANSI.Leijen (Doc)
@@ -15,7 +16,7 @@ import Text.PrettyPrint.ANSI.Leijen (Doc)
 data Error
   = ParserError ParserError
   | CheckError CheckError (Maybe SrcSpan)
-  | EvalError EvalError (Maybe SrcSpan)
+  | EvalError EvalError (Maybe SrcSpan) Backtrace
   deriving (Show)
 
 data EvalError

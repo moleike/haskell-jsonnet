@@ -79,7 +79,7 @@ primitiveEquals (VBool a) (VBool b) = pure (a == b)
 primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
 primitiveEquals _ _ =
-  throwError
+  throwE
     ( StdError $
         text $
           T.unpack $
@@ -103,7 +103,7 @@ length = \case
     (ps, _) <- unbind f
     pure $ P.length (unrec ps)
   v ->
-    throwError
+    throwE
       ( StdError $
           text $
             T.unpack $

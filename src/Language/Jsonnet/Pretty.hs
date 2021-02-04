@@ -23,7 +23,7 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
-import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep)
+import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
 import Unbound.Generics.LocallyNameless (Name, name2String)
 
 instance Pretty (Name a) where
@@ -148,10 +148,11 @@ instance Pretty EvalError where
 instance Pretty Error where
   pretty =
     \case
-      EvalError e sp ->
+      EvalError e sp _ ->
         text "Runtime error:"
           <+> pretty e
           <$$> indent 4 (pretty sp)
+      -- <$$> indent 4 (vcat $ pretty <$> backtrace)
       ParserError e -> pretty e
       CheckError e sp ->
         text "Static error:"

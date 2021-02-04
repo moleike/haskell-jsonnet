@@ -106,7 +106,7 @@ desugar expr = pure (Desugar.desugar expr)
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
-  env <- singleton "std" . TV . pure <$> asks stdlib
+  ctx <- singleton "std" . TV . pure <$> asks stdlib
   JsonnetM $
     lift $
-      runEval env ((eval >=> manifest) expr)
+      runEval (Env ctx []) ((eval >=> manifest) expr)

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Language.Jsonnet.Parser where
 
@@ -15,6 +16,7 @@ import Data.Either
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
+import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -31,7 +33,7 @@ import Language.Jsonnet.Syntax.Annotated
 import System.Directory
 import System.FilePath.Posix (takeDirectory)
 import System.IO.Error (tryIOError)
-import Text.Megaparsec hiding (ParseError, parse, sepBy1)
+import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -135,7 +137,7 @@ stringLiteral = quoted (char '\"') <|> quoted (char '\'')
 
 escapeAscii :: Parser Char
 escapeAscii = do
-  char '\\'
+  void (char '\\')
   choice
     [ char '\"' $> '\"',
       char '\'' $> '\'', -- this one is jsonnet specific
@@ -163,11 +165,37 @@ verbatimString = char '@' *> (quoted (char '\'') <|> quoted (char '\"'))
           ((c *> c) <|> anySingle)
           (try $ c <* notFollowedBy c)
 
+textBlock :: Parser String
+textBlock = do
+  _ <- symbol "|||" <* sc'
+  ref <- L.indentLevel
+  x <- line
+  xs <-
+    manyTill
+      (L.indentGuard (sc'' ref) EQ ref >> line)
+      (try $ sc' *> symbol "|||")
+  pure $ concat (x : xs)
+  where
+    line :: Parser String
+    line = (++) <$> many (anySingleBut '\n') <*> some (char '\n')
+    sc' :: Parser ()
+    sc' = L.space (void $ some (char ' ' <|> char '\t')) empty empty
+    sc'' :: Pos -> Parser ()
+    sc'' x = void $ count' 0 (unPos x - 1) (oneOf [' ', '\t'])
+
 unquoted :: Parser Expr'
 unquoted = Fix <$> annotateLoc (mkStrF <$> identifier)
 
 stringP :: Parser Expr'
-stringP = Fix <$> annotateLoc (mkStrF <$> (verbatimString <|> stringLiteral))
+stringP =
+  Fix
+    <$> annotateLoc
+      ( mkStrF
+          <$> ( verbatimString
+                  <|> stringLiteral
+                  <|> textBlock
+              )
+      )
 
 numberP :: Parser Expr'
 numberP = Fix <$> annotateLoc number
@@ -215,7 +243,7 @@ ifElseP = Fix <$> annotateLoc ifElseExpr
         (keywordP "else" *> (mkIfElseF cond expr <$> exprP))
 
 paramsP :: Parser [Param Expr']
-paramsP = parens (param `sepBy` comma)
+paramsP = parens (param `sepEndBy` comma)
   where
     param = (,) <$> identifier <*> optional (symbol "=" *> exprP)
 
@@ -408,7 +436,7 @@ applyP :: Parser (Expr' -> Expr')
 applyP = flip mkApply <$> argsP
   where
     argsP :: Parser (Args Expr')
-    argsP = Args <$> parens (args `sepBy` comma) <*> tailstrict
+    argsP = Args <$> parens (args `sepEndBy` comma) <*> tailstrict
       where
         args = try named <|> posal
         posal = Pos <$> exprP
@@ -420,8 +448,8 @@ sliceP :: Parser (Expr' -> Expr')
 sliceP = brackets $ do
   start <- optional exprP <* colon
   end <- optional exprP
-  step <- optional (colon *> exprP)
-  pure $ mkSlice start end step
+  step <- optional (colon *> optional exprP)
+  pure $ mkSlice start end (join step)
 
 primP :: Parser Expr'
 primP =
@@ -464,3 +492,35 @@ reservedKeywords =
     "then",
     "true"
   ]
+
+pComplexItem :: Parser (String, [String])
+pComplexItem = L.indentBlock scn p
+  where
+    p = do
+      header <- pItem
+      return (L.IndentMany Nothing (return . (header,)) pLineFold)
+
+pLineFold :: Parser String
+pLineFold = L.lineFold scn $ \sc' ->
+  let ps = some (alphaNumChar <|> char '-') `sepBy1` try sc'
+   in concat <$> ps
+
+scn = L.space space1 empty empty
+
+pItem :: Parser String
+pItem = lexeme (some (alphaNumChar <|> char '-')) <?> "list item"
+  where
+    lexeme :: Parser a -> Parser a
+    lexeme = L.lexeme sc
+    sc = L.space (void $ some (char ' ' <|> char '\t')) empty empty
+
+--  "  foo\n    bar\n  baz" -> ["foo\n", "  bar\n", "baz\n"]
+foo :: Parser String
+foo = skipCount 5 ws >> ps
+  where
+    ps = some (alphaNumChar <|> char '-' <|> spaceChar)
+    ws = oneOf [' ', '\t']
+
+lineFold :: Parser () -> (Parser () -> Parser a) -> Parser a
+lineFold sc action =
+  sc >> L.indentLevel >>= action . void . L.indentGuard sc GT
