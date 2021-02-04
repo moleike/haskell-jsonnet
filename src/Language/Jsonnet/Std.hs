@@ -11,32 +11,39 @@ module Language.Jsonnet.Std
 where
 
 import Control.Monad.Except
+import Control.Monad.State
+import Data.Aeson (FromJSON (..))
+import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
+import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Vector (Vector)
 import Data.Word
 import Language.Jsonnet.Core (Fun (Fun))
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import qualified Language.Jsonnet.Object as O
+import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Value
+import System.FilePath.Posix (takeFileName)
+import Text.Megaparsec.Pos (SourcePos (..))
 import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
 
--- The native subset of Jsonnet standard library
+-- | The native subset of Jsonnet standard library
 std :: Value
-std = VObj $ (fmap (TV . pure)) <$> H.fromList xs
+std = VObj $ H.fromList $ map f xs
   where
-    xs :: [(O.Key Text, O.Value Value)]
+    f = \(k, v) -> (O.Key k, TV <$> O.Value v O.Hidden)
     xs =
+      ("thisFile", inj <$> thisFile) :
       map
-        (\(k, v) -> (O.Key k, O.Value v O.Hidden))
+        (\(k, v) -> (k, pure v))
         [ ("type", inj valueType),
           ("primitiveEquals", inj primitiveEquals),
           ("length", inj length),
@@ -62,7 +69,8 @@ std = VObj $ (fmap (TV . pure)) <$> H.fromList xs
           ("makeArray", inj makeArray),
           ("filter", inj (filterM @Eval @Value)),
           ("objectHasEx", inj objectHasEx),
-          ("objectFieldsEx", inj objectFieldsEx)
+          ("objectFieldsEx", inj objectFieldsEx),
+          ("parseJson", inj (JSON.decodeStrict @Value))
         ]
 
 primitiveEquals :: Value -> Value -> Eval Bool
@@ -80,7 +88,8 @@ primitiveEquals _ _ =
 
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o True = sort (O.key <$> H.keys o) -- all fields
-objectFieldsEx o False = sort $ fmap O.key $ H.keys $ H.filter (not . O.hidden) o -- only visible (incl. forced)
+objectFieldsEx o False =
+  sort $ fmap O.key $ H.keys $ H.filter (not . O.hidden) o -- only visible (incl. forced)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all = f `elem` objectFieldsEx o all
@@ -104,3 +113,26 @@ length = \case
 
 makeArray :: Int -> (Int -> Eval Value) -> Eval [Value]
 makeArray n f = traverse f [0 .. n - 1]
+
+-- hacky way of returning the current file
+thisFile :: Eval (Maybe FilePath)
+thisFile = f <$> gets curSpan
+  where
+    f = fmap (takeFileName . sourceName . spanBegin)
+
+instance FromJSON Value where
+  parseJSON = \case
+    JSON.Null -> pure VNull
+    JSON.Bool b -> pure $ VBool b
+    JSON.Number n -> pure $ VNum n
+    JSON.String s -> pure $ VStr s
+    JSON.Array a -> VArr <$> traverse (fmap mkThunk' . parseJSON) a
+    JSON.Object o -> VObj . f <$> traverse parseJSON o
+    where
+      f :: HashMap Text Value -> Object
+      f o =
+        H.fromList
+          [ (mkField k (mkThunk' v))
+            | (k, v) <- H.toList o
+          ]
+      mkField k v = (O.Key k, O.Value v O.Visible)
