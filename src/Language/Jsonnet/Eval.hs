@@ -11,7 +11,7 @@
 module Language.Jsonnet.Eval
   ( eval,
     evalClos,
-    mergeObjects,
+    mergeWith,
     module Language.Jsonnet.Eval.Monad,
   )
 where
@@ -36,7 +36,7 @@ import Data.Text.Lazy (toStrict)
 import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
-import Language.Jsonnet.Common
+import Language.Jsonnet.Common hiding (span)
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
@@ -56,24 +56,19 @@ import Unbound.Generics.LocallyNameless.Bind
 
 eval :: Core -> Eval Value
 eval = \case
-  CLoc sp e@CApp {} -> extendStack sp (eval e)
-  CLoc sp e -> updateSpan sp >> eval e
+  CLoc sp e -> do
+    --traceShowM (spanBegin sp)
+    updateSpan (Just sp) >> eval e
   CLit l -> evalLiteral l
   CVar n -> do
     env <- asks ctx
+    --sp <- gets currentPos
+    --traceShowM (spanBegin <$> sp)
     v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n env)
     force v
-  CFun f -> VClos f <$> (asks ctx)
-  CApp e es -> do
-    vs <- evalArgs es
-    eval e >>= \case
-      VClos f rho -> evalClos rho f vs
-      v@(VFun _) -> foldlM f v vs
-        where
-          f (VFun g) (Pos v) = g v
-          f v _ = throwTypeMismatch "function" v
-      v -> throwTypeMismatch "function" v
-  CLet (Let bnd) -> mdo
+  CFun f -> VClos f <$> ask
+  CApp e es -> evalApp e =<< evalArgs es
+  cc@(CLet (Let bnd)) -> mdo
     (r, e1) <- unbind bnd
     bnds <-
       mapM
@@ -82,6 +77,9 @@ eval = \case
             pure (v, th)
         )
         (unrec r)
+
+    --traceShowM "applying the body of the local binding"
+    --traceShowM e1
     extendCtx' bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
@@ -120,18 +118,11 @@ eval = \case
 
 thunk :: Core -> Eval Thunk
 thunk e =
-  asks ctx >>= \rho ->
-    mkThunk $ withCtx rho (eval e)
+  ask >>= \rho ->
+    mkThunk $ withCtx (ctx rho) (eval e)
 
 extendCtx' :: [(Name Core, Thunk)] -> Eval a -> Eval a
 extendCtx' = extendCtx . M.fromList
-
-extendStack :: SrcSpan -> Eval a -> Eval a
-extendStack sp =
-  local
-    ( \env@Env {callStack} ->
-        env {callStack = sp : callStack}
-    )
 
 evalArgs :: Args Core -> Eval [Arg Thunk]
 evalArgs = \case
@@ -139,6 +130,26 @@ evalArgs = \case
   as@(Args _ Strict) -> args <$> traverse f as
     where
       f = eval >=> pure . mkThunk'
+
+evalApp :: Core -> [Arg Thunk] -> Eval Value
+evalApp e vs = withStackFrame e $ do
+  eval e >>= \case
+    VClos f Env {..} -> evalClos ctx f vs
+    v@(VFun _) -> foldlM f v vs
+      where
+        f (VFun g) (Pos v) = g v
+        f v _ = throwTypeMismatch "function" v
+    v -> throwTypeMismatch "function" v
+
+withStackFrame :: Core -> Eval a -> Eval a
+withStackFrame (CLoc sp (CVar n)) e =
+  pushScope n (pushSpan (Just sp) e)
+withStackFrame (CLoc sp _) e =
+  pushScope (s2n "anonymous") (pushSpan (Just sp) e)
+withStackFrame (CVar n) e =
+  pushScope n (pushSpan Nothing e)
+withStackFrame _ e =
+  pushScope (s2n "anonymous") (pushSpan Nothing e)
 
 evalClos :: Ctx -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) vs = do
@@ -190,29 +201,32 @@ evalFun bnds e args = do
             g a = find ((a ==) . name2String) ns
 
 -- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
-mergeObjects :: Value -> Value -> Eval Value
-mergeObjects (VObj xs) (VObj ys) = do
+mergeWith :: Object -> Object -> Object
+mergeWith xs ys =
   let f a b
-        | O.hidden a && O.visible b = a
+        | hidden a && visible b = a
         | otherwise = b
-      zs = H.unionWith f xs ys
-      fs =
-        VObj $
-          H.map
-            ( fmap $ \case
-                TC rho e -> TC (M.insert "self" (mkThunk' fs) rho) e
-                v@(TV {}) -> v
-            )
-            zs
-  pure fs
+      g name xs = fmap $
+        \case
+          TC rho e -> TC (M.insert name (mkThunk' $ VObj xs) rho) e
+          v@(TV {}) -> v
+      h name xs = fmap $
+        \case
+          TC rho e -> TC (insert' name (mkThunk' $ VObj xs) rho) e
+          v@(TV {}) -> v
+      xs' = H.map (g "self" zs') xs
+      ys' = H.map (g "self" zs' . h "super" xs') ys
+      zs' = H.unionWith f xs' ys'
+      insert' = M.insertWith (const)
+   in zs'
 
-evalObj :: [O.Field Core] -> Eval Value
+evalObj :: [KeyValue Core] -> Eval Value
 evalObj xs = mdo
   env <- asks ctx
   fs <-
     catMaybes
       <$> mapM
-        ( \(O.Field key value) -> do
+        ( \(KeyValue key value) -> do
             k <- evalKey key
             v <- pure $ TC (M.insert "self" (self fs) env) <$> value
             case k of
@@ -224,15 +238,15 @@ evalObj xs = mdo
   where
     self = mkThunk' . VObj . H.fromList
 
-evalKey :: O.Key Core -> Eval (Maybe (O.Key Text))
-evalKey (O.Key key) =
+evalKey :: Core -> Eval (Maybe Text)
+evalKey key =
   eval key >>= \case
-    VStr k -> pure $ Just (O.Key k)
+    VStr k -> pure $ Just k
     VNull -> pure Nothing
     v -> throwInvalidKey v
 
-evalField :: O.Field Core -> Eval (Maybe (O.Key Text, O.Value Thunk))
-evalField (O.Field key value) = do
+evalKeyValue :: KeyValue Core -> Eval (Maybe (Text, Hideable Thunk))
+evalKeyValue (KeyValue key value) = do
   a <- evalKey key
   b <- asks ctx >>= \rho -> pure (TC rho <$> value)
   pure $ (,b) <$> a
@@ -263,7 +277,7 @@ evalArrComp cs bnd = do
 
 evalObjComp ::
   Core ->
-  Bind (Name Core) (O.Field Core, Maybe Core) ->
+  Bind (Name Core) (KeyValue Core, Maybe Core) ->
   Eval Value
 evalObjComp cs bnd = do
   xs <- comp
@@ -276,7 +290,7 @@ evalObjComp cs bnd = do
           extendCtx' [(n, x)] $ do
             b <- f cond
             if b
-              then evalField e
+              then evalKeyValue e
               else pure Nothing
         v -> throwTypeMismatch "array" v
     f Nothing = pure True
@@ -295,7 +309,7 @@ evalBinOp In s o = evalBin (\o s -> Std.objectHasEx o s True) o s
 evalBinOp (Arith Add) x@(VStr _) y = inj <$> append x y
 evalBinOp (Arith Add) x y@(VStr _) = inj <$> append x y
 evalBinOp (Arith Add) x@(VArr _) y@(VArr _) = evalBin ((V.++) @Thunk) x y
-evalBinOp (Arith Add) x@(VObj _) y@(VObj _) = mergeObjects x y
+evalBinOp (Arith Add) (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
 evalBinOp (Arith op) x y = evalArith op x y
 evalBinOp (Comp op) x y = evalComp op x y
 evalBinOp (Bitwise op) x y = evalBitwise op x y
@@ -341,7 +355,8 @@ evalLookup (VArr a) (VNum i)
 evalLookup (VArr _) _ =
   throwE (InvalidIndex $ "array index was not integer")
 evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey (pretty s)) (H.lookup (O.Key s) o) >>= force . O.value
+  liftMaybe (NoSuchKey (pretty s)) (H.lookup s o)
+    >>= \(Hideable v _) -> force v
 evalLookup (VStr s) (VNum i) | isInteger i = do
   liftMaybe (IndexOutOfBounds i) (f =<< bounded)
   where
@@ -376,8 +391,8 @@ append v1 v2 = T.append <$> toString v1 <*> toString v2
 throwInvalidKey :: Value -> Eval a
 throwInvalidKey = throwE . InvalidKey . pretty . valueType
 
-updateSpan :: SrcSpan -> Eval ()
-updateSpan sp = modify $ \st -> st {curSpan = Just sp}
+updateSpan :: Maybe SrcSpan -> Eval ()
+updateSpan sp = modify $ \st -> st {currentPos = sp}
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s

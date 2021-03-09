@@ -11,4 +11,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+local foo = import 'foo.bar';
+
 function(x, x) x

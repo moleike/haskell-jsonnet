@@ -49,14 +49,12 @@ data Value
   | VStr !Text
   | VArr !Array
   | VObj !Object
-  | VClos !Fun !Ctx
+  | VClos !Fun !Env
   | VFun !(Thunk -> Eval Value)
 
 type Array = Vector Thunk
 
-type Object = HashMap (O.Key Text) (O.Value Thunk)
-
-instance Hashable (O.Key Text)
+type Object = HashMap Text (Hideable Thunk)
 
 valueType :: Value -> Text
 valueType =
@@ -180,8 +178,8 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) whe
   proj (VFun f) = pure $ \x -> do
     r <- f (mkThunk' $ inj x)
     proj r
-  proj (VClos f rho) = pure $ \x -> do
-    r <- evalClos rho f $ [Pos $ mkThunk' $ inj x]
+  proj (VClos f env) = pure $ \x -> do
+    r <- evalClos (ctx env) f $ [Pos $ mkThunk' $ inj x]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = VFun $ \v -> proj' v >>= fmap inj . f
@@ -192,7 +190,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
     r <- g (mkThunk' $ inj y)
     proj r
   proj (VClos f env) = pure $ \x y -> do
-    r <- evalClos env f $ Pos . mkThunk' <$> [inj x, inj y]
+    r <- evalClos (ctx env) f $ Pos . mkThunk' <$> [inj x, inj y]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)

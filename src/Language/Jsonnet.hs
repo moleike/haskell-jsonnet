@@ -28,6 +28,7 @@ import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import qualified Data.Text.IO as T (readFile)
 import Debug.Trace
+import Language.Jsonnet.Annotate
 import qualified Language.Jsonnet.Check as Check
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
@@ -62,18 +63,19 @@ data Config = Config
     stdlib :: Value
   }
 
+mergeObjects (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
+
 -- the jsonnet stdlib is written in both jsonnet
 -- and Haskell, here we merge the native with the
 -- interpreted parts
-evalStd :: ExceptT Error IO Value
-evalStd = do
+evalStd :: FilePath -> ExceptT Error IO Value
+evalStd fp = do
   inp <- liftIO $ T.readFile fp
   expr <- Parser.parse fp inp
   expr' <- Parser.resolveImports fp expr
-  stdJ <- runEval emptyEnv (eval (Desugar.desugar expr'))
-  runEval emptyEnv $ mergeObjects std stdJ
-  where
-    fp = "stdlib/std.jsonnet"
+  core <- pure $ Desugar.desugar (annMap (const ()) expr')
+  stdJ <- runEval emptyEnv (eval core)
+  runEval emptyEnv $ mergeObjects stdJ std
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
 runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
@@ -109,4 +111,4 @@ evaluate expr = do
   ctx <- singleton "std" . TV . pure <$> asks stdlib
   JsonnetM $
     lift $
-      runEval (Env ctx []) ((eval >=> manifest) expr)
+      runEval (emptyEnv {ctx = ctx}) ((eval >=> manifest) expr)

@@ -10,7 +10,7 @@ import Data.Functor.Identity
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import Language.Jsonnet.Annotate
-import Language.Jsonnet.Common
+import Language.Jsonnet.Common hiding (span)
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan

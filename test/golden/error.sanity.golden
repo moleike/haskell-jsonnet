@@ -1,2 +1,3 @@
 Runtime error: Assertion failed. 1 != 2
-    stdlib/std.jsonnet:814:13,814:50
+  ./test/golden/error.sanity.jsonnet:14:1-16 function <anonymous>
+  ./test/golden/error.sanity.jsonnet:14:1-16 

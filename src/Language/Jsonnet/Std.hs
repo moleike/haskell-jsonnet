@@ -22,10 +22,10 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Word
-import Language.Jsonnet.Core (Fun (Fun))
+import Language.Jsonnet.Common
+import Language.Jsonnet.Core (Fun (Fun), KeyValue (..))
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Value
 import System.FilePath.Posix (takeFileName)
@@ -39,7 +39,7 @@ import qualified Prelude as P (length)
 std :: Value
 std = VObj $ H.fromList $ map f xs
   where
-    f = \(k, v) -> (O.Key k, TV <$> O.Value v O.Hidden)
+    f = \(k, v) -> (k, TV <$> Hideable v Hidden)
     xs =
       ("thisFile", inj <$> thisFile) :
       map
@@ -87,9 +87,8 @@ primitiveEquals _ _ =
     )
 
 objectFieldsEx :: Object -> Bool -> [Text]
-objectFieldsEx o True = sort (O.key <$> H.keys o) -- all fields
-objectFieldsEx o False =
-  sort $ fmap O.key $ H.keys $ H.filter (not . O.hidden) o -- only visible (incl. forced)
+objectFieldsEx o True = sort (H.keys o) -- all fields
+objectFieldsEx o False = sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all = f `elem` objectFieldsEx o all
@@ -116,7 +115,7 @@ makeArray n f = traverse f [0 .. n - 1]
 
 -- hacky way of returning the current file
 thisFile :: Eval (Maybe FilePath)
-thisFile = f <$> gets curSpan
+thisFile = f <$> gets currentPos
   where
     f = fmap (takeFileName . sourceName . spanBegin)
 
@@ -135,4 +134,4 @@ instance FromJSON Value where
           [ (mkField k (mkThunk' v))
             | (k, v) <- H.toList o
           ]
-      mkField k v = (O.Key k, O.Value v O.Visible)
+      mkField k v = (k, Hideable v Visible)

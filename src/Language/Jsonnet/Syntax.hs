@@ -11,10 +11,12 @@ import Data.Functor.Sum
 import Data.List.NonEmpty
 import Data.Scientific (Scientific)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Common
 import Language.Jsonnet.Object
 import Text.Show.Deriving
+import Unbound.Generics.LocallyNameless
 
 type Ident = String
 
@@ -63,11 +65,29 @@ data ExprF a
       Functor,
       Foldable,
       Traversable,
-      Generic,
-      Generic1
+      Generic
     )
 
 --deriveShow1 ''ExprF
+
+data Field a = Field
+  { key :: a,
+    value :: a,
+    visibility :: Visibility,
+    override :: Bool
+  }
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Generic,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (Field a)
 
 newtype Import = Import FilePath
   deriving (Show, Eq)

@@ -312,17 +312,20 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       pure $ mkObjectF fs ls
     fieldP = try methodP <|> pairP
     pairP = do
-      k <- keyP
-      h <- sepP
-      v <- exprP
-      pure $ Field (Key k) (Value v h)
+      key <- keyP
+      (override, visibility) <-
+        (,)
+          <$> option False ((symbol "+") $> True) <*> sepP
+      value <- exprP
+      pure $ Field {..}
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
-      k <- unquoted
+      let override = False
+      key <- unquoted
       ps <- paramsP
-      h <- sepP
-      v <- function (pure ps) exprP
-      pure $ Field (Key k) (Value v h)
+      visibility <- sepP
+      value <- function (pure ps) exprP
+      pure $ Field {..}
     sepP =
       try (symbol ":::" $> Forced)
         <|> try (symbol "::" $> Hidden)

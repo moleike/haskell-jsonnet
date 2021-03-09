@@ -1,2 +1,2 @@
-Static error: duplicate parameter 'x'
-    ./test/golden/error.function_duplicate_param.jsonnet:14:9,15:1
+Parse error: foo.bar (No such file or directory)
+    ./test/golden/error.function_duplicate_param.jsonnet:14:13-29

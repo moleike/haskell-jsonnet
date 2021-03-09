@@ -15,6 +15,8 @@ import Control.Monad.RWS.Strict
 import Control.Monad.Reader
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
+import Data.Maybe (listToMaybe)
+import Debug.Trace
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
@@ -54,29 +56,59 @@ extendCtx ctx' =
         env {ctx = M.union ctx' ctx}
     )
 
+pushScope :: Name Core -> Eval a -> Eval a
+pushScope name =
+  local
+    ( \env@Env {scopes} ->
+        env {scopes = Just name : scopes}
+    )
+
+pushSpan :: Maybe SrcSpan -> Eval a -> Eval a
+pushSpan span c = do
+  local
+    ( \env@Env {spans} ->
+        env {spans = span : spans}
+    )
+    c
+
 withCtx :: Ctx -> Eval a -> Eval a
 withCtx ctx = local (\env -> env {ctx = ctx})
 
 data Env = Env
   { ctx :: Ctx,
-    callStack :: CallStack
+    spans :: [Maybe SrcSpan],
+    scopes :: [Maybe (Name Core)]
   }
 
+withEnv :: Env -> Eval a -> Eval a
+withEnv rho = local (const rho)
+
 emptyEnv :: Env
-emptyEnv = Env M.empty []
+emptyEnv = Env M.empty [] [Nothing]
 
 data EvalState = EvalState
-  { curSpan :: Maybe SrcSpan
+  { currentPos :: Maybe SrcSpan
   }
 
 emptyState :: EvalState
 emptyState = EvalState Nothing
 
+--  traceShowM $ "length of spans: "
+--  traceShowM $ length sp
+--  traceShowM $ "length of scopes: "
+--  traceShowM $ length sc
+getBacktrace :: Eval (Backtrace Core)
+getBacktrace = do
+  sp <- (:) <$> gets currentPos <*> asks spans
+  sc <- asks scopes
+  pure $
+    Backtrace $
+      case sequence sp of
+        Just sp -> zipWith StackFrame sc sp
+        Nothing -> []
+
 throwE :: EvalError -> Eval a
-throwE e = do
-  bt <- Backtrace . Just <$> asks callStack
-  sp <- gets curSpan
-  throwError (EvalError e sp bt)
+throwE e = throwError . EvalError e =<< getBacktrace
 
 runEval :: Env -> Eval a -> ExceptT Error IO a
 runEval env = mapExceptT f . unEval

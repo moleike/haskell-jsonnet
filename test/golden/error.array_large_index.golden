@@ -1,2 +1,2 @@
 Runtime error: index out of bounds: 18446744073709552000
-    ./test/golden/error.array_large_index.jsonnet:14:11,14:18
+  ./test/golden/error.array_large_index.jsonnet:14:11-18 

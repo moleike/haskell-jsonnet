@@ -16,7 +16,6 @@ import Debug.Trace
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Value
 
 manifest :: Value -> Eval JSON.Value
@@ -39,6 +38,6 @@ forceObject = traverse (force >=> manifest) . visibleKeys
 
 visibleKeys :: Object -> HashMap Text Thunk
 visibleKeys o =
-  H.fromList [(k, v) | ((O.Key k), vv@(O.Value v _)) <- xs, not (O.hidden vv)]
+  H.fromList [(k, v) | (k, vv@(Hideable v _)) <- xs, not (hidden vv)]
   where
     xs = H.toList o

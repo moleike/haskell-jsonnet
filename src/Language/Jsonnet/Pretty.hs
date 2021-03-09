@@ -19,6 +19,7 @@ import Data.Text.Lazy.Builder
 import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import qualified Data.Vector as V
 import GHC.IO.Exception (IOException (..))
+import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec.Error (errorBundlePretty)
@@ -72,14 +73,20 @@ instance Pretty SrcSpan where
   pretty SrcSpan {spanBegin, spanEnd} =
     text (sourceName spanBegin)
       <> colon
-      <> lc spanBegin
-      <> comma
-      <> lc spanEnd
+      <> lc spanBegin spanEnd
     where
-      lc pos =
-        (int . unPos . sourceLine) pos
-          <> colon
-          <> (int . unPos . sourceColumn) pos
+      lc (SourcePos _ lb cb) (SourcePos _ le ce)
+        | lb == le =
+          int (unPos lb) <> colon
+            <> int (unPos cb)
+            <> dash
+            <> int (unPos ce)
+        | otherwise =
+          int (unPos lb) <> colon <> int (unPos cb) <> dash
+            <> int (unPos le)
+            <> colon
+            <> int (unPos ce)
+      dash = char '-'
 
 instance Pretty ParserError where
   pretty (ParseError e) = pretty (errorBundlePretty e)
@@ -87,6 +94,7 @@ instance Pretty ParserError where
     text "Parse error:"
       <+> pretty f
       <+> parens (text desc)
+      <$$> indent 4 (pretty sp)
 
 instance Pretty CheckError where
   pretty =
@@ -145,16 +153,24 @@ instance Pretty EvalError where
           <+> int n
           <+> "parameter(s)"
 
+instance Pretty (StackFrame a) where
+  pretty StackFrame {..} =
+    pretty span <+> pretty name'
+    where
+      name' = (<+>) (text "function") . angles . pretty <$> name
+
+instance Pretty (Backtrace a) where
+  pretty (Backtrace xs) = vcat $ pretty <$> xs
+
 instance Pretty Error where
   pretty =
     \case
-      EvalError e sp _ ->
+      EvalError e bt ->
         text "Runtime error:"
           <+> pretty e
-          <$$> indent 4 (pretty sp)
-      -- <$$> indent 4 (vcat $ pretty <$> backtrace)
+          <$$> indent 2 (pretty bt)
       ParserError e -> pretty e
       CheckError e sp ->
         text "Static error:"
           <+> pretty e
-          <$$> indent 4 (pretty sp)
+          <$$> indent 2 (pretty sp)

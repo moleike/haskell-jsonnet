@@ -9,6 +9,7 @@ import Data.Scientific (Scientific)
 import Data.Text (Text)
 import Data.Void (Void)
 import Language.Jsonnet.Common
+import Language.Jsonnet.Core
 import Language.Jsonnet.Parser.SrcSpan
 import Text.Megaparsec (ParseErrorBundle)
 import Text.PrettyPrint.ANSI.Leijen (Doc)
@@ -16,11 +17,14 @@ import Text.PrettyPrint.ANSI.Leijen (Doc)
 data Error
   = ParserError ParserError
   | CheckError CheckError (Maybe SrcSpan)
-  | EvalError EvalError (Maybe SrcSpan) Backtrace
+  | EvalError EvalError (Backtrace Core)
   deriving (Show)
 
 data EvalError
-  = TypeMismatch {expected :: Text, actual :: Text}
+  = TypeMismatch
+      { expected :: Text,
+        actual :: Text
+      }
   | InvalidKey Doc
   | DuplicateKey Doc
   | NoSuchKey Doc

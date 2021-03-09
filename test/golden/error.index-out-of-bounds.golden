@@ -1,2 +1,2 @@
 Runtime error: index out of bounds: 100
-    ./test/golden/error.index-out-of-bounds.jsonnet:3:10,3:17
+  ./test/golden/error.index-out-of-bounds.jsonnet:3:10-17 

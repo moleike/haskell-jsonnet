@@ -1,2 +1,2 @@
 Static error: positional after named argument
-    ./test/golden/error.function_arg_positional_after_named.jsonnet:16:1,16:4
+  ./test/golden/error.function_arg_positional_after_named.jsonnet:16:1-4

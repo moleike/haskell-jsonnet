@@ -10,11 +10,15 @@ import Data.String
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import Language.Jsonnet.Common
-import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Unbound.Generics.LocallyNameless
 
 type Param a = (Name a, Embed (Maybe a))
+
+data KeyValue a = KeyValue a (Hideable a)
+  deriving (Show, Typeable, Generic)
+
+instance Alpha a => Alpha (KeyValue a)
 
 newtype Fun = Fun (Bind (Rec [Param Core]) Core)
   deriving (Show, Typeable, Generic)
@@ -29,7 +33,7 @@ instance Alpha Let
 
 data Comp
   = ArrC (Bind (Name Core) (Core, Maybe Core))
-  | ObjC (Bind (Name Core) (Field Core, Maybe Core))
+  | ObjC (Bind (Name Core) (KeyValue Core, Maybe Core))
   deriving (Show, Typeable, Generic)
 
 instance Alpha Comp
@@ -41,7 +45,7 @@ data Core
   | CFun Fun
   | CApp Core (Args Core)
   | CLet Let
-  | CObj [Field Core]
+  | CObj [KeyValue Core]
   | CArr [Core]
   | CBinOp BinOp Core Core
   | CUnyOp UnyOp Core

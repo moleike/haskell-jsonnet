@@ -100,7 +100,6 @@ data Args a = Args
       Show,
       Typeable,
       Generic,
-      Generic1,
       Functor,
       Foldable,
       Traversable
@@ -119,22 +118,12 @@ data Assert a = Assert
       Show,
       Typeable,
       Generic,
-      Generic1,
       Functor,
       Foldable,
       Traversable
     )
 
 instance Alpha a => Alpha (Assert a)
-
-instance Eq1 Assert where
-  liftEq = liftEqDefault
-
-instance Read1 Assert where
-  liftReadsPrec = liftReadsPrecDefault
-
-instance Show1 Assert where
-  liftShowsPrec = liftShowsPrecDefault
 
 data CompSpec a = CompSpec
   { var :: String,
@@ -147,7 +136,6 @@ data CompSpec a = CompSpec
       Show,
       Typeable,
       Generic,
-      Generic1,
       Functor,
       Foldable,
       Traversable
@@ -155,20 +143,53 @@ data CompSpec a = CompSpec
 
 instance Alpha a => Alpha (CompSpec a)
 
-instance Eq1 CompSpec where
-  liftEq = liftEqDefault
+data StackFrame a = StackFrame
+  { name :: Maybe (Name a),
+    span :: SrcSpan
+  }
+  deriving (Eq, Show)
 
-instance Read1 CompSpec where
-  liftReadsPrec = liftReadsPrecDefault
+pushStackFrame ::
+  StackFrame a ->
+  Backtrace a ->
+  Backtrace a
+pushStackFrame x (Backtrace xs) = Backtrace (x : xs)
 
-instance Show1 CompSpec where
-  liftShowsPrec = liftShowsPrecDefault
+data Backtrace a = Backtrace [StackFrame a]
+  deriving (Eq, Show)
 
--- this is just my current workaround to report
--- better error messages; we collect the source spans
--- at call site, but reporting a bunch of locations
--- doesn't seem very heplful either
-type CallStack = [SrcSpan]
+data Visibility = Visible | Hidden | Forced
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Generic
+    )
 
-data Backtrace = Backtrace (Maybe CallStack)
-  deriving (Show)
+instance Alpha Visibility
+
+class HasVisibility a where
+  visible :: a -> Bool
+  forced :: a -> Bool
+  hidden :: a -> Bool
+
+data Hideable a = Hideable a Visibility
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Generic,
+      Functor
+    )
+
+instance Alpha a => Alpha (Hideable a)
+
+instance HasVisibility (Hideable a) where
+  visible (Hideable _ Visible) = True
+  visible _ = False
+
+  forced (Hideable _ Forced) = True
+  forced _ = False
+
+  hidden (Hideable _ Hidden) = True
+  hidden _ = False

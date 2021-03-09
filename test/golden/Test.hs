@@ -36,7 +36,7 @@ run conf = do
 goldenTests :: IO TestTree
 goldenTests = do
   jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
-  runExceptT evalStd >>= \case
+  runExceptT (evalStd "stdlib/std.jsonnet") >>= \case
     Left err -> error (show $ pretty err)
     Right stdlib -> do
       return $

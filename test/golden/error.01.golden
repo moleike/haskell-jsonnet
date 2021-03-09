@@ -1,2 +1,5 @@
 Runtime error: foo
-    ./test/golden/error.01.jsonnet:14:29,14:40
+  ./test/golden/error.01.jsonnet:17:29-40 function <bananas>
+  ./test/golden/error.01.jsonnet:18:29-36 function <oranges>
+  ./test/golden/error.01.jsonnet:19:28-35 function <apples>
+  ./test/golden/error.01.jsonnet:20:1-7 

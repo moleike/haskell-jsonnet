@@ -1,2 +1,2 @@
 Static error: duplicate local var 'a'
-    ./test/golden/error.duplicate_local_var.jsonnet:1:1,3:1
+  ./test/golden/error.duplicate_local_var.jsonnet:1:1-3:1

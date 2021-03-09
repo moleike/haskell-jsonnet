@@ -36,12 +36,15 @@ Here is the implementation status of the main language features:
 - [X] default arguments                                                        
 - [ ] top-level arguments                                                      
 - [ ] external variables                                                       
-- [X] object composition (`self` and merging objects)
-- [X] outermost object reference `$`                                           
-- [ ] `super` keyword
-- [ ] overriding deeply nested fields (`+:` field syntax)                      
 - [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
 - [X] tailstrict annotation                                                    
+
+OO features are implemented but need some more work:
+- [X] `self` keyword
+- [X] `super` keyword
+- [X] outermost object reference `$`                                           
+- [X] object composition (merging objects)
+- [X] field composition (`+:` field syntax)                      
 
 [//]: # "Implementation overview"
 

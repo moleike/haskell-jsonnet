@@ -1,2 +1,2 @@
 Runtime error: no such key: y
-    ./test/golden/error.field-not-exist.jsonnet:14:1,15:1
+  ./test/golden/error.field-not-exist.jsonnet:14:1-15:1 
