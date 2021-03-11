@@ -6,9 +6,6 @@ This is an (unofficial) Haskell implementation of the [Jsonnet][jsonnet] confi
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
 We are using the same test suite used in the C++ and Go implementations (which is very comprehensive).
 
-[jsonnet]: https://jsonnet.org/
-[tutorial]: https://jsonnet.org/learning/tutorial.html
-[reference]: https://jsonnet.org/ref/language.html
 
 ## Build
 
@@ -19,7 +16,6 @@ git clone github.com/moleike/jsonnet-hs.git
 cd jsonnet-hs
 stack build
 ```
-[stack]: https://docs.haskellstack.org/en/stable/README
 
 ## Progress
 
@@ -49,9 +45,25 @@ OO features are implemented but need some more work:
 [//]: # "Implementation overview"
 
 
+
+## Contributing
+
+See [CONTRIBUTING.md][contributing].
+
 ## Acknowledgments
+
 I took inspiration from [Expresso][Expresso], [hnix][hnix], [fixplate][fixplate], and numerous other libraries. Thanks to their authors.
 
+## License
+
+See [LICENSE.md][license].
+
+Copyright © 2020–present Alexandre Moreno
+
+[jsonnet]: https://jsonnet.org/
+[tutorial]: https://jsonnet.org/learning/tutorial.html
+[reference]: https://jsonnet.org/ref/language.html
+[stack]: https://docs.haskellstack.org/en/stable/README
 [Expresso]: https://github.com/willtim/Expresso
 [hnix]: https://github.com/haskell-nix/hnix
 [fixplate]: https://hackage.haskell.org/package/fixplate
