@@ -56,7 +56,7 @@ I took inspiration from [Expresso][Expresso], [hnix][hnix], [fixplate][fixplate]
 
 ## License
 
-See [LICENSE.md][license].
+See [LICENSE][license].
 
 Copyright © 2020–present Alexandre Moreno
 
@@ -67,3 +67,6 @@ Copyright © 2020–present Alexandre Moreno
 [Expresso]: https://github.com/willtim/Expresso
 [hnix]: https://github.com/haskell-nix/hnix
 [fixplate]: https://hackage.haskell.org/package/fixplate
+[contributing]: https://github.com/moleike/haskell-jsonnet/blob/master/CONTRIBUTING.md
+[license]: https://github.com/moleike/haskell-jsonnet/blob/master/LICENSE
+
