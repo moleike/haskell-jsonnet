@@ -2,10 +2,9 @@
 
 [![Actions Status](https://github.com/moleike/jsonnet-hs/workflows/build/badge.svg)](https://github.com/moleike/jsonnet-hs/actions) [![Join the chat at https://gitter.im/jsonnet-hs/community](https://badges.gitter.im/jsonnet-hs/community.svg)](https://gitter.im/jsonnet-hs/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-This is an (unofficial) Haskell implementation of the [Jsonnet][jsonnet] configuration language.
+A full-fledged Haskell implementation of the [Jsonnet][jsonnet] spec.
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
-We are using the same test suite used in the C++ and Go implementations (which is very comprehensive).
-
+We are using the same test suite used in the offical [C++][cpp-jsonnet] and [Go][go-jsonnet] implementation (which is fairly comprehensive).
 
 ## Build
 
@@ -69,4 +68,6 @@ Copyright © 2020–present Alexandre Moreno
 [fixplate]: https://hackage.haskell.org/package/fixplate
 [contributing]: https://github.com/moleike/haskell-jsonnet/blob/master/CONTRIBUTING.md
 [license]: https://github.com/moleike/haskell-jsonnet/blob/master/LICENSE
+[cpp-jsonnet]: https://github.com/google/jsonnet
+[go-jsonnet]: https://github.com/google/go-jsonnet
 
