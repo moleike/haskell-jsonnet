@@ -44,7 +44,7 @@ import Language.Jsonnet.Manifest
 import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
-import qualified Language.Jsonnet.Std as Std
+import qualified Language.Jsonnet.Std.Lib as Std
 import Language.Jsonnet.Value
 import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Unbound.Generics.LocallyNameless

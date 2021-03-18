@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -7,6 +8,7 @@
 module Language.Jsonnet.Syntax where
 
 import Control.Applicative (Const (..))
+import Data.Data (Data)
 import Data.Functor.Sum
 import Data.List.NonEmpty
 import Data.Scientific (Scientific)
@@ -21,6 +23,28 @@ import Unbound.Generics.LocallyNameless
 type Ident = String
 
 type Param a = (Ident, Maybe a)
+
+data Field a = Field
+  { key :: a,
+    value :: a,
+    visibility :: Visibility,
+    override :: Bool
+  }
+  deriving
+    ( Eq,
+      Read,
+      Show,
+      Typeable,
+      Data,
+      Generic,
+      Functor,
+      Foldable,
+      Traversable
+    )
+
+instance Alpha a => Alpha (Field a)
+
+deriveShow1 ''Field
 
 data ExprF a
   = ELit Literal
@@ -65,29 +89,12 @@ data ExprF a
       Functor,
       Foldable,
       Traversable,
-      Generic
-    )
-
---deriveShow1 ''ExprF
-
-data Field a = Field
-  { key :: a,
-    value :: a,
-    visibility :: Visibility,
-    override :: Bool
-  }
-  deriving
-    ( Eq,
-      Read,
-      Show,
-      Typeable,
       Generic,
-      Functor,
-      Foldable,
-      Traversable
+      Typeable,
+      Data
     )
 
-instance Alpha a => Alpha (Field a)
+deriveShow1 ''ExprF
 
 newtype Import = Import FilePath
   deriving (Show, Eq)

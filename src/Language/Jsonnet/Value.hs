@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
@@ -15,6 +17,7 @@ import Control.Monad.Reader
 import Control.Monad.State.Lazy
 import Data.Bits
 import Data.ByteString (ByteString)
+import Data.Data
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.Hashable (Hashable)
@@ -26,6 +29,7 @@ import Data.Scientific (Scientific, fromFloatDigits, toRealFloat)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Data.Typeable
 import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
@@ -48,9 +52,10 @@ data Value
   | VNum !Scientific
   | VStr !Text
   | VArr !Array
-  | VObj !Object
+  | VObj !(HashMap Text (Hideable Thunk))
   | VClos !Fun !Env
   | VFun !(Thunk -> Eval Value)
+  deriving (Generic)
 
 type Array = Vector Thunk
 
@@ -69,6 +74,7 @@ valueType =
     VFun _ -> "function"
 
 data Thunk = TC !Ctx !Core | TV !(Eval Value)
+  deriving (Generic)
 
 force :: Thunk -> Eval Value
 force = \case

@@ -15,6 +15,7 @@ import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet
 import Language.Jsonnet.Error
 import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Std
 import System.FilePath (replaceExtension, takeBaseName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
@@ -30,13 +31,13 @@ render = encodeUtf8 . pack . show . pretty
 run :: Config -> IO LBS.ByteString
 run conf = do
   prog <- T.readFile (fname conf)
-  outp <- jsonnet conf prog
+  outp <- interpret conf prog
   pure (either render render outp)
 
 goldenTests :: IO TestTree
 goldenTests = do
   jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
-  runExceptT (evalStd "stdlib/std.jsonnet") >>= \case
+  runExceptT std >>= \case
     Left err -> error (show $ pretty err)
     Right stdlib -> do
       return $

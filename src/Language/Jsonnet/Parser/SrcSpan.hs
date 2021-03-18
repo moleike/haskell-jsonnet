@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -6,6 +7,7 @@
 -- |
 module Language.Jsonnet.Parser.SrcSpan where
 
+import Data.Data
 import Data.Function (on)
 import GHC.Generics (Generic)
 import Text.Megaparsec.Pos (SourcePos (..))
@@ -21,7 +23,9 @@ data SrcSpan = SrcSpan
       Eq,
       Show,
       Read,
-      Generic
+      Generic,
+      Typeable,
+      Data
     )
 
 $(makeClosedAlpha ''SrcSpan)

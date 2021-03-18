@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -7,6 +8,7 @@
 
 module Language.Jsonnet.Common where
 
+import Data.Data (Data)
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
@@ -15,6 +17,7 @@ import Data.Text (Text)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Language.Jsonnet.Parser.SrcSpan
+import Text.Show.Deriving
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
@@ -23,7 +26,7 @@ data Literal
   | Bool Bool
   | String Text
   | Number Scientific
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Typeable, Data)
 
 makeClosedAlpha ''Literal
 
@@ -37,26 +40,26 @@ data BinOp
   | Bitwise BitwiseOp
   | Logical LogicalOp
   | In
-  deriving (Eq, Show, Generic)
+  deriving (Show, Eq, Generic, Typeable, Data)
 
 data UnyOp
   = Compl
   | LNot
   | Plus
   | Minus
-  deriving (Show, Eq, Enum, Bounded, Generic)
+  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
 
 data ArithOp = Add | Sub | Mul | Div | Mod
-  deriving (Show, Eq, Enum, Bounded, Generic)
+  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
 
 data CompOp = Lt | Le | Gt | Ge | Eq | Ne
-  deriving (Show, Eq, Enum, Bounded, Generic)
+  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
 
 data BitwiseOp = And | Or | Xor | ShiftL | ShiftR
-  deriving (Show, Eq, Enum, Bounded, Generic)
+  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
 
 data LogicalOp = LAnd | LOr
-  deriving (Show, Eq, Enum, Bounded, Generic)
+  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
 
 instance Alpha ArithOp
 
@@ -71,7 +74,7 @@ instance Alpha LogicalOp
 instance Alpha UnyOp
 
 data Strictness = Strict | Lazy
-  deriving (Eq, Read, Show, Generic)
+  deriving (Eq, Read, Show, Generic, Typeable, Data)
 
 instance Alpha Strictness
 
@@ -81,12 +84,15 @@ data Arg a = Pos a | Named String a
       Read,
       Show,
       Typeable,
+      Data,
       Generic,
       Generic1,
       Functor,
       Foldable,
       Traversable
     )
+
+deriveShow1 ''Arg
 
 instance Alpha a => Alpha (Arg a)
 
@@ -99,11 +105,14 @@ data Args a = Args
       Read,
       Show,
       Typeable,
+      Data,
       Generic,
       Functor,
       Foldable,
       Traversable
     )
+
+deriveShow1 ''Args
 
 instance Alpha a => Alpha (Args a)
 
@@ -117,6 +126,7 @@ data Assert a = Assert
       Read,
       Show,
       Typeable,
+      Data,
       Generic,
       Functor,
       Foldable,
@@ -124,6 +134,8 @@ data Assert a = Assert
     )
 
 instance Alpha a => Alpha (Assert a)
+
+deriveShow1 ''Assert
 
 data CompSpec a = CompSpec
   { var :: String,
@@ -135,11 +147,14 @@ data CompSpec a = CompSpec
       Read,
       Show,
       Typeable,
+      Data,
       Generic,
       Functor,
       Foldable,
       Traversable
     )
+
+deriveShow1 ''CompSpec
 
 instance Alpha a => Alpha (CompSpec a)
 
@@ -163,7 +178,9 @@ data Visibility = Visible | Hidden | Forced
     ( Eq,
       Read,
       Show,
-      Generic
+      Generic,
+      Typeable,
+      Data
     )
 
 instance Alpha Visibility
@@ -179,7 +196,9 @@ data Hideable a = Hideable a Visibility
       Read,
       Show,
       Generic,
-      Functor
+      Functor,
+      Typeable,
+      Data
     )
 
 instance Alpha a => Alpha (Hideable a)

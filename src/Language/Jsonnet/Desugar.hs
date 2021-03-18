@@ -62,36 +62,40 @@ alg outermost = \case
   EIfElse c t e -> CIfElse c t e
   EIf c t -> CIfElse c t (CLit Null)
   EArr e -> CArr e
-  EObj {..} ->
-    --mkLet (("self", CObj fields) :| bnds) self
-    case bnds of
-      [] -> fs
-      xs -> mkLet (NE.fromList xs) fs
-    where
-      bnds =
-        if outermost
-          then (("$", fs) : locals)
-          else locals
-      fs = CObj (mkKeyValue <$> fields)
+  EObj {..} -> mkObj outermost locals fields
   ELookup e1 e2 -> CLookup e1 e2
   EIndex e1 e2 -> CLookup e1 e2
   EErr e -> CErr e
   EAssert e -> mkAssert e
-  ESlice {..} ->
-    stdFunc
-      "slice"
-      ( Args
-          [ Pos expr,
-            Pos $ maybeNull start,
-            Pos $ maybeNull end,
-            Pos $ maybeNull step
-          ]
-          Lazy
-      )
-    where
-      maybeNull = fromMaybe (CLit Null)
+  ESlice {..} -> mkSlice expr start end step
   EArrComp {expr, comp} -> mkArrComp expr comp
   EObjComp {field, comp, locals} -> mkObjComp field comp locals
+
+mkSlice expr start end step =
+  stdFunc
+    "slice"
+    ( Args
+        [ Pos expr,
+          Pos $ maybeNull start,
+          Pos $ maybeNull end,
+          Pos $ maybeNull step
+        ]
+        Lazy
+    )
+  where
+    maybeNull = fromMaybe (CLit Null)
+
+mkObj outermost locals fields =
+  --mkLet (("self", CObj fields) :| bnds) self
+  case bnds of
+    [] -> fs
+    xs -> mkLet (NE.fromList xs) fs
+  where
+    bnds =
+      if outermost
+        then (("$", fs) : locals)
+        else locals
+    fs = CObj (mkKeyValue <$> fields)
 
 mkAssert :: Assert Core -> Core
 mkAssert (Assert c m e) =

@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,6 +18,7 @@ import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
 import Data.Maybe (listToMaybe)
 import Debug.Trace
+import GHC.Generics
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
@@ -44,7 +46,8 @@ newtype Eval a = Eval
       MonadCatch,
       MonadMask,
       MonadFail,
-      Fresh
+      Fresh,
+      Generic
     )
 
 type Ctx = Map (Name Core) Thunk

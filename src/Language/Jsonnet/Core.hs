@@ -1,11 +1,14 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Language.Jsonnet.Core where
 
+import Data.Data (Data)
 import Data.String
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
