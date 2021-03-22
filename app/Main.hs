@@ -8,13 +8,13 @@ module Main where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
-import Data.ByteString.Builder
+import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Char8 as LC (putStrLn)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding
+import Data.Text.Encoding (encodeUtf8Builder)
 import qualified Data.Text.IO as TIO
 import Data.Version (showVersion)
 import Language.Jsonnet
