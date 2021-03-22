@@ -65,8 +65,9 @@ runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
 runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
 
 interpret :: Config -> Text -> IO (Either Error JSON.Value)
-interpret conf = runJsonnetM conf .
-  (parse >=> check >=> desugar >=> evaluate)
+interpret conf =
+  runJsonnetM conf
+    . (parse >=> check >=> desugar >=> evaluate)
 
 parse :: Text -> JsonnetM Expr
 parse inp =

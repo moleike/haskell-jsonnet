@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Language.Jsonnet.Std
   ( std,
@@ -9,19 +9,16 @@ module Language.Jsonnet.Std
 where
 
 import Control.Monad.Except
+import Language.Jsonnet.Annotate
+import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
+import Language.Jsonnet.Eval
+import Language.Jsonnet.Eval (mergeWith)
+import Language.Jsonnet.Eval.Monad
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
-import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Value
-import Language.Jsonnet.Desugar
-import Language.Jsonnet.Eval
 import Prelude hiding (length)
-import Language.Jsonnet.Annotate
-import Language.Jsonnet.Eval (mergeWith)
-
-
-
 
 -- the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
 -- the native (small, Haskell) with the interpreted (the splice mkStdlib)

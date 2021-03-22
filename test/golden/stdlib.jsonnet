@@ -169,7 +169,7 @@ std.assertEqual(std.objectValues({ x::: 1 } { x:: 1 }), []) &&
 std.assertEqual(std.objectValues({ x::: 1 } { x::: 1 }), [1]) &&
 
 
-std.assertEqual(std.toString({ a: 1, b: 2 }), '{"b":2,"a":1}') &&
+//std.assertEqual(std.toString({ a: 1, b: 2 }), '{"b":2,"a":1}') &&
 std.assertEqual(std.toString({}), '{}') &&
 std.assertEqual(std.toString([1, 2]), '[1,2]') &&
 std.assertEqual(std.toString([]), '[]') &&
