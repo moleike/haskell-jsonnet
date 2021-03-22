@@ -1,14 +1,15 @@
-cabal-version:  >= 1.12
-
+cabal-version:  2.2
 name:           jsonnet
 version:        0.1.0.0
+synopsis:       Jsonnet implementaton in pure Haskell
 description:    Please see the README on GitHub at <https://github.com/moleike/jsonnet-haskell#readme>
-homepage:       https://github.com/moleike/jsonnet-haskell#readme
-bug-reports:    https://github.com/moleike/jsonnet-haskell/issues
+homepage:       https://github.com/moleike/haskell-jsonnet#readme
+bug-reports:    https://github.com/moleike/haskell-jsonnet/issues
 author:         Alexandre Moreno
 maintainer:     alexmorenocano@gmail.com
 copyright:      2020 Alexandre Moreno
-license:        BSD3
+category:       Compiler
+license:        BSD-3-Clause
 x-license:      BSD-3-Clause OR Apache-2.0
 license-file:   LICENSE
 build-type:     Simple
@@ -49,28 +50,28 @@ library
   hs-source-dirs:
       src
   build-depends:
-      ansi-wl-pprint       >= 0.6.9 && < 0.7
-    , base                 >= 4.13.0 && < 5
-    , bytestring           >= 0.10.10 && < 0.11
-    , containers           >= 0.6.2 && < 0.7
-    , data-fix             >= 0.3.0 && < 0.4
-    , text                 >= 1.2.4 && < 1.3
-    , deriving-compat      >= 0.5.9 && < 0.6
-    , transformers-compat  >= 0.6.5 && < 0.7
-    , directory            >= 1.3.6 && < 1.4
-    , filepath             >= 1.4.2 && < 1.5
-    , megaparsec           >= 8.0.0 && < 9.0
-    , hashable             >= 1.3.0 && < 1.4
-    , mtl                  >= 2.2.2 && < 2.3
-    , parser-combinators   >= 1.2.1 && < 1.3
-    , semigroupoids        >= 5.3.4 && < 5.4
-    , unordered-containers >= 0.2.10.0 && < 0.3
-    , unbound-generics     >= 0.4.1 && < 0.5
-    , vector               >= 0.12.1 && < 0.13
-    , scientific           >= 0.3.6 && < 0.4
-    , aeson                >= 1.4.7.1 && < 1.6
-    , exceptions           >= 0.10.4 && < 0.11
-    , template-haskell     >= 2.15.0 && < 2.16
+    aeson                 >= 1.5.6 && < 1.6,
+    base                  >= 4.14.1 && < 4.15,
+    bytestring            >= 0.10.12 && < 0.11,
+    containers            >= 0.6.2 && < 0.7,
+    scientific            >= 0.3.6 && < 0.4,
+    hashable              >= 1.3.1 && < 1.4,
+    text                  >= 1.2.4 && < 1.3,
+    template-haskell      >= 2.16.0 && < 2.17,
+    data-fix              >= 0.3.1 && < 0.4,
+    transformers-compat   >= 0.6.6 && < 0.7,
+    unordered-containers  >= 0.2.13 && < 0.3,
+    mtl                   >= 2.2.2 && < 2.3,
+    vector                >= 0.12.2 && < 0.13,
+    ansi-wl-pprint        >= 0.6.9 && < 0.7,
+    deriving-compat       >= 0.5.10 && < 0.6,
+    directory             >= 1.3.6 && < 1.4,
+    filepath              >= 1.4.2 && < 1.5,
+    exceptions            >= 0.10.4 && < 0.11,
+    megaparsec            >= 9.0.1 && < 9.1,
+    parser-combinators    >= 1.3.0 && < 1.4,
+    semigroupoids         >= 5.3.5 && < 5.4,
+    unbound-generics      >= 0.4.1 && < 0.5
   default-language: Haskell2010
   default-extensions:
       MultiParamTypeClasses
@@ -87,14 +88,14 @@ executable jsonnet
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base                 >= 4.13.0 && < 5
-    , jsonnet
-    , optparse-applicative >= 0.16.1 && < 0.17
-    , text                 >= 1.2.4 && < 1.3
-    , ansi-wl-pprint       >= 0.6.9 && < 0.7
-    , mtl                  >= 2.2.2 && < 2.3
-    , bytestring           >= 0.10.10 && < 0.11
-    , aeson                >= 1.4.7.1 && < 1.6
+    jsonnet,
+    base                  >= 4.14.1 && < 4.15,
+    optparse-applicative  >= 0.16.1 && < 0.17,
+    text                  >= 1.2.4 && < 1.3,
+    ansi-wl-pprint        >= 0.6.9 && < 0.7,
+    mtl                   >= 2.2.2 && < 2.3,
+    bytestring            >= 0.10.12 && < 0.11,
+    aeson                 >= 1.5.6 && < 1.6
   default-language: Haskell2010
 
 test-suite jsonnet-test
