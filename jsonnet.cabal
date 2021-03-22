@@ -44,8 +44,11 @@ library
     , Language.Jsonnet.Manifest
     , Language.Jsonnet.TH
     , Language.Jsonnet.TH.QQ
+  autogen-modules:
+      Paths_jsonnet
   other-modules:
       Paths_jsonnet
+
   hs-source-dirs:
       src
   build-depends:
