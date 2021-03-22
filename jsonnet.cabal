@@ -42,7 +42,6 @@ library
     , Language.Jsonnet.Std.Lib
     , Language.Jsonnet.Std.TH
     , Language.Jsonnet.Manifest
-    , Language.Jsonnet.Object
     , Language.Jsonnet.TH
     , Language.Jsonnet.TH.QQ
   other-modules:

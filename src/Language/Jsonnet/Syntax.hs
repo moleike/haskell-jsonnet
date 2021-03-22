@@ -16,7 +16,6 @@ import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Common
-import Language.Jsonnet.Object
 import Text.Show.Deriving
 import Unbound.Generics.LocallyNameless
 

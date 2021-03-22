@@ -26,7 +26,6 @@ import GHC.IO.Exception hiding (IOError)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
-import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated

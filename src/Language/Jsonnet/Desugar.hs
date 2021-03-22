@@ -18,7 +18,6 @@ import Data.Text (Text)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
-import Language.Jsonnet.Object
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Unbound.Generics.LocallyNameless

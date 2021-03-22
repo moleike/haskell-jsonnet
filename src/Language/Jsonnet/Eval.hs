@@ -41,7 +41,6 @@ import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Manifest
-import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std.Lib as Std

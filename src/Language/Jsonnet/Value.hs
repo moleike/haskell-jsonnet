@@ -39,7 +39,6 @@ import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import {-# SOURCE #-} Language.Jsonnet.Eval (eval, evalClos)
 import Language.Jsonnet.Eval.Monad
-import qualified Language.Jsonnet.Object as O
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Text.PrettyPrint.ANSI.Leijen (Doc, pretty)
