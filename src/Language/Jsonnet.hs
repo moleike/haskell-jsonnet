@@ -12,7 +12,6 @@ module Language.Jsonnet
     Value (..),
     runJsonnetM,
     parse,
-    desugar,
     evaluate,
   )
 where
