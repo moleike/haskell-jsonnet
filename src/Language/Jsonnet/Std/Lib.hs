@@ -15,6 +15,7 @@ import Control.Monad.State
 import Data.Aeson (FromJSON (..))
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
+import Data.Foldable (foldrM)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import Data.List (sort)
@@ -46,6 +47,7 @@ std = VObj $ H.fromList $ map f xs
         (\(k, v) -> (k, pure v))
         [ ("type", inj valueType),
           ("primitiveEquals", inj primitiveEquals),
+          ("equals", inj equals),
           ("length", inj length),
           ("pow", inj ((^^) @Double @Int)),
           ("exp", inj (exp @Double)),
@@ -78,13 +80,36 @@ primitiveEquals VNull VNull = pure True
 primitiveEquals (VBool a) (VBool b) = pure (a == b)
 primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
-primitiveEquals _ _ =
+primitiveEquals a b =
   throwE
     ( StdError $
         text $
           T.unpack $
-            "primitiveEquals operates on primitive types"
+            "primitiveEquals operates on primitive types "
+              <> valueType a
+              <> valueType b
     )
+
+equals :: Value -> Value -> Eval Bool
+equals as@(VArr a) bs@(VArr b)
+  | P.length a == P.length b = do
+    as' <- proj as
+    bs' <- proj bs
+    allM (uncurry equals) (zip as' bs')
+  | P.length a /= P.length b = pure False
+equals (VObj a) (VObj b) = do
+  let fields = objectFieldsEx a False
+  if fields /= objectFieldsEx b False
+    then pure False
+    else allM objectFieldEquals fields
+  where
+    objectFieldEquals field = do
+      a' <- force (value $ a H.! field)
+      b' <- force (value $ b H.! field)
+      equals a' b'
+equals a b
+  | valueType a == valueType b = primitiveEquals a b
+equals _ _ = pure False
 
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o True = sort (H.keys o) -- all fields
@@ -118,6 +143,9 @@ thisFile :: Eval (Maybe FilePath)
 thisFile = f <$> gets currentPos
   where
     f = fmap (takeFileName . sourceName . spanBegin)
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM p = foldrM (\a b -> (&& b) <$> p a) True
 
 instance FromJSON Value where
   parseJSON = \case

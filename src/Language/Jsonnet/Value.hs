@@ -166,11 +166,6 @@ instance {-# OVERLAPS #-} HasValue Object where
   proj v = throwTypeMismatch "object" v
   inj = VObj
 
---instance HasValue a => HasValue (Object a) where
---  proj (VObj o) = traverse proj' o
---  proj v = throwTypeMismatch "object" v
---  inj o = VObj $ mkThunk' . inj <$> o
-
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
   proj v = throwTypeMismatch "impossible" v
   inj f = VFun $ \x -> force x >>= fmap (inj . f) . proj

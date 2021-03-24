@@ -57,7 +57,7 @@ newtype JsonnetM a = JsonnetM
 
 data Config = Config
   { fname :: FilePath,
-    stdlib :: Value
+    stdlib :: Thunk
   }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
@@ -90,7 +90,7 @@ desugar expr = pure (Desugar.desugar expr)
 -- evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
-  ctx <- singleton "std" . TV . pure <$> asks stdlib
+  ctx <- singleton "std" <$> asks stdlib
   JsonnetM $
     lift $
       runEval (emptyEnv {ctx = ctx}) ((eval >=> manifest) expr)

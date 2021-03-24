@@ -190,7 +190,7 @@ class HasVisibility a where
   forced :: a -> Bool
   hidden :: a -> Bool
 
-data Hideable a = Hideable a Visibility
+data Hideable a = Hideable {value :: a, visiblity :: Visibility}
   deriving
     ( Eq,
       Read,
