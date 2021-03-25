@@ -82,7 +82,7 @@ library
     , DeriveGeneric
     , LambdaCase
 
-executable jsonnet
+executable hs-jsonnet
   main-is: Main.hs
   other-modules:
       Paths_jsonnet
