@@ -18,10 +18,12 @@ import qualified Data.ByteString as B
 import Data.Foldable (foldrM)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
-import Data.List (sort)
+import qualified Data.List as L (intercalate, sort)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
+import Data.Vector (Vector)
+import qualified Data.Vector as V
 import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core (Fun (Fun), KeyValue (..))
@@ -70,6 +72,7 @@ std = VObj $ H.fromList $ map f xs
           ("decodeUTF8", inj (T.decodeUtf8 . B.pack :: [Word8] -> Text)),
           ("makeArray", inj makeArray),
           ("filter", inj (filterM @Eval @Value)),
+          ("join", inj intercalate),
           ("objectHasEx", inj objectHasEx),
           ("objectFieldsEx", inj objectFieldsEx),
           ("parseJson", inj (JSON.decodeStrict @Value))
@@ -89,6 +92,15 @@ primitiveEquals a b =
               <> valueType a
               <> valueType b
     )
+
+intercalate :: Value -> [Value] -> Eval Value
+intercalate sep arr = go sep (filter null arr)
+  where
+    null VNull = False
+    null _ = True
+    go sep@(VArr _) = app (L.intercalate @Value) sep
+    go sep@(VStr _) = app T.intercalate sep
+    app f sep arr = inj <$> (f <$> proj sep <*> traverse proj arr)
 
 equals :: Value -> Value -> Eval Bool
 equals as@(VArr a) bs@(VArr b)
@@ -112,8 +124,8 @@ equals a b
 equals _ _ = pure False
 
 objectFieldsEx :: Object -> Bool -> [Text]
-objectFieldsEx o True = sort (H.keys o) -- all fields
-objectFieldsEx o False = sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
+objectFieldsEx o True = L.sort (H.keys o) -- all fields
+objectFieldsEx o False = L.sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all = f `elem` objectFieldsEx o all
@@ -135,14 +147,14 @@ length = \case
                 <> valueType v
       )
 
-makeArray :: Int -> (Int -> Eval Value) -> Eval [Value]
-makeArray n f = traverse f [0 .. n - 1]
+makeArray :: Int -> (Int -> Eval Value) -> Eval (Vector Thunk)
+makeArray n f = traverse (mkThunk <$> f) (V.fromList [0 .. n - 1])
 
 -- hacky way of returning the current file
-thisFile :: Eval (Maybe FilePath)
+thisFile :: Eval (Maybe Text)
 thisFile = f <$> gets currentPos
   where
-    f = fmap (takeFileName . sourceName . spanBegin)
+    f = fmap (T.pack . takeFileName . sourceName . spanBegin)
 
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
 allM p = foldrM (\a b -> (&& b) <$> p a) True
