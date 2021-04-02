@@ -135,7 +135,7 @@ See [CONTRIBUTING.md][contributing].
 
 ## Acknowledgments
 
-I took inspiration from [Expresso][Expresso], [hnix][hnix], [fixplate][fixplate], 
+I took inspiration from [Expresso][Expresso], [hnix][hnix], [fixplate][fixplate], [Disco][disco], 
 and numerous other libraries. Thanks to their authors.
 
 ## License
@@ -151,6 +151,7 @@ Copyright © 2020–present Alexandre Moreno
 [Expresso]: https://github.com/willtim/Expresso
 [hnix]: https://github.com/haskell-nix/hnix
 [fixplate]: https://hackage.haskell.org/package/fixplate
+[disco]: https://github.com/disco-lang/disco
 [contributing]: https://github.com/moleike/haskell-jsonnet/blob/master/CONTRIBUTING.md
 [license]: https://github.com/moleike/haskell-jsonnet/blob/master/LICENSE
 [cpp-jsonnet]: https://github.com/google/jsonnet
