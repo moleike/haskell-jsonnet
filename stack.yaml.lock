@@ -18,6 +18,13 @@ packages:
       sha256: 6cf43af344624e087dbe2f1e96e985de6142e85bb02db8449df6d72bee3c1013
   original:
     hackage: data-fix-0.3.0@sha256:058a266d1e658500e0ffb8babe68195b0ce06a081dcfc3814afc784b083fd9a5,1645
+- completed:
+    hackage: th-utilities-0.2.4.1@sha256:b37d23c8bdabd678aee5a36dd4373049d4179e9a85f34eb437e9cd3f04f435ca,1869
+    pantry-tree:
+      size: 882
+      sha256: 0f2cadecd5bf76c605a2768f3b150318750258fd82bde4d8e206651802106065
+  original:
+    hackage: th-utilities-0.2.4.1@sha256:b37d23c8bdabd678aee5a36dd4373049d4179e9a85f34eb437e9cd3f04f435ca,1869
 snapshots:
 - completed:
     size: 532380
