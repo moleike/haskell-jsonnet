@@ -16,7 +16,7 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Unbound.Generics.LocallyNameless
 
-type Param a = (Name a, Embed (Maybe a))
+type Param a = (Name a, Embed a)
 
 data KeyValue a = KeyValue a (Hideable a)
   deriving (Show, Typeable, Generic)

@@ -11,15 +11,19 @@
 module Language.Jsonnet.Desugar (desugar) where
 
 import Data.Fix as F
-import Data.List.NonEmpty (NonEmpty (..), fromList, toList)
+import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
+import qualified Data.Text as T (pack)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
+import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
+import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
+import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
 import Unbound.Generics.LocallyNameless
 
 class Desugarer a where
@@ -43,6 +47,7 @@ zipWithOutermost = annZip . inherit go False
     go (Fix (AnnF (EObj {}) _)) True = (False, True)
     go _ x = (False, x)
 
+alg :: Bool -> ExprF Core -> Core
 alg outermost = \case
   ELit l -> CLit l
   EIdent i -> CVar (s2n i)
@@ -163,11 +168,20 @@ mkFun ps e =
         ( rec $
             fmap
               ( \(n, a) ->
-                  (s2n n, Embed a)
+                  (s2n n, Embed (fromMaybe (errNotBound n) a))
               )
               ps
         )
         e
+  where
+    errNotBound n =
+      CErr $
+        CLit $
+          String
+            ( T.pack $
+                show $
+                  pretty $ ParamNotBound (pretty n)
+            )
 
 mkLet bnds e =
   CLet $

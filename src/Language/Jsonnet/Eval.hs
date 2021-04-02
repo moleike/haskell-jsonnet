@@ -67,7 +67,7 @@ eval = \case
     force v
   CFun f -> VClos f <$> ask
   CApp e es -> evalApp e =<< evalArgs es
-  cc@(CLet (Let bnd)) -> mdo
+  CLet (Let bnd) -> mdo
     (r, e1) <- unbind bnd
     bnds <-
       mapM
@@ -76,9 +76,6 @@ eval = \case
             pure (v, th)
         )
         (unrec r)
-
-    --traceShowM "applying the body of the local binding"
-    --traceShowM e1
     extendCtx' bnds (eval e1)
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
@@ -151,53 +148,60 @@ withStackFrame _ e =
   pushScope (s2n "anonymous") (pushSpan Nothing e)
 
 evalClos :: Ctx -> Fun -> [Arg Thunk] -> Eval Value
-evalClos rho (Fun f) vs = do
+evalClos rho (Fun f) args = do
   (bnds, e) <- unbind f
-  let xs = second unembed <$> unrec bnds
-  withCtx rho (evalFun xs e vs)
+  (rs, ps, ns) <- splitArgs args (second unembed <$> unrec bnds)
+  withCtx rho $
+    extendCtx' ps $
+      extendCtx' ns $
+        appDefaults rs e
 
-appDefaults :: [(Name Core, Maybe Core)] -> Core -> Eval Value
-appDefaults rs e = do
-  case findIndex isNothing ds of
-    Just x -> throwE $ ParamNotBound (pretty $ ns !! x)
-    Nothing -> mdo
-      bnds <-
-        mapM
-          ( \(v, e) -> do
-              th <- mkThunk $ extendCtx' bnds $ eval e
-              pure (v, th)
-          )
-          (zip ns $ catMaybes ds)
-      extendCtx' bnds (eval e)
-  where
-    (ns, ds) = unzip rs
+-- all parameter names are bound in default values
+appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
+appDefaults rs e = mdo
+  bnds <-
+    mapM
+      ( \(n, e) -> do
+          th <- mkThunk $ extendCtx' bnds $ eval e
+          pure (n, th)
+      )
+      rs
+  extendCtx' bnds (eval e)
 
-evalFun bnds e args = do
-  if length ps > length bnds
-    then throwE $ TooManyArgs (length bnds)
-    else extendCtx' (zip names ps') $ evalNamedArgs ns bnds'
+-- returns a triple with unapplied binders, positional and named
+splitArgs args bnds = do
+  named <- getNamed
+  pos <- getPos
+  unapp <- getUnapp named
+  pure (unapp, pos, named)
   where
-    isPos = \case
-      Pos _ -> True
-      _ -> False
-    (ps, ns) = span isPos args
-    ps' = fmap (\(Pos a) -> a) ps
-    (names, _) = unzip bnds
-    bnds' = drop (length ps) bnds
-    evalNamedArgs ns bnds = do
-      ns' <- forM ns $ \case
-        Named n v -> pure (n, v)
-      (names, vs) <- unzip <$> buildParams ns' bnds
-      let rs = filter ((`notElem` names) . fst) bnds
-      extendCtx' (zip names vs) (appDefaults rs e)
+    (bnds1, bnds2) = splitAt (length ps) bnds
+    (ps, ns) = split args
+    pNames = fst (unzip bnds)
+
+    getPos = do
+      if length ps > length bnds
+        then throwE $ TooManyArgs (length bnds)
+        else pure $ zip (fst $ unzip bnds1) ps
+
+    -- checks the provided named arguments exist
+    getNamed = traverse f ns
       where
-        buildParams as bnds = traverse f as
-          where
-            ns = fst $ unzip bnds
-            f (a, b) = case g a of
-              Nothing -> throwE $ BadParam (pretty a)
-              Just n -> pure (n, b)
-            g a = find ((a ==) . name2String) ns
+        f (a, b) = case g a of
+          Nothing -> throwE $ BadParam (pretty a)
+          Just n -> pure (n, b)
+        g a = find ((a ==) . name2String) pNames
+
+    getUnapp named =
+      pure $ filter ((`notElem` ns) . fst) bnds2
+        where
+          ns = fst (unzip named)
+
+    split [] = ([], [])
+    split (Pos p : xs) =
+      let (ys, zs) = split xs in (p : ys, zs)
+    split (Named n v : xs) =
+      let (ys, zs) = split xs in (ys, (n, v) : zs)
 
 -- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
 mergeWith :: Object -> Object -> Object
