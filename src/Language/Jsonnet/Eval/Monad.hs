@@ -6,6 +6,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.Jsonnet.Eval.Monad where
 
@@ -25,12 +26,35 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import {-# SOURCE #-} Language.Jsonnet.Value (Thunk)
 import Unbound.Generics.LocallyNameless
+import Control.Lens (makeLenses, use, locally, view)
+
+data EvalState = EvalState
+  { _currentPos :: Maybe SrcSpan
+  }
+
+makeLenses ''EvalState
+
+data CallStack = CallStack
+  { _spans :: [Maybe SrcSpan],
+    _scopes :: [Maybe (Name Core)]
+  }
+
+makeLenses ''CallStack
+
+type Env = Map (Name Core) Thunk
+
+data EvalContext = EvalContext
+  { _env :: Env, -- ^ binding local variables to their values
+    _callStack :: CallStack -- ^ call-stack simulation
+  }
+
+makeLenses ''EvalContext
 
 instance (Monoid w, Fresh m) => Fresh (RWST r w s m) where
   fresh = lift . fresh
 
 newtype Eval a = Eval
-  { unEval :: ExceptT Error (RWST Env () EvalState (FreshMT IO)) a
+  { unEval :: ExceptT Error (RWST EvalContext () EvalState (FreshMT IO)) a
   }
   deriving
     ( Functor,
@@ -39,7 +63,7 @@ newtype Eval a = Eval
       MonadIO,
       MonadFix,
       MonadWriter (),
-      MonadReader Env,
+      MonadReader EvalContext,
       MonadError Error,
       MonadState EvalState,
       MonadThrow,
@@ -50,60 +74,30 @@ newtype Eval a = Eval
       Generic
     )
 
-type Ctx = Map (Name Core) Thunk
-
-extendCtx :: Ctx -> Eval a -> Eval a
-extendCtx ctx' =
-  local
-    ( \env@Env {ctx} ->
-        env {ctx = M.union ctx' ctx}
-    )
-
-pushScope :: Name Core -> Eval a -> Eval a
-pushScope name =
-  local
-    ( \env@Env {scopes} ->
-        env {scopes = Just name : scopes}
-    )
-
-pushSpan :: Maybe SrcSpan -> Eval a -> Eval a
-pushSpan span c = do
-  local
-    ( \env@Env {spans} ->
-        env {spans = span : spans}
-    )
-    c
-
-withCtx :: Ctx -> Eval a -> Eval a
-withCtx ctx = local (\env -> env {ctx = ctx})
-
-data Env = Env
-  { ctx :: Ctx,
-    spans :: [Maybe SrcSpan],
-    scopes :: [Maybe (Name Core)]
-  }
+extendEnv :: Env -> Eval a -> Eval a
+extendEnv = locally env . M.union
 
 withEnv :: Env -> Eval a -> Eval a
-withEnv rho = local (const rho)
+withEnv = locally env . const
 
-emptyEnv :: Env
-emptyEnv = Env M.empty [] [Nothing]
+pushStackFrame :: (Name Core, Maybe SrcSpan) -> Eval a -> Eval a
+pushStackFrame (name, span) =
+  locally (callStack . scopes) (Just name :)
+  . locally (callStack . spans) (span :)
 
-data EvalState = EvalState
-  { currentPos :: Maybe SrcSpan
-  }
+emptyContext :: EvalContext
+emptyContext = EvalContext M.empty emptyStack
+
+emptyStack :: CallStack
+emptyStack = CallStack [] [Nothing]
 
 emptyState :: EvalState
 emptyState = EvalState Nothing
 
---  traceShowM $ "length of spans: "
---  traceShowM $ length sp
---  traceShowM $ "length of scopes: "
---  traceShowM $ length sc
 getBacktrace :: Eval (Backtrace Core)
 getBacktrace = do
-  sp <- (:) <$> gets currentPos <*> asks spans
-  sc <- asks scopes
+  sp <- (:) <$> use currentPos <*> view (callStack . spans)
+  sc <- view (callStack . scopes)
   pure $
     Backtrace $
       case sequence sp of
@@ -117,5 +111,6 @@ runEval :: Env -> Eval a -> ExceptT Error IO a
 runEval env = mapExceptT f . unEval
   where
     f comp = do
-      (a, _, _) <- runFreshMT $ runRWST comp env emptyState
+      (a, _, _) <- runFreshMT $ runRWST comp ctx emptyState
       pure a
+    ctx = EvalContext env emptyStack

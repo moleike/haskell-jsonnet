@@ -3,7 +3,12 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module Language.Jsonnet.Parser where
+-- | Parser for Jsonnet source code.
+module Language.Jsonnet.Parser
+  ( parse,
+    resolveImports,
+  )
+where
 
 import Control.Applicative hiding (many, some)
 import Control.Arrow (left)
@@ -40,8 +45,11 @@ type Parser = Parsec Void Text
 
 parse ::
   MonadError Error m =>
+  -- | File name (only for source location annotations)
   FilePath ->
+  -- | Input for parser
   Text ->
+  -- | AST with unresolved imports
   m Expr'
 parse fp inp =
   liftEither $
@@ -50,8 +58,11 @@ parse fp inp =
 
 resolveImports ::
   (MonadError Error m, MonadIO m) =>
+  -- | File path (modules are resolved relative to this path)
   FilePath ->
+  -- | AST with unresolved imports
   Expr' ->
+  -- | AST with imports resolved
   m Expr
 resolveImports fp = foldFixM go
   where

@@ -10,10 +10,10 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 
--- annotated syntax tree with resolved imports
+-- | annotated syntax tree with resolved imports
 type Expr = Ann ExprF SrcSpan
 
--- annotated syntax tree with unresolved imports
+-- | annotated syntax tree with unresolved imports
 type Expr' = Ann ExprF' SrcSpan
 
 mkApply :: Expr' -> Args Expr' -> Expr'

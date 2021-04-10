@@ -48,6 +48,7 @@ import Language.Jsonnet.Value
 import Text.PrettyPrint.ANSI.Leijen (pretty)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Bind
+import Control.Lens ((.=), use, locally, view)
 
 -- an evaluator for the core calculus, based on a
 -- big-step, call-by-need operational semantics, matching
@@ -60,23 +61,12 @@ eval = \case
     updateSpan (Just sp) >> eval e
   CLit l -> evalLiteral l
   CVar n -> do
-    env <- asks ctx
-    --sp <- gets currentPos
-    --traceShowM (spanBegin <$> sp)
-    v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n env)
+    rho <- view env
+    v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n rho)
     force v
-  CFun f -> VClos f <$> ask
+  CFun f -> VClos f <$> view env
   CApp e es -> evalApp e =<< evalArgs es
-  CLet (Let bnd) -> mdo
-    (r, e1) <- unbind bnd
-    bnds <-
-      mapM
-        ( \(v, Embed e) -> do
-            th <- mkThunk $ extendCtx' bnds $ eval e
-            pure (v, th)
-        )
-        (unrec r)
-    extendCtx' bnds (eval e1)
+  CLet bnd -> evalLetrec bnd
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
   CBinOp (Logical op) e1 e2 -> do
@@ -114,11 +104,22 @@ eval = \case
 
 thunk :: Core -> Eval Thunk
 thunk e =
-  ask >>= \rho ->
-    mkThunk $ withCtx (ctx rho) (eval e)
+  view env >>= \rho ->
+    mkThunk $ withEnv rho (eval e)
 
-extendCtx' :: [(Name Core, Thunk)] -> Eval a -> Eval a
-extendCtx' = extendCtx . M.fromList
+extendEnv' :: [(Name Core, Thunk)] -> Eval a -> Eval a
+extendEnv' = extendEnv . M.fromList
+
+evalLetrec (Let bnd) = mdo
+  (r, e1) <- unbind bnd
+  bnds <-
+    mapM
+      ( \(v, Embed e) -> do
+          th <- mkThunk $ extendEnv' bnds $ eval e
+          pure (v, th)
+      )
+      (unrec r)
+  extendEnv' bnds (eval e1)
 
 evalArgs :: Args Core -> Eval [Arg Thunk]
 evalArgs = \case
@@ -130,7 +131,7 @@ evalArgs = \case
 evalApp :: Core -> [Arg Thunk] -> Eval Value
 evalApp e vs = withStackFrame e $ do
   eval e >>= \case
-    VClos f Env {..} -> evalClos ctx f vs
+    VClos f env -> evalClos env f vs
     v@(VFun _) -> foldlM f v vs
       where
         f (VFun g) (Pos v) = g v
@@ -139,21 +140,21 @@ evalApp e vs = withStackFrame e $ do
 
 withStackFrame :: Core -> Eval a -> Eval a
 withStackFrame (CLoc sp (CVar n)) e =
-  pushScope n (pushSpan (Just sp) e)
+  pushStackFrame (n,  Just sp) e
 withStackFrame (CLoc sp _) e =
-  pushScope (s2n "anonymous") (pushSpan (Just sp) e)
+  pushStackFrame (s2n "anonymous", Just sp) e
 withStackFrame (CVar n) e =
-  pushScope n (pushSpan Nothing e)
+  pushStackFrame (n, Nothing) e
 withStackFrame _ e =
-  pushScope (s2n "anonymous") (pushSpan Nothing e)
+  pushStackFrame (s2n "anonymous", Nothing) e
 
-evalClos :: Ctx -> Fun -> [Arg Thunk] -> Eval Value
+evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) args = do
   (bnds, e) <- unbind f
   (rs, ps, ns) <- splitArgs args (second unembed <$> unrec bnds)
-  withCtx rho $
-    extendCtx' ps $
-      extendCtx' ns $
+  withEnv rho $
+    extendEnv' ps $
+      extendEnv' ns $
         appDefaults rs e
 
 -- all parameter names are bound in default values
@@ -162,11 +163,11 @@ appDefaults rs e = mdo
   bnds <-
     mapM
       ( \(n, e) -> do
-          th <- mkThunk $ extendCtx' bnds $ eval e
+          th <- mkThunk $ extendEnv' bnds $ eval e
           pure (n, th)
       )
       rs
-  extendCtx' bnds (eval e)
+  extendEnv' bnds (eval e)
 
 -- returns a triple with unapplied binders, positional and named
 splitArgs args bnds = do
@@ -225,13 +226,13 @@ mergeWith xs ys =
 
 evalObj :: [KeyValue Core] -> Eval Value
 evalObj xs = mdo
-  env <- asks ctx
+  rho <- view env
   fs <-
     catMaybes
       <$> mapM
         ( \(KeyValue key value) -> do
             k <- evalKey key
-            v <- pure $ TC (M.insert "self" (self fs) env) <$> value
+            v <- pure $ TC (M.insert "self" (self fs) rho) <$> value
             case k of
               Just k -> pure $ Just (k, v)
               _ -> pure Nothing
@@ -251,7 +252,7 @@ evalKey key =
 evalKeyValue :: KeyValue Core -> Eval (Maybe (Text, Hideable Thunk))
 evalKeyValue (KeyValue key value) = do
   a <- evalKey key
-  b <- asks ctx >>= \rho -> pure (TC rho <$> value)
+  b <- view env >>= \rho -> pure (TC rho <$> value)
   pure $ (,b) <$> a
 
 evalArrComp ::
@@ -266,7 +267,7 @@ evalArrComp cs bnd = do
       eval cs >>= \case
         VArr xs -> forM xs $ \x -> do
           (n, (e, cond)) <- unbind bnd
-          extendCtx' [(n, x)] $ do
+          extendEnv' [(n, x)] $ do
             b <- f cond
             if b
               then Just <$> thunk e
@@ -290,7 +291,7 @@ evalObjComp cs bnd = do
       eval cs >>= \case
         VArr xs -> forM xs $ \x -> do
           (n, (e, cond)) <- unbind bnd
-          extendCtx' [(n, x)] $ do
+          extendEnv' [(n, x)] $ do
             b <- f cond
             if b
               then evalKeyValue e
@@ -395,7 +396,9 @@ throwInvalidKey :: Value -> Eval a
 throwInvalidKey = throwE . InvalidKey . pretty . valueType
 
 updateSpan :: Maybe SrcSpan -> Eval ()
-updateSpan sp = modify $ \st -> st {currentPos = sp}
+updateSpan sp = do
+  currentPos .= sp
+  pure ()
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s

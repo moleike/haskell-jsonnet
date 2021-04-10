@@ -164,12 +164,6 @@ data StackFrame a = StackFrame
   }
   deriving (Eq, Show)
 
-pushStackFrame ::
-  StackFrame a ->
-  Backtrace a ->
-  Backtrace a
-pushStackFrame x (Backtrace xs) = Backtrace (x : xs)
-
 data Backtrace a = Backtrace [StackFrame a]
   deriving (Eq, Show)
 

@@ -6,6 +6,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+
 -- |
 module Language.Jsonnet.Value where
 
@@ -72,12 +73,12 @@ valueType =
     VClos _ _ -> "function"
     VFun _ -> "function"
 
-data Thunk = TC !Ctx !Core | TV !(Eval Value)
+data Thunk = TC !Env !Core | TV !(Eval Value)
   deriving (Generic)
 
 force :: Thunk -> Eval Value
 force = \case
-  TC rho expr -> withCtx rho (eval expr)
+  TC rho expr -> withEnv rho (eval expr)
   TV comp -> comp
 
 mkThunk' :: Value -> Thunk
@@ -179,7 +180,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) whe
     r <- f (mkThunk' $ inj x)
     proj r
   proj (VClos f env) = pure $ \x -> do
-    r <- evalClos (ctx env) f $ [Pos $ mkThunk' $ inj x]
+    r <- evalClos env f $ [Pos $ mkThunk' $ inj x]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = VFun $ \v -> proj' v >>= fmap inj . f
@@ -190,7 +191,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
     r <- g (mkThunk' $ inj y)
     proj r
   proj (VClos f env) = pure $ \x y -> do
-    r <- evalClos (ctx env) f $ Pos . mkThunk' <$> [inj x, inj y]
+    r <- evalClos env f $ Pos . mkThunk' <$> [inj x, inj y]
     proj r
   proj v = throwTypeMismatch "function" v
   inj f = inj $ \x -> inj (f x)
