@@ -1,2 +1,2 @@
 Runtime error: invalid key: number
-  ./test/golden/error.invalid-key.jsonnet:4:4-9 
+  ./test/golden/error.invalid-key.jsonnet:1:1-6:1 

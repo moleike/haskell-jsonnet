@@ -45,6 +45,7 @@ run conf = do
 goldenTests :: IO TestTree
 goldenTests = do
   jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
+  --let jsonnetFiles = ["/Users/alex/Development/jsonnet-hs/test/golden/error.array_large_index.jsonnet"]
   stdlib <- mkThunk std
   return $
     testGroup

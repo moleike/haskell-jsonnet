@@ -85,11 +85,12 @@ check expr = do
   pure expr
 
 desugar :: Expr -> JsonnetM Core
-desugar expr = pure (Desugar.desugar expr)
+desugar = pure . Desugar.desugar
 
--- evaluate a Core expression with the implicit stdlib
+-- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
+  --traceShowM expr
   env <- singleton "std" <$> asks stdlib
   JsonnetM $
     lift $

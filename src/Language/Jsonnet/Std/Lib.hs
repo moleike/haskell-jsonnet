@@ -37,7 +37,7 @@ import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
-import Control.Lens (use)
+import Control.Lens (view)
 
 -- | The native subset of Jsonnet standard library
 std :: Value
@@ -153,7 +153,7 @@ makeArray n f = traverse (mkThunk <$> f) (V.fromList [0 .. n - 1])
 
 -- hacky way of returning the current file
 thisFile :: Eval (Maybe Text)
-thisFile = f <$> use currentPos
+thisFile = f <$> view currentPos
   where
     f = fmap (T.pack . takeFileName . sourceName . spanBegin)
 

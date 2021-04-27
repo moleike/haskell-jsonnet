@@ -27,34 +27,42 @@ import Language.Jsonnet.Parser.SrcSpan
 import {-# SOURCE #-} Language.Jsonnet.Value (Thunk)
 import Unbound.Generics.LocallyNameless
 import Control.Lens (makeLenses, use, locally, view)
+import Data.Maybe (fromJust)
 
-data EvalState = EvalState
-  { _currentPos :: Maybe SrcSpan
-  }
-
-makeLenses ''EvalState
-
+-- | Simulate a call-stack to report stack traces
 data CallStack = CallStack
   { _spans :: [Maybe SrcSpan],
-    _scopes :: [Maybe (Name Core)]
+    -- ^ source location of call-sites
+    _scopes :: [Name Core]
+    -- ^ names of called functions
   }
 
 makeLenses ''CallStack
 
+emptyStack :: CallStack
+emptyStack = CallStack [] [s2n "top-level"]
+
 type Env = Map (Name Core) Thunk
 
 data EvalContext = EvalContext
-  { _env :: Env, -- ^ binding local variables to their values
-    _callStack :: CallStack -- ^ call-stack simulation
+  { _env :: Env,
+    -- ^ binding local variables to their values
+    _callStack :: CallStack,
+    -- ^ call-stack simulation
+    _currentPos :: Maybe SrcSpan
+    -- ^ source span of expression being evaluated
   }
 
 makeLenses ''EvalContext
+
+emptyContext :: EvalContext
+emptyContext = EvalContext M.empty emptyStack Nothing
 
 instance (Monoid w, Fresh m) => Fresh (RWST r w s m) where
   fresh = lift . fresh
 
 newtype Eval a = Eval
-  { unEval :: ExceptT Error (RWST EvalContext () EvalState (FreshMT IO)) a
+  { unEval :: ExceptT Error (RWST EvalContext () () (FreshMT IO)) a
   }
   deriving
     ( Functor,
@@ -65,7 +73,7 @@ newtype Eval a = Eval
       MonadWriter (),
       MonadReader EvalContext,
       MonadError Error,
-      MonadState EvalState,
+      MonadState (),
       MonadThrow,
       MonadCatch,
       MonadMask,
@@ -82,21 +90,13 @@ withEnv = locally env . const
 
 pushStackFrame :: (Name Core, Maybe SrcSpan) -> Eval a -> Eval a
 pushStackFrame (name, span) =
-  locally (callStack . scopes) (Just name :)
+  locally (callStack . scopes) (name :)
   . locally (callStack . spans) (span :)
-
-emptyContext :: EvalContext
-emptyContext = EvalContext M.empty emptyStack
-
-emptyStack :: CallStack
-emptyStack = CallStack [] [Nothing]
-
-emptyState :: EvalState
-emptyState = EvalState Nothing
 
 getBacktrace :: Eval (Backtrace Core)
 getBacktrace = do
-  sp <- (:) <$> use currentPos <*> view (callStack . spans)
+  x <- view currentPos
+  sp <- (:) <$> view currentPos <*> view (callStack . spans)
   sc <- view (callStack . scopes)
   pure $
     Backtrace $
@@ -111,6 +111,6 @@ runEval :: Env -> Eval a -> ExceptT Error IO a
 runEval env = mapExceptT f . unEval
   where
     f comp = do
-      (a, _, _) <- runFreshMT $ runRWST comp ctx emptyState
+      (a, _, _) <- runFreshMT $ runRWST comp ctx ()
       pure a
-    ctx = EvalContext env emptyStack
+    ctx = EvalContext env emptyStack Nothing

@@ -392,38 +392,38 @@ opTable =
       prefix "!" (mkUnyOp LNot),
       prefix "~" (mkUnyOp Compl)
     ],
-    [ binary "*" (mkBinOp (Arith Mul)),
-      binary "/" (mkBinOp (Arith Div)),
-      binary "%" (mkBinOp (Arith Mod))
+    [ binary "*" (mkBinOp Mul),
+      binary "/" (mkBinOp Div),
+      binary "%" (mkBinOp Mod)
     ],
-    [ binary "+" (mkBinOp (Arith Add)),
-      binary "-" (mkBinOp (Arith Sub)),
+    [ binary "+" (mkBinOp Add),
+      binary "-" (mkBinOp Sub),
       Postfix postfixObjectMerge
     ],
-    [ binary ">>" (mkBinOp (Bitwise ShiftR)),
-      binary "<<" (mkBinOp (Bitwise ShiftL))
+    [ binary ">>" (mkBinOp ShiftR),
+      binary "<<" (mkBinOp ShiftL)
     ],
     [ binary "in" (mkBinOp In),
-      binary ">" (mkBinOp (Comp Gt)),
-      binary "<=" (mkBinOp (Comp Le)),
-      binary ">=" (mkBinOp (Comp Ge)),
-      binary "<" (mkBinOp (Comp Lt))
+      binary ">" (mkBinOp Gt),
+      binary "<=" (mkBinOp Le),
+      binary ">=" (mkBinOp Ge),
+      binary "<" (mkBinOp Lt)
     ],
-    [ binary "==" (mkBinOp (Comp Eq)),
-      binary "!=" (mkBinOp (Comp Ne))
+    [ binary "==" (mkBinOp Eq),
+      binary "!=" (mkBinOp Ne)
     ],
-    [binary "&" (mkBinOp (Bitwise And))],
-    [binary "^" (mkBinOp (Bitwise Xor))],
-    [binary "|" (mkBinOp (Bitwise Or))],
-    [binary "&&" (mkBinOp (Logical LAnd))],
-    [binary "||" (mkBinOp (Logical LOr))]
+    [binary "&" (mkBinOp And)],
+    [binary "^" (mkBinOp Xor)],
+    [binary "|" (mkBinOp Or)],
+    [binary "&&" (mkBinOp LAnd)],
+    [binary "||" (mkBinOp LOr)]
   ]
 
 -- | shorthand syntax for object composition:
 -- when the right-hand side is an object literal the '+'
 -- operator can be elided.
 postfixObjectMerge :: Parser (Expr' -> Expr')
-postfixObjectMerge = flip (mkBinOp (Arith Add)) <$> objectP
+postfixObjectMerge = flip (mkBinOp Add) <$> objectP
 
 -- | application, indexing and lookup: e(...) e[...] e.f
 -- all have the same precedence (the highest)

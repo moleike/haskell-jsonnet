@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Language.Jsonnet.Common where
 
@@ -34,42 +35,46 @@ instance Subst a Literal where
   subst _ _ = id
   substs _ = id
 
-data BinOp
-  = Arith ArithOp
-  | Comp CompOp
-  | Bitwise BitwiseOp
-  | Logical LogicalOp
-  | In
+data Prim
+  = UnyOp UnyOp
+  | BinOp BinOp
+  | Cond
   deriving (Show, Eq, Generic, Typeable, Data)
+
+instance Alpha Prim
+
+data BinOp
+  = Add
+  | Sub
+  | Mul
+  | Div
+  | Mod
+  | Lt
+  | Le
+  | Gt
+  | Ge
+  | Eq
+  | Ne
+  | And
+  | Or
+  | Xor
+  | ShiftL
+  | ShiftR
+  | LAnd
+  | LOr
+  | In
+  | Lookup
+  deriving (Show, Eq, Generic, Typeable, Data)
+
+instance Alpha BinOp
 
 data UnyOp
   = Compl
   | LNot
   | Plus
   | Minus
-  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
-
-data ArithOp = Add | Sub | Mul | Div | Mod
-  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
-
-data CompOp = Lt | Le | Gt | Ge | Eq | Ne
-  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
-
-data BitwiseOp = And | Or | Xor | ShiftL | ShiftR
-  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
-
-data LogicalOp = LAnd | LOr
-  deriving (Show, Eq, Enum, Bounded, Generic, Typeable, Data)
-
-instance Alpha ArithOp
-
-instance Alpha BinOp
-
-instance Alpha CompOp
-
-instance Alpha BitwiseOp
-
-instance Alpha LogicalOp
+  | Err
+  deriving (Show, Eq, Generic, Typeable, Data)
 
 instance Alpha UnyOp
 
@@ -159,7 +164,7 @@ deriveShow1 ''CompSpec
 instance Alpha a => Alpha (CompSpec a)
 
 data StackFrame a = StackFrame
-  { name :: Maybe (Name a),
+  { name :: Name a,
     span :: SrcSpan
   }
   deriving (Eq, Show)
@@ -191,6 +196,8 @@ data Hideable a = Hideable {value :: a, visiblity :: Visibility}
       Show,
       Generic,
       Functor,
+      Foldable,
+      Traversable,
       Typeable,
       Data
     )

@@ -155,9 +155,10 @@ instance Pretty EvalError where
 
 instance Pretty (StackFrame a) where
   pretty StackFrame {..} =
-    pretty span <+> pretty name'
+    pretty span <+> pretty (f $ name2String name)
     where
-      name' = (<+>) (text "function") . angles . pretty <$> name
+      f "top-level" = mempty
+      f x = text "function" <+> (angles $ pretty x)
 
 instance Pretty (Backtrace a) where
   pretty (Backtrace xs) = vcat $ pretty <$> xs

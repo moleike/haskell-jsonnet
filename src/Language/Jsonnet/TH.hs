@@ -50,19 +50,10 @@ instance Lift Literal where
 instance Lift Scientific where
   lift s = [|fromRational $(return $ LitE $ RationalL (toRational s))|]
 
+instance Lift Prim where
+  lift = liftData
+
 instance Lift BinOp where
-  lift = liftData
-
-instance Lift ArithOp where
-  lift = liftData
-
-instance Lift CompOp where
-  lift = liftData
-
-instance Lift BitwiseOp where
-  lift = liftData
-
-instance Lift LogicalOp where
   lift = liftData
 
 instance Lift UnyOp where

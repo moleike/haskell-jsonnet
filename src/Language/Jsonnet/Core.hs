@@ -46,15 +46,11 @@ data Core
   | CLit Literal
   | CVar (Name Core)
   | CFun Fun
+  | CPrim Prim
   | CApp Core (Args Core)
   | CLet Let
   | CObj [KeyValue Core]
   | CArr [Core]
-  | CBinOp BinOp Core Core
-  | CUnyOp UnyOp Core
-  | CIfElse Core Core Core
-  | CErr Core
-  | CLookup Core Core
   | CComp Comp Core
   deriving (Show, Typeable, Generic)
 

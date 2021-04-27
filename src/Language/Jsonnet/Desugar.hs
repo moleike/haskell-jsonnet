@@ -25,6 +25,7 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
 import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
 import Unbound.Generics.LocallyNameless
+import Debug.Trace
 
 class Desugarer a where
   desugar :: a -> Core
@@ -37,7 +38,7 @@ instance Desugarer (Ann ExprF ()) where
 instance Desugarer (Ann ExprF SrcSpan) where
   desugar = foldFix go . zipWithOutermost
     where
-      go (AnnF f (a, b)) = alg b $ CLoc a <$> f
+      go (AnnF f (a, b)) = CLoc a (alg b f)
 
 -- annotate nodes with a boolean denoting outermost objects
 zipWithOutermost :: Ann ExprF a -> Ann ExprF (a, Bool)
@@ -55,21 +56,21 @@ alg outermost = \case
   EApply e es -> CApp e es
   ELocal bnds e -> mkLet bnds e
   -- operator % is overloaded for both modulo and string formatting
-  EBinOp (Arith Mod) e1 e2 ->
+  EBinOp Mod e1 e2 ->
     stdFunc "mod" (Args [Pos e1, Pos e2] Lazy)
-  EBinOp (Comp Eq) e1 e2 ->
+  EBinOp Eq e1 e2 ->
     stdFunc "equals" (Args [Pos e1, Pos e2] Lazy)
-  EBinOp (Comp Ne) e1 e2 ->
-    CUnyOp LNot (stdFunc "equals" (Args [Pos e1, Pos e2] Lazy))
-  EBinOp op e1 e2 -> CBinOp op e1 e2
-  EUnyOp op e -> CUnyOp op e
-  EIfElse c t e -> CIfElse c t e
-  EIf c t -> CIfElse c t (CLit Null)
+  EBinOp Ne e1 e2 ->
+    mkUnyOp LNot (stdFunc "equals" (Args [Pos e1, Pos e2] Lazy))
+  EBinOp op e1 e2 -> mkBinOp op e1 e2
+  EUnyOp op e -> mkUnyOp op e
+  EIfElse c t e -> mkIfElse c t e
+  EIf c t -> mkIfElse c t (CLit Null)
   EArr e -> CArr e
   EObj {..} -> mkObj outermost locals fields
-  ELookup e1 e2 -> CLookup e1 e2
-  EIndex e1 e2 -> CLookup e1 e2
-  EErr e -> CErr e
+  ELookup e1 e2 -> mkLookup e1 e2
+  EIndex e1 e2 -> mkLookup e1 e2
+  EErr e -> mkErr e
   EAssert e -> mkAssert e
   ESlice {..} -> mkSlice expr start end step
   EArrComp {expr, comp} -> mkArrComp expr comp
@@ -89,6 +90,21 @@ mkSlice expr start end step =
   where
     maybeNull = fromMaybe (CLit Null)
 
+mkIfElse :: Core -> Core -> Core -> Core
+mkIfElse c t e = CApp (CPrim Cond) (Args [Pos c, Pos t, Pos e] Lazy)
+
+mkLookup :: Core -> Core -> Core
+mkLookup e1 e2 = CApp (CPrim (BinOp Lookup)) (Args [Pos e1, Pos e2] Lazy)
+
+mkErr :: Core -> Core
+mkErr e = CApp (CPrim (UnyOp Err)) (Args [Pos e] Lazy)
+
+mkBinOp :: BinOp -> Core -> Core -> Core
+mkBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
+
+mkUnyOp :: UnyOp -> Core -> Core
+mkUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
+
 mkObj outermost locals fields =
   --mkLet (("self", CObj fields) :| bnds) self
   case bnds of
@@ -103,10 +119,10 @@ mkObj outermost locals fields =
 
 mkAssert :: Assert Core -> Core
 mkAssert (Assert c m e) =
-  CIfElse
+  mkIfElse
     c
     e
-    ( CErr $
+    ( mkErr $
         fromMaybe
           (CLit $ String "Assertion failed")
           m
@@ -124,9 +140,9 @@ mkKeyValue Field {..} = KeyValue key (Hideable value' visibility)
     value' =
       if override
         then
-          CIfElse
-            (CBinOp In key super)
-            (CBinOp (Arith Add) (CLookup super key) value)
+          mkIfElse
+            (mkBinOp In key super)
+            (mkBinOp Add (mkLookup super key) value)
             value
         else value
     super = CVar $ s2n "super"
@@ -149,14 +165,14 @@ mkObjComp (Field {..}) comp locals =
       [] -> mkLet bnds value
       -- we need to nest the let bindings due to the impl.
       xs -> mkLet bnds $ mkLet (NE.fromList xs) value
-    xs = CLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
+    xs = mkLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
     arrComp = mkArrComp arr comp
     arr = CArr $ NE.toList $ CVar . s2n . var <$> comp
 
 stdFunc :: Text -> Args Core -> Core
 stdFunc f =
   CApp
-    ( CLookup
+    ( mkLookup
         (CVar "std")
         (CLit $ String f)
     )
@@ -175,7 +191,7 @@ mkFun ps e =
         e
   where
     errNotBound n =
-      CErr $
+      mkErr $
         CLit $
           String
             ( T.pack $

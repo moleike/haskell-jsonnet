@@ -50,53 +50,24 @@ import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Bind
 import Control.Lens ((.=), use, locally, view)
 
--- an evaluator for the core calculus, based on a
--- big-step, call-by-need operational semantics, matching
--- jsonnet specificaton
+-- | an evaluator for the core calculus, based on a
+--   big-step, call-by-need operational semantics, matching
+--   jsonnet specificaton
 
 eval :: Core -> Eval Value
 eval = \case
-  CLoc sp e -> do
-    --traceShowM (spanBegin sp)
-    updateSpan (Just sp) >> eval e
+  CLoc sp e -> locally currentPos (const $ Just sp) (eval e)
   CLit l -> evalLiteral l
   CVar n -> do
     rho <- view env
     v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n rho)
     force v
   CFun f -> VClos f <$> view env
+  CPrim op -> pure (VPrim op)
   CApp e es -> evalApp e =<< evalArgs es
   CLet bnd -> evalLetrec bnd
   CObj e -> evalObj e
   CArr e -> VArr . V.fromList <$> traverse thunk e
-  CBinOp (Logical op) e1 e2 -> do
-    e1' <- thunk e1
-    e2' <- thunk e2
-    evalLogical op e1' e2'
-  CBinOp op e1 e2 -> do
-    e1' <- eval e1
-    e2' <- eval e2
-    evalBinOp op e1' e2'
-  CUnyOp op e -> do
-    e' <- eval e
-    evalUnyOp op e'
-  CLookup e1 e2 -> do
-    v1 <- eval e1
-    v2 <- eval e2
-    evalLookup v1 v2
-  CIfElse c e1 e2 -> do
-    eval c >>= \case
-      VBool b ->
-        if b
-          then eval e1
-          else eval e2
-      v -> throwTypeMismatch "bool" v
-  CErr e ->
-    ( eval
-        >=> toString
-        >=> throwE . RuntimeError . pretty
-    )
-      e
   CComp (ArrC bnd) cs -> do
     evalArrComp cs bnd
   CComp (ObjC bnd) cs -> do
@@ -132,21 +103,36 @@ evalApp :: Core -> [Arg Thunk] -> Eval Value
 evalApp e vs = withStackFrame e $ do
   eval e >>= \case
     VClos f env -> evalClos env f vs
+    VPrim op -> evalPrim op vs
     v@(VFun _) -> foldlM f v vs
       where
         f (VFun g) (Pos v) = g v
         f v _ = throwTypeMismatch "function" v
     v -> throwTypeMismatch "function" v
 
+evalPrim :: Prim -> [Arg Thunk] -> Eval Value
+evalPrim (BinOp LAnd) [Pos e1, Pos e2] = evalLogical id e1 e2
+evalPrim (BinOp LOr) [Pos e1, Pos e2] = evalLogical not e1 e2
+evalPrim (BinOp op) [Pos e1, Pos e2] = liftA2 (,) (force e1) (force e2) >>= uncurry (evalBinOp op)
+evalPrim (UnyOp op) [Pos e] = force e >>= evalUnyOp op
+evalPrim Cond [Pos c, Pos t, Pos e] = evalCond c t e
+
 withStackFrame :: Core -> Eval a -> Eval a
 withStackFrame (CLoc sp (CVar n)) e =
   pushStackFrame (n,  Just sp) e
 withStackFrame (CLoc sp _) e =
   pushStackFrame (s2n "anonymous", Just sp) e
-withStackFrame (CVar n) e =
-  pushStackFrame (n, Nothing) e
-withStackFrame _ e =
-  pushStackFrame (s2n "anonymous", Nothing) e
+withStackFrame (CVar n) e = e
+  --pushStackFrame (n, Nothing) e
+withStackFrame _ e = e
+  --pushStackFrame (s2n "anonymous", Nothing) e
+
+evalCond :: Thunk -> Thunk -> Thunk -> Eval Value
+evalCond c e1 e2 = do
+  c' <- proj' c
+  if c'
+    then force e1
+    else force e2
 
 evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
 evalClos rho (Fun f) args = do
@@ -307,50 +293,37 @@ evalUnyOp Compl x = inj <$> fmap (complement @Int64) (proj x)
 evalUnyOp LNot x = inj <$> fmap not (proj x)
 evalUnyOp Minus x = inj <$> fmap (negate @Double) (proj x)
 evalUnyOp Plus x = inj <$> fmap (id @Double) (proj x)
+evalUnyOp Err x = (toString >=> throwE . RuntimeError . pretty) x
 
 evalBinOp :: BinOp -> Value -> Value -> Eval Value
+evalBinOp Add x@(VStr _) y = inj <$> append x y
+evalBinOp Add x y@(VStr _) = inj <$> append x y
+evalBinOp Add x@(VArr _) y@(VArr _) = evalBin ((V.++) @Thunk) x y
+evalBinOp Add (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
+evalBinOp Add n1 n2 = evalBin ((+) @Double) n1 n2
+evalBinOp Sub n1 n2 = evalBin ((-) @Double) n1 n2
+evalBinOp Mul n1 n2 = evalBin ((*) @Double) n1 n2
+evalBinOp Div (VNum _) (VNum 0) = throwE DivByZero
+evalBinOp Div n1 n2 = evalBin ((/) @Double) n1 n2
+evalBinOp Mod (VNum _) (VNum 0) = throwE DivByZero
+evalBinOp Mod n1 n2 = evalBin (mod @Int64) n1 n2
+evalBinOp Lt e1 e2 = evalBin ((<) @Double) e1 e2
+evalBinOp Gt e1 e2 = evalBin ((>) @Double) e1 e2
+evalBinOp Le e1 e2 = evalBin ((<=) @Double) e1 e2
+evalBinOp Ge e1 e2 = evalBin ((>=) @Double) e1 e2
+evalBinOp And e1 e2 = evalBin ((.&.) @Int64) e1 e2
+evalBinOp Or e1 e2 = evalBin ((.|.) @Int64) e1 e2
+evalBinOp Xor e1 e2 = evalBin (xor @Int64) e1 e2
+evalBinOp ShiftL e1 e2 = evalBin (shiftL @Int64) e1 e2
+evalBinOp ShiftR e1 e2 = evalBin (shiftR @Int64) e1 e2
+evalBinOp Lookup e1 e2 = evalLookup e1 e2
 evalBinOp In s o = evalBin (\o s -> Std.objectHasEx o s True) o s
-evalBinOp (Arith Add) x@(VStr _) y = inj <$> append x y
-evalBinOp (Arith Add) x y@(VStr _) = inj <$> append x y
-evalBinOp (Arith Add) x@(VArr _) y@(VArr _) = evalBin ((V.++) @Thunk) x y
-evalBinOp (Arith Add) (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
-evalBinOp (Arith op) x y = evalArith op x y
-evalBinOp (Comp op) x y = evalComp op x y
-evalBinOp (Bitwise op) x y = evalBitwise op x y
 
-evalArith :: ArithOp -> Value -> Value -> Eval Value
-evalArith Add n1 n2 = evalBin ((+) @Double) n1 n2
-evalArith Sub n1 n2 = evalBin ((-) @Double) n1 n2
-evalArith Mul n1 n2 = evalBin ((*) @Double) n1 n2
-evalArith Div (VNum _) (VNum 0) = throwE DivByZero
-evalArith Div n1 n2 = evalBin ((/) @Double) n1 n2
-evalArith Mod (VNum _) (VNum 0) = throwE DivByZero
-evalArith Mod n1 n2 = evalBin (mod @Int64) n1 n2
-
-evalComp :: CompOp -> Value -> Value -> Eval Value
-evalComp Lt n1 n2 = evalBin ((<) @Double) n1 n2
-evalComp Gt n1 n2 = evalBin ((>) @Double) n1 n2
-evalComp Le n1 n2 = evalBin ((<=) @Double) n1 n2
-evalComp Ge n1 n2 = evalBin ((>=) @Double) n1 n2
-
-evalLogical :: LogicalOp -> Thunk -> Thunk -> Eval Value
-evalLogical LAnd e1 e2 = do
-  force e1 >>= \case
-    VBool True -> force e2 >>= \x -> inj <$> fmap (id @Bool) (proj x)
-    VBool False -> pure (VBool False)
-    v -> throwTypeMismatch "boolean" v
-evalLogical LOr e1 e2 = do
-  force e1 >>= \case
-    VBool False -> force e2 >>= \x -> inj <$> fmap (id @Bool) (proj x)
-    VBool True -> pure (VBool True)
-    v -> throwTypeMismatch "boolean" v
-
-evalBitwise :: BitwiseOp -> Value -> Value -> Eval Value
-evalBitwise And = evalBin ((.&.) @Int64)
-evalBitwise Or = evalBin ((.|.) @Int64)
-evalBitwise Xor = evalBin (xor @Int64)
-evalBitwise ShiftL = evalBin (shiftL @Int64)
-evalBitwise ShiftR = evalBin (shiftR @Int64)
+evalLogical f e1 e2 = do
+  x <- proj' e1
+  if (f x)
+    then inj <$> proj' @Bool e2
+    else pure (inj x)
 
 evalLookup :: Value -> Value -> Eval Value
 evalLookup (VArr a) (VNum i)
@@ -394,11 +367,6 @@ append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 throwInvalidKey :: Value -> Eval a
 throwInvalidKey = throwE . InvalidKey . pretty . valueType
-
-updateSpan :: Maybe SrcSpan -> Eval ()
-updateSpan sp = do
-  currentPos .= sp
-  pure ()
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s

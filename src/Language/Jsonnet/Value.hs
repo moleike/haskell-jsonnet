@@ -55,6 +55,7 @@ data Value
   | VObj !(HashMap Text (Hideable Thunk))
   | VClos !Fun !Env
   | VFun !(Thunk -> Eval Value)
+  | VPrim !Prim
   deriving (Generic)
 
 type Array = Vector Thunk
