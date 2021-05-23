@@ -47,9 +47,6 @@ instance Lift Strictness where
 instance Lift Literal where
   lift = liftData
 
-instance Lift Scientific where
-  lift s = [|fromRational $(return $ LitE $ RationalL (toRational s))|]
-
 instance Lift Prim where
   lift = liftData
 
