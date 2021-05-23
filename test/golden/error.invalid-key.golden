@@ -1,2 +1,2 @@
-Runtime error: invalid key: number
+Runtime error: type mismatch: expected string but got number
   ./test/golden/error.invalid-key.jsonnet:1:1-6:1 

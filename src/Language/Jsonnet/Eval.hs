@@ -1,159 +1,136 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-module Language.Jsonnet.Eval
-  ( eval,
-    evalClos,
-    mergeWith,
-    module Language.Jsonnet.Eval.Monad,
-  )
-where
+module Language.Jsonnet.Eval where
 
 import Control.Applicative
+import Control.Lens (locally, view)
 import Control.Monad.Except
-import Control.Monad.Reader
-import Control.Monad.State.Lazy
-import Data.Aeson.Text
+import qualified Data.Aeson as JSON
+import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
 import Data.Bits
+import Data.ByteString (ByteString)
 import Data.Foldable
+import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
-import Data.Int
-import Data.List
+import Data.IORef
+import Data.Int (Int64)
+import qualified Data.List as L (sort)
 import qualified Data.Map.Lazy as M
-import Data.Maybe (catMaybes, isNothing)
-import Data.Scientific (isInteger, toBoundedInteger)
+import Data.Maybe
+import Data.Scientific
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
-import Language.Jsonnet.Common hiding (span)
+import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Manifest
-import Language.Jsonnet.Parser.SrcSpan
-import Language.Jsonnet.Pretty ()
-import qualified Language.Jsonnet.Std.Lib as Std
 import Language.Jsonnet.Value
-import Text.PrettyPrint.ANSI.Leijen (pretty)
+import Language.Jsonnet.Pretty ()
+import Text.PrettyPrint.ANSI.Leijen hiding (equals, (<$>))
 import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Bind
-import Control.Lens ((.=), use, locally, view)
+import Prelude hiding (length)
+import qualified Prelude as P (length)
 
--- | an evaluator for the core calculus, based on a
---   big-step, call-by-need operational semantics, matching
---   jsonnet specificaton
+rnf :: Core -> Eval JSON.Value
+rnf = whnf >=> manifest
 
-eval :: Core -> Eval Value
-eval = \case
-  CLoc sp e -> locally currentPos (const $ Just sp) (eval e)
-  CLit l -> evalLiteral l
-  CVar n -> do
-    rho <- view env
-    v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n rho)
-    force v
-  CFun f -> VClos f <$> view env
-  CPrim op -> pure (VPrim op)
-  CApp e es -> evalApp e =<< evalArgs es
-  CLet bnd -> evalLetrec bnd
-  CObj e -> evalObj e
-  CArr e -> VArr . V.fromList <$> traverse thunk e
-  CComp (ArrC bnd) cs -> do
-    evalArrComp cs bnd
-  CComp (ObjC bnd) cs -> do
-    evalObjComp cs bnd
+whnfV :: Value -> Eval Value
+whnfV (VIndir loc) = whnfIndir loc >>= whnfV
+whnfV (VThunk c e) = withEnv e (whnf c)
+whnfV v = pure v
 
-thunk :: Core -> Eval Thunk
-thunk e =
-  view env >>= \rho ->
-    mkThunk $ withEnv rho (eval e)
+whnf :: Core -> Eval Value
+whnf (CVar n) = lookupVar n
+whnf (CLoc sp c) = locally currentPos (const $ Just sp) (whnf c)
+whnf (CLit l) = pure (whnfLiteral l)
+whnf (CObj bnd) = whnfObj bnd
+whnf (CArr cs) = VArr . V.fromList <$> mapM mkValue cs
+whnf (CLet bnd) = whnfLetrec bnd
+whnf (CPrim p) = pure (VPrim p)
+whnf (CApp e es) = whnfApp e es
+whnf (CLam f) = VClos f <$> view ctx
+whnf (CComp comp e) = whnfComp comp e
 
-extendEnv' :: [(Name Core, Thunk)] -> Eval a -> Eval a
-extendEnv' = extendEnv . M.fromList
+mkValue :: Core -> Eval Value
+mkValue c@(CLit _) = whnf c
+mkValue c@(CLam _) = whnf c
+mkValue c@(CPrim _) = whnf c
+mkValue c = mkThunk c >>= mkIndirV
 
-evalLetrec (Let bnd) = mdo
-  (r, e1) <- unbind bnd
-  bnds <-
-    mapM
-      ( \(v, Embed e) -> do
-          th <- mkThunk $ extendEnv' bnds $ eval e
-          pure (v, th)
-      )
-      (unrec r)
-  extendEnv' bnds (eval e1)
+lookupVar :: Name Core -> Eval Value
+lookupVar n = do
+  rho <- view ctx
+  v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n rho)
+  whnfV v
 
-evalArgs :: Args Core -> Eval [Arg Thunk]
-evalArgs = \case
-  as@(Args _ Lazy) -> args <$> traverse thunk as
-  as@(Args _ Strict) -> args <$> traverse f as
-    where
-      f = eval >=> pure . mkThunk'
+whnfLiteral :: Literal -> Value
+whnfLiteral = \case
+  Null -> VNull
+  Bool b -> VBool b
+  String s -> VStr s
+  Number n -> VNum n
 
-evalApp :: Core -> [Arg Thunk] -> Eval Value
-evalApp e vs = withStackFrame e $ do
-  eval e >>= \case
-    VClos f env -> evalClos env f vs
-    VPrim op -> evalPrim op vs
+whnfArgs :: Args Core -> Eval [Arg Value]
+whnfArgs = \case
+  as@(Args _ Strict) -> args <$> mapM whnf as
+  as@(Args _ Lazy) -> args <$> mapM mkValue as
+
+whnfApp :: Core -> Args Core -> Eval Value
+whnfApp e es = withStackFrame e $ do
+  vs <- whnfArgs es
+  whnf e >>= whnfV >>= \case
+    VClos f env -> whnfClos env f vs
+    VPrim op -> whnfPrim op vs
     v@(VFun _) -> foldlM f v vs
       where
         f (VFun g) (Pos v) = g v
         f v _ = throwTypeMismatch "function" v
     v -> throwTypeMismatch "function" v
 
-evalPrim :: Prim -> [Arg Thunk] -> Eval Value
-evalPrim (BinOp LAnd) [Pos e1, Pos e2] = evalLogical id e1 e2
-evalPrim (BinOp LOr) [Pos e1, Pos e2] = evalLogical not e1 e2
-evalPrim (BinOp op) [Pos e1, Pos e2] = liftA2 (,) (force e1) (force e2) >>= uncurry (evalBinOp op)
-evalPrim (UnyOp op) [Pos e] = force e >>= evalUnyOp op
-evalPrim Cond [Pos c, Pos t, Pos e] = evalCond c t e
-
 withStackFrame :: Core -> Eval a -> Eval a
 withStackFrame (CLoc sp (CVar n)) e =
-  pushStackFrame (n,  Just sp) e
+  pushStackFrame (n, Just sp) e
 withStackFrame (CLoc sp _) e =
   pushStackFrame (s2n "anonymous", Just sp) e
-withStackFrame (CVar n) e = e
-  --pushStackFrame (n, Nothing) e
+withStackFrame (CVar _) e = e
+--pushStackFrame (n, Nothing) e
 withStackFrame _ e = e
-  --pushStackFrame (s2n "anonymous", Nothing) e
+--pushStackFrame (s2n "anonymous", Nothing) e
 
-evalCond :: Thunk -> Thunk -> Thunk -> Eval Value
-evalCond c e1 e2 = do
-  c' <- proj' c
-  if c'
-    then force e1
-    else force e2
-
-evalClos :: Env -> Fun -> [Arg Thunk] -> Eval Value
-evalClos rho (Fun f) args = do
+whnfClos :: Env -> Lam -> [Arg Value] -> Eval Value
+whnfClos rho f args = do
   (bnds, e) <- unbind f
   (rs, ps, ns) <- splitArgs args (second unembed <$> unrec bnds)
   withEnv rho $
-    extendEnv' ps $
-      extendEnv' ns $
+    extendEnv (M.fromList ps) $
+      extendEnv (M.fromList ns) $
         appDefaults rs e
 
 -- all parameter names are bound in default values
 appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
 appDefaults rs e = mdo
   bnds <-
-    mapM
-      ( \(n, e) -> do
-          th <- mkThunk $ extendEnv' bnds $ eval e
-          pure (n, th)
-      )
-      rs
-  extendEnv' bnds (eval e)
+    M.fromList
+      <$> mapM
+        ( \(n, e) -> do
+            th <- extendEnv bnds (mkValue e)
+            pure (n, th)
+        )
+        rs
+  extendEnv bnds (whnf e)
 
 -- returns a triple with unapplied binders, positional and named
 splitArgs args bnds = do
@@ -164,12 +141,12 @@ splitArgs args bnds = do
   where
     (bnds1, bnds2) = splitAt (length ps) bnds
     (ps, ns) = split args
-    pNames = fst (unzip bnds)
+    pNames = map fst bnds
 
-    getPos = do
+    getPos =
       if length ps > length bnds
         then throwE $ TooManyArgs (length bnds)
-        else pure $ zip (fst $ unzip bnds1) ps
+        else pure $ zip (map fst bnds1) ps
 
     -- checks the provided named arguments exist
     getNamed = traverse f ns
@@ -181,8 +158,8 @@ splitArgs args bnds = do
 
     getUnapp named =
       pure $ filter ((`notElem` ns) . fst) bnds2
-        where
-          ns = fst (unzip named)
+      where
+        ns = map fst named
 
     split [] = ([], [])
     split (Pos p : xs) =
@@ -190,152 +167,79 @@ splitArgs args bnds = do
     split (Named n v : xs) =
       let (ys, zs) = split xs in (ys, (n, v) : zs)
 
--- | right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
-mergeWith :: Object -> Object -> Object
-mergeWith xs ys =
-  let f a b
-        | hidden a && visible b = a
-        | otherwise = b
-      g name xs = fmap $
-        \case
-          TC rho e -> TC (M.insert name (mkThunk' $ VObj xs) rho) e
-          v@(TV {}) -> v
-      h name xs = fmap $
-        \case
-          TC rho e -> TC (insert' name (mkThunk' $ VObj xs) rho) e
-          v@(TV {}) -> v
-      xs' = H.map (g "self" zs') xs
-      ys' = H.map (g "self" zs' . h "super" xs') ys
-      zs' = H.unionWith f xs' ys'
-      insert' = M.insertWith (const)
-   in zs'
+whnfPrim :: Prim -> [Arg Value] -> Eval Value
+whnfPrim (UnyOp op) [Pos e] = whnfV e >>= whnfUnyOp op
+whnfPrim (BinOp LAnd) [Pos e1, Pos e2] = whnfLogical id e1 e2
+whnfPrim (BinOp LOr) [Pos e1, Pos e2] = whnfLogical not e1 e2
+whnfPrim (BinOp op) [Pos e1, Pos e2] =
+  liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry (whnfBinOp op)
+whnfPrim Cond [Pos c, Pos t, Pos e] = whnfCond c t e
 
-evalObj :: [KeyValue Core] -> Eval Value
-evalObj xs = mdo
-  rho <- view env
-  fs <-
-    catMaybes
-      <$> mapM
-        ( \(KeyValue key value) -> do
-            k <- evalKey key
-            v <- pure $ TC (M.insert "self" (self fs) rho) <$> value
-            case k of
-              Just k -> pure $ Just (k, v)
-              _ -> pure Nothing
-        )
-        xs
-  pure $ VObj $ H.fromList $ fs
-  where
-    self = mkThunk' . VObj . H.fromList
+whnfBinOp :: BinOp -> Value -> Value -> Eval Value
+whnfBinOp Lookup e1 e2 = whnfLookup e1 e2
+whnfBinOp Add x@(VStr _) y = inj <$> append x y
+whnfBinOp Add x y@(VStr _) = inj <$> append x y
+whnfBinOp Add x@(VArr _) y@(VArr _) = liftF2 ((V.++) @Value) x y
+whnfBinOp Add (VObj x) (VObj y) = x `mergeWith` y
+whnfBinOp Add n1 n2 = liftF2 ((+) @Double) n1 n2
+whnfBinOp Sub n1 n2 = liftF2 ((-) @Double) n1 n2
+whnfBinOp Mul n1 n2 = liftF2 ((*) @Double) n1 n2
+whnfBinOp Div (VNum _) (VNum 0) = throwE DivByZero
+whnfBinOp Div n1 n2 = liftF2 ((/) @Double) n1 n2
+whnfBinOp Mod (VNum _) (VNum 0) = throwE DivByZero
+whnfBinOp Mod n1 n2 = liftF2 (mod @Int64) n1 n2
+whnfBinOp Eq e1 e2 = inj <$> equals e1 e2
+whnfBinOp Ne e1 e2 = inj . not <$> equals e1 e2
+whnfBinOp Lt e1 e2 = liftF2 ((<) @Double) e1 e2
+whnfBinOp Gt e1 e2 = liftF2 ((>) @Double) e1 e2
+whnfBinOp Le e1 e2 = liftF2 ((<=) @Double) e1 e2
+whnfBinOp Ge e1 e2 = liftF2 ((>=) @Double) e1 e2
+whnfBinOp And e1 e2 = liftF2 ((.&.) @Int64) e1 e2
+whnfBinOp Or e1 e2 = liftF2 ((.|.) @Int64) e1 e2
+whnfBinOp Xor e1 e2 = liftF2 (xor @Int64) e1 e2
+whnfBinOp ShiftL e1 e2 = liftF2 (shiftL @Int64) e1 e2
+whnfBinOp ShiftR e1 e2 = liftF2 (shiftR @Int64) e1 e2
+whnfBinOp In s o = liftF2 (\o s -> objectHasEx o s True) o s
 
-evalKey :: Core -> Eval (Maybe Text)
-evalKey key =
-  eval key >>= \case
-    VStr k -> pure $ Just k
-    VNull -> pure Nothing
-    v -> throwInvalidKey v
-
-evalKeyValue :: KeyValue Core -> Eval (Maybe (Text, Hideable Thunk))
-evalKeyValue (KeyValue key value) = do
-  a <- evalKey key
-  b <- view env >>= \rho -> pure (TC rho <$> value)
-  pure $ (,b) <$> a
-
-evalArrComp ::
-  Core ->
-  Bind (Name Core) (Core, Maybe Core) ->
-  Eval Value
-evalArrComp cs bnd = do
-  xs <- comp
-  inj' flattenArrays $ VArr $ V.mapMaybe id xs
-  where
-    comp =
-      eval cs >>= \case
-        VArr xs -> forM xs $ \x -> do
-          (n, (e, cond)) <- unbind bnd
-          extendEnv' [(n, x)] $ do
-            b <- f cond
-            if b
-              then Just <$> thunk e
-              else pure Nothing
-        v -> throwTypeMismatch "array" v
-      where
-        f Nothing = pure True
-        f (Just c) = do
-          vb <- eval c
-          proj vb
-
-evalObjComp ::
-  Core ->
-  Bind (Name Core) (KeyValue Core, Maybe Core) ->
-  Eval Value
-evalObjComp cs bnd = do
-  xs <- comp
-  pure $ VObj $ H.fromList $ catMaybes $ V.toList xs
-  where
-    comp =
-      eval cs >>= \case
-        VArr xs -> forM xs $ \x -> do
-          (n, (e, cond)) <- unbind bnd
-          extendEnv' [(n, x)] $ do
-            b <- f cond
-            if b
-              then evalKeyValue e
-              else pure Nothing
-        v -> throwTypeMismatch "array" v
-    f Nothing = pure True
-    f (Just c) = do
-      vb <- eval c
-      proj vb
-
-evalUnyOp :: UnyOp -> Value -> Eval Value
-evalUnyOp Compl x = inj <$> fmap (complement @Int64) (proj x)
-evalUnyOp LNot x = inj <$> fmap not (proj x)
-evalUnyOp Minus x = inj <$> fmap (negate @Double) (proj x)
-evalUnyOp Plus x = inj <$> fmap (id @Double) (proj x)
-evalUnyOp Err x = (toString >=> throwE . RuntimeError . pretty) x
-
-evalBinOp :: BinOp -> Value -> Value -> Eval Value
-evalBinOp Add x@(VStr _) y = inj <$> append x y
-evalBinOp Add x y@(VStr _) = inj <$> append x y
-evalBinOp Add x@(VArr _) y@(VArr _) = evalBin ((V.++) @Thunk) x y
-evalBinOp Add (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
-evalBinOp Add n1 n2 = evalBin ((+) @Double) n1 n2
-evalBinOp Sub n1 n2 = evalBin ((-) @Double) n1 n2
-evalBinOp Mul n1 n2 = evalBin ((*) @Double) n1 n2
-evalBinOp Div (VNum _) (VNum 0) = throwE DivByZero
-evalBinOp Div n1 n2 = evalBin ((/) @Double) n1 n2
-evalBinOp Mod (VNum _) (VNum 0) = throwE DivByZero
-evalBinOp Mod n1 n2 = evalBin (mod @Int64) n1 n2
-evalBinOp Lt e1 e2 = evalBin ((<) @Double) e1 e2
-evalBinOp Gt e1 e2 = evalBin ((>) @Double) e1 e2
-evalBinOp Le e1 e2 = evalBin ((<=) @Double) e1 e2
-evalBinOp Ge e1 e2 = evalBin ((>=) @Double) e1 e2
-evalBinOp And e1 e2 = evalBin ((.&.) @Int64) e1 e2
-evalBinOp Or e1 e2 = evalBin ((.|.) @Int64) e1 e2
-evalBinOp Xor e1 e2 = evalBin (xor @Int64) e1 e2
-evalBinOp ShiftL e1 e2 = evalBin (shiftL @Int64) e1 e2
-evalBinOp ShiftR e1 e2 = evalBin (shiftR @Int64) e1 e2
-evalBinOp Lookup e1 e2 = evalLookup e1 e2
-evalBinOp In s o = evalBin (\o s -> Std.objectHasEx o s True) o s
-
-evalLogical f e1 e2 = do
-  x <- proj' e1
-  if (f x)
-    then inj <$> proj' @Bool e2
+whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
+whnfLogical f e1 e2 = do
+  x <- whnfV e1 >>= proj'
+  if f x
+    then inj <$> (whnfV e2 >>= proj' @Bool)
     else pure (inj x)
 
-evalLookup :: Value -> Value -> Eval Value
-evalLookup (VArr a) (VNum i)
+append :: Value -> Value -> Eval Text
+append v1 v2 = T.append <$> toString v1 <*> toString v2
+
+whnfUnyOp :: UnyOp -> Value -> Eval Value
+whnfUnyOp Compl x = inj <$> fmap (complement @Int64) (proj' x)
+whnfUnyOp LNot x = inj <$> fmap not (proj' x)
+whnfUnyOp Minus x = inj <$> fmap (negate @Double) (proj' x)
+whnfUnyOp Plus x = inj <$> fmap (id @Double) (proj' x)
+whnfUnyOp Err x = (toString >=> throwE . RuntimeError . pretty) x
+
+toString :: Value -> Eval Text
+toString (VStr s) = pure s
+toString v = toStrict . encodeToLazyText <$> manifest v
+
+whnfCond :: Value -> Value -> Value -> Eval Value
+whnfCond c e1 e2 = do
+  c' <- proj' c
+  if c'
+    then whnfV e1
+    else whnfV e2
+
+whnfLookup :: Value -> Value -> Eval Value
+whnfLookup (VObj o) (VStr s) =
+  whnfV . fieldValWHNF =<< liftMaybe (NoSuchKey (pretty s)) (H.lookup s o)
+whnfLookup (VArr a) (VNum i)
   | isInteger i =
-    liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i) >>= force
-evalLookup (VArr _) _ =
-  throwE (InvalidIndex $ "array index was not integer")
-evalLookup (VObj o) (VStr s) =
-  liftMaybe (NoSuchKey (pretty s)) (H.lookup s o)
-    >>= \(Hideable v _) -> force v
-evalLookup (VStr s) (VNum i) | isInteger i = do
-  liftMaybe (IndexOutOfBounds i) (f =<< bounded)
+    whnfV =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
+whnfLookup (VArr _) _ =
+  throwE (InvalidIndex "array index was not integer")
+whnfLookup (VStr s) (VNum i)
+  | isInteger i =
+    liftMaybe (IndexOutOfBounds i) (f =<< bounded)
   where
     f = pure . VStr . T.singleton . T.index s
     bounded =
@@ -343,40 +247,334 @@ evalLookup (VStr s) (VNum i) | isInteger i = do
         if T.length s - 1 < i' && i' < 0
           then Nothing
           else Just i'
-evalLookup (VStr _) _ =
-  throwE (InvalidIndex $ "string index was not integer")
-evalLookup v _ = throwTypeMismatch "array/object/string" v
+whnfLookup (VStr _) _ =
+  throwE (InvalidIndex "string index was not integer")
+whnfLookup v _ = throwTypeMismatch "array/object/string" v
 
-evalLiteral :: Literal -> Eval Value
-evalLiteral = \case
-  Null -> pure VNull
-  Bool b -> pure $ VBool b
-  String s -> pure $ VStr s
-  Number n -> pure $ VNum n
+whnfIndir :: Ref -> Eval Value
+whnfIndir ref = do
+  c <- liftIO $ readIORef ref
+  case c of
+    Cell v True ->
+      return v -- Already evaluated, just return it
+    Cell v False -> do
+      v' <- whnfV v -- Needs to be reduced
+      liftIO $ writeIORef ref (Cell v' True)
+      return v'
 
-evalBin ::
-  (HasValue a, HasValue b, HasValue c) =>
-  (a -> b -> c) ->
-  Value ->
-  Value ->
-  Eval Value
-evalBin = inj''
+whnfLetrec :: Let -> Eval Value
+whnfLetrec bnd = mdo
+  (r, e1) <- unbind bnd
+  bnds <-
+    M.fromList
+      <$> mapM
+        ( \(n, Embed e) -> do
+            v <- extendEnv bnds (mkValue e)
+            pure (n, v)
+        )
+        (unrec r)
+  extendEnv bnds (mkValue e1)
 
-append :: Value -> Value -> Eval Text
-append v1 v2 = T.append <$> toString v1 <*> toString v2
+whnfObj :: [CField] -> Eval Value
+whnfObj xs = mdo
+  obj <-
+    mkIndirV . VObj . H.fromList . catMaybes
+      =<< mapM
+        ( \field ->
+            let self = M.singleton (s2n "self") obj
+             in whnfField self field
+        )
+        xs
+  pure obj
 
-throwInvalidKey :: Value -> Eval a
-throwInvalidKey = throwE . InvalidKey . pretty . valueType
+whnfField ::
+  -- | self object
+  Env ->
+  -- |
+  CField ->
+  -- |
+  Eval (Maybe (Text, VField))
+whnfField self (CField k v h) = do
+  let fieldVis = h
+  fieldKey <- whnf k -- keys are strictly evaluated
+  fieldValWHNF <- extendEnv self (mkValue v)
+  fieldVal <- extendEnv self (mkThunk v)
+  fmap (,VField {..}) <$> proj' fieldKey
 
-toString :: Value -> Eval Text
-toString (VStr s) = pure s
-toString v = toStrict . encodeToLazyText <$> manifest v
-
-flattenArrays :: Vector (Vector Thunk) -> Vector Thunk
+flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
+
+whnfComp ::
+  Comp ->
+  Core ->
+  Eval Value
+whnfComp (ArrC bnd) cs = do
+  xs <- comp
+  liftF flattenArrays $ VArr $ V.mapMaybe id xs
+  where
+    comp =
+      whnf cs >>= \case
+        VArr xs -> forM xs $ \x -> do
+          (n, (e, cond)) <- unbind bnd
+          extendEnv (M.fromList [(n, x)]) $ do
+            b <- f cond
+            if b
+              then Just <$> mkValue e
+              else pure Nothing
+        v -> throwTypeMismatch "" v
+      where
+        f Nothing = pure True
+        f (Just c) = proj' =<< whnf c
+whnfComp (ObjC bnd) cs = do
+  xs <- comp
+  pure $ VObj $ H.fromList $ catMaybes $ V.toList xs
+  where
+    comp =
+      whnf cs >>= \case
+        VArr xs -> forM xs $ \x -> do
+          (n, (CField k v h, cond)) <- unbind bnd
+          extendEnv (M.fromList [(n, x)]) $ do
+            b <- f cond
+            if b
+              then do
+                fieldKey <- whnf k
+                fieldValWHNF <- mkValue v
+                fieldVal <- mkThunk v
+                let fieldVis = h
+                fmap (,VField {..}) <$> proj' fieldKey
+              else pure Nothing
+        v -> throwTypeMismatch "array" v
+    f Nothing = pure True
+    f (Just c) = proj' =<< whnf c
+
+-- | Right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
+--   with OO-like `self` and `super` support via value recursion (knot-tying)
+mergeWith :: Object -> Object -> Eval Value
+mergeWith xs ys = mdo
+  zs' <- mkIndirV $ VObj (H.unionWith f xs' ys')
+  xs' <- mapM (ref "self" zs') xs
+  ys' <- do
+    xs'' <- mkIndirV (VObj xs')
+    ys'' <- mapM (ref "self" zs') ys
+    mapM (ref "super" xs'') ys''
+  pure zs'
+  where
+    f a b
+      | hidden a && visible b = a
+      | otherwise = b
+    ref name xs f@VField {..} = case fieldVal of
+      VThunk c env -> do
+        let env' = M.insert name xs env
+        let fieldVal = VThunk c env'
+        fieldValWHNF <- mkIndirV fieldVal
+        pure VField {..}
+      _ -> pure f
+
+visibleKeys :: Object -> HashMap Text Value
+visibleKeys = H.mapMaybe f
+  where
+    f v@VField {..}
+      | not (hidden v) = Just fieldValWHNF
+      | otherwise = Nothing
 
 liftMaybe :: EvalError -> Maybe a -> Eval a
 liftMaybe e =
   \case
     Nothing -> throwE e
     Just a -> pure a
+
+manifest :: Value -> Eval JSON.Value
+manifest = \case
+  VNull -> pure JSON.Null
+  VBool b -> pure (JSON.Bool b)
+  VStr s -> pure (JSON.String s)
+  VNum n -> pure (JSON.Number n)
+  VObj vs -> JSON.Object <$> mapM manifest (visibleKeys vs)
+  VArr vs -> JSON.Array <$> mapM manifest vs
+  VClos {} -> throwE (ManifestError "function")
+  VFun _ -> throwE (ManifestError "function")
+  v@VThunk {} -> whnfV v >>= manifest
+  v@VIndir {} -> whnfV v >>= manifest
+  _ -> throwE (ManifestError "impossible")
+
+objectFieldsEx :: Object -> Bool -> [Text]
+objectFieldsEx o True = L.sort (H.keys o) -- all fields
+objectFieldsEx o False = L.sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
+
+objectHasEx :: Object -> Text -> Bool -> Bool
+objectHasEx o f all = f `elem` objectFieldsEx o all
+
+primitiveEquals :: Value -> Value -> Eval Bool
+primitiveEquals VNull VNull = pure True
+primitiveEquals (VBool a) (VBool b) = pure (a == b)
+primitiveEquals (VStr a) (VStr b) = pure (a == b)
+primitiveEquals (VNum a) (VNum b) = pure (a == b)
+primitiveEquals a b =
+  throwE
+    ( StdError $
+        text $
+          T.unpack $
+            "primitiveEquals operates on primitive types "
+            --  <> showTy a
+            --  <> showTy b
+    )
+
+equals :: Value -> Value -> Eval Bool
+equals e1 e2 = liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry go
+  where
+    go as@(VArr a) bs@(VArr b)
+      | P.length a == P.length b = do
+        as' <- proj' as
+        bs' <- proj' bs
+        allM (uncurry equals) (zip as' bs')
+      | P.length a /= P.length b = pure False
+    go (VObj a) (VObj b) = do
+      let fields = objectFieldsEx a False
+      if fields /= objectFieldsEx b False
+        then pure False
+        else allM objectFieldEquals fields
+      where
+        objectFieldEquals field =
+          let a' = fieldValWHNF (a H.! field)
+              b' = fieldValWHNF (b H.! field)
+           in equals a' b'
+    go a b = do
+      ta <- showTy a
+      tb <- showTy b
+      if ta == tb
+        then primitiveEquals a b
+        else pure False
+
+allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM p = foldrM (\a b -> (&& b) <$> p a) True
+
+-- better names?
+liftF ::
+  (HasValue a, HasValue b) =>
+  (a -> b) ->
+  (Value -> Eval Value)
+liftF f v = inj . f <$> proj' v
+{-# INLINE liftF #-}
+
+liftF2 ::
+  (HasValue a, HasValue b, HasValue c) =>
+  (a -> b -> c) ->
+  Value ->
+  Value ->
+  Eval Value
+liftF2 f v1 v2 = inj <$> liftA2 f (proj' v1) (proj' v2)
+{-# INLINE liftF2 #-}
+
+proj' :: HasValue a => Value -> Eval a
+proj' = whnfV >=> proj
+{-# INLINE proj' #-}
+
+throwTypeMismatch :: Text -> Value -> Eval a
+throwTypeMismatch e = throwE . TypeMismatch e <=< showTy
+
+showTy :: Value -> Eval Text
+showTy = \case
+  VNull -> pure "null"
+  VNum _ -> pure "number"
+  VBool _ -> pure "boolean"
+  VStr _ -> pure "string"
+  VObj _ -> pure "object"
+  VArr _ -> pure "array"
+  VClos {} -> pure "function"
+  VFun _ -> pure "function"
+  VPrim _ -> pure "function"
+  VThunk {} -> pure "thunk"
+  VIndir {} -> pure "pointer"
+
+--v@VThunk {} -> whnfV v >>= showTy
+--v@VIndir {} -> whnfV v >>= showTy
+
+instance HasValue Bool where
+  proj (VBool n) = pure n
+  proj v = throwTypeMismatch "bool" v
+  inj = VBool
+  {-# INLINE inj #-}
+
+instance HasValue Text where
+  proj (VStr s) = pure s
+  proj v = throwTypeMismatch "string" v
+  inj = VStr
+  {-# INLINE inj #-}
+
+instance {-# OVERLAPPING #-} HasValue [Char] where
+  proj (VStr s) = pure $ T.unpack s
+  proj v = throwTypeMismatch "string" v
+  inj = VStr . T.pack
+  {-# INLINE inj #-}
+
+instance HasValue ByteString where
+  proj (VStr s) = pure (encodeUtf8 s)
+  proj v = throwTypeMismatch "string" v
+  inj = VStr . decodeUtf8
+  {-# INLINE inj #-}
+
+instance HasValue Scientific where
+  proj (VNum n) = pure n
+  proj v = throwTypeMismatch "number" v
+  inj = VNum
+  {-# INLINE inj #-}
+
+instance HasValue Double where
+  proj (VNum n) = pure (toRealFloat n)
+  proj v = throwTypeMismatch "number" v
+  inj = VNum . fromFloatDigits
+  {-# INLINE inj #-}
+
+instance {-# OVERLAPS #-} Integral a => HasValue a where
+  proj (VNum n) = pure (round n)
+  proj v = throwTypeMismatch "number" v
+  inj = VNum . fromIntegral
+  {-# INLINE inj #-}
+
+instance HasValue a => HasValue (Maybe a) where
+  proj VNull = pure Nothing
+  proj a = Just <$> proj' a
+  inj Nothing = VNull
+  inj (Just a) = inj a
+  {-# INLINE inj #-}
+
+instance {-# OVERLAPS #-} HasValue Object where
+  proj (VObj o) = pure o
+  proj v = throwTypeMismatch "object" v
+  inj = VObj
+  {-# INLINE inj #-}
+
+instance HasValue a => HasValue (Vector a) where
+  proj (VArr as) = mapM proj' as
+  proj v = throwTypeMismatch "array" v
+  inj as = VArr (inj <$> as)
+  {-# INLINE inj #-}
+
+instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
+  proj = fmap V.toList . proj'
+  inj = inj . V.fromList
+  {-# INLINE inj #-}
+
+instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
+  inj f = VFun $ fmap (inj . f) . proj'
+  {-# INLINE inj #-}
+  proj = throwTypeMismatch "impossible"
+
+instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> c) where
+  inj f = inj $ \x -> inj (f x)
+  {-# INLINE inj #-}
+  proj = throwTypeMismatch "impossible"
+
+instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
+  inj f = VFun $ proj' >=> fmap inj . f
+  {-# INLINE inj #-}
+  proj (VFun f) = pure $ \x -> f (inj x) >>= proj'
+  proj (VClos f e) = pure $ \x -> proj =<< whnfClos e f [Pos (inj x)]
+  proj v = throwTypeMismatch "function" v
+
+instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
+  inj f = inj $ \x -> inj (f x)
+  {-# INLINE inj #-}
+  proj (VFun f) = pure $ \x y -> f (inj x) >>= \(VFun g) -> g (inj y) >>= proj'
+  proj (VClos f env) = pure $ \x y -> proj' =<< whnfClos env f [Pos (inj x), Pos (inj y)]
+  proj v = throwTypeMismatch "function" v

@@ -59,7 +59,7 @@ instance Lift BinOp where
 instance Lift UnyOp where
   lift = liftData
 
-instance Data a => Lift (Field a) where
+instance Data a => Lift (EField a) where
   lift = liftData
 
 instance Data a => Lift (Assert a) where
@@ -90,7 +90,7 @@ liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
 
 -- ouch: https://gitlab.haskell.org/ghc/ghc/-/issues/12596
 liftDataWithText :: Data a => a -> Q Exp
-liftDataWithText = dataToExpQ (\a -> liftText <$> cast a)
+liftDataWithText = dataToExpQ (fmap liftText . cast)
 
 parse :: FilePath -> Text -> Q Exp
 parse path str = do

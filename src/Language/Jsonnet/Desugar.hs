@@ -10,12 +10,14 @@
 
 module Language.Jsonnet.Desugar (desugar) where
 
+import qualified Data.Bifunctor
 import Data.Fix as F
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T (pack)
+import Debug.Trace
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
@@ -25,7 +27,6 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
 import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
 import Unbound.Generics.LocallyNameless
-import Debug.Trace
 
 class Desugarer a where
   desugar :: a -> Core
@@ -40,43 +41,39 @@ instance Desugarer (Ann ExprF SrcSpan) where
     where
       go (AnnF f (a, b)) = CLoc a (alg b f)
 
--- annotate nodes with a boolean denoting outermost objects
+-- | annotate nodes with a boolean denoting outermost objects
 zipWithOutermost :: Ann ExprF a -> Ann ExprF (a, Bool)
 zipWithOutermost = annZip . inherit go False
   where
-    go (Fix (AnnF (EObj {}) _)) False = (True, True)
-    go (Fix (AnnF (EObj {}) _)) True = (False, True)
+    go (Fix (AnnF EObj {} _)) False = (True, True)
+    go (Fix (AnnF EObj {} _)) True = (False, True)
     go _ x = (False, x)
 
 alg :: Bool -> ExprF Core -> Core
 alg outermost = \case
   ELit l -> CLit l
   EIdent i -> CVar (s2n i)
-  EFun ps e -> mkFun ps e
+  EFun ps e -> desugarFun ps e
   EApply e es -> CApp e es
-  ELocal bnds e -> mkLet bnds e
-  -- operator % is overloaded for both modulo and string formatting
+  ELocal bnds e -> desugarLet bnds e
   EBinOp Mod e1 e2 ->
+    -- operator % is overloaded for both modulo and string formatting
     stdFunc "mod" (Args [Pos e1, Pos e2] Lazy)
-  EBinOp Eq e1 e2 ->
-    stdFunc "equals" (Args [Pos e1, Pos e2] Lazy)
-  EBinOp Ne e1 e2 ->
-    mkUnyOp LNot (stdFunc "equals" (Args [Pos e1, Pos e2] Lazy))
-  EBinOp op e1 e2 -> mkBinOp op e1 e2
-  EUnyOp op e -> mkUnyOp op e
-  EIfElse c t e -> mkIfElse c t e
-  EIf c t -> mkIfElse c t (CLit Null)
+  EBinOp op e1 e2 -> desugarBinOp op e1 e2
+  EUnyOp op e -> desugarUnyOp op e
+  EIfElse c t e -> desugarIfElse c t e
+  EIf c t -> desugarIfElse c t (CLit Null)
   EArr e -> CArr e
-  EObj {..} -> mkObj outermost locals fields
-  ELookup e1 e2 -> mkLookup e1 e2
-  EIndex e1 e2 -> mkLookup e1 e2
-  EErr e -> mkErr e
-  EAssert e -> mkAssert e
-  ESlice {..} -> mkSlice expr start end step
-  EArrComp {expr, comp} -> mkArrComp expr comp
-  EObjComp {field, comp, locals} -> mkObjComp field comp locals
+  EObj {..} -> desugarObj outermost locals fields
+  ELookup e1 e2 -> desugarLookup e1 e2
+  EIndex e1 e2 -> desugarLookup e1 e2
+  EErr e -> desugarErr e
+  EAssert e -> desugarAssert e
+  ESlice {..} -> desugarSlice expr start end step
+  EArrComp {expr, comp} -> desugarArrComp expr comp
+  EObjComp {field, comp, locals} -> desugarObjComp field comp locals
 
-mkSlice expr start end step =
+desugarSlice expr start end step =
   stdFunc
     "slice"
     ( Args
@@ -90,69 +87,75 @@ mkSlice expr start end step =
   where
     maybeNull = fromMaybe (CLit Null)
 
-mkIfElse :: Core -> Core -> Core -> Core
-mkIfElse c t e = CApp (CPrim Cond) (Args [Pos c, Pos t, Pos e] Lazy)
+desugarIfElse :: Core -> Core -> Core -> Core
+desugarIfElse c t e = CApp (CPrim Cond) (Args [Pos c, Pos t, Pos e] Lazy)
 
-mkLookup :: Core -> Core -> Core
-mkLookup e1 e2 = CApp (CPrim (BinOp Lookup)) (Args [Pos e1, Pos e2] Lazy)
+desugarLookup :: Core -> Core -> Core
+desugarLookup e1 e2 = CApp (CPrim (BinOp Lookup)) (Args [Pos e1, Pos e2] Lazy)
 
-mkErr :: Core -> Core
-mkErr e = CApp (CPrim (UnyOp Err)) (Args [Pos e] Lazy)
+desugarErr :: Core -> Core
+desugarErr e = CApp (CPrim (UnyOp Err)) (Args [Pos e] Lazy)
 
-mkBinOp :: BinOp -> Core -> Core -> Core
-mkBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
+desugarBinOp :: BinOp -> Core -> Core -> Core
+desugarBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
 
-mkUnyOp :: UnyOp -> Core -> Core
-mkUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
+desugarUnyOp :: UnyOp -> Core -> Core
+desugarUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
 
-mkObj outermost locals fields =
-  --mkLet (("self", CObj fields) :| bnds) self
-  case bnds of
-    [] -> fs
-    xs -> mkLet (NE.fromList xs) fs
+desugarObj outermost locals fields = obj
   where
+    obj = CObj (desugarField <$> fields')
+
     bnds =
       if outermost
-        then (("$", fs) : locals)
+        then ("$", CVar "self") : locals
         else locals
-    fs = CObj (mkKeyValue <$> fields)
 
-mkAssert :: Assert Core -> Core
-mkAssert (Assert c m e) =
-  mkIfElse
+    f v@(CLit _) = v
+    f v@(CLoc _ (CLit _)) = v
+    f v = case bnds of
+      [] -> v
+      xs -> desugarLet (NE.fromList xs) v
+
+    fields' =
+      (\(EField key val v o) -> EField key (f val) v o) <$> fields
+
+desugarAssert :: Assert Core -> Core
+desugarAssert (Assert c m e) =
+  desugarIfElse
     c
     e
-    ( mkErr $
+    ( desugarErr $
         fromMaybe
           (CLit $ String "Assertion failed")
           m
     )
 
-mkArrComp :: Core -> NonEmpty (CompSpec Core) -> Core
-mkArrComp expr comp = foldr f (CArr [expr]) comp
+desugarArrComp :: Core -> NonEmpty (CompSpec Core) -> Core
+desugarArrComp expr = foldr f (CArr [expr])
   where
     f CompSpec {..} e =
       CComp (ArrC (bind (s2n var) (e, ifspec))) forspec
 
-mkKeyValue :: Field Core -> KeyValue Core
-mkKeyValue Field {..} = KeyValue key (Hideable value' visibility)
+desugarField :: EField Core -> CField
+desugarField EField {..} = mkField key value' visibility
   where
     value' =
       if override
         then
-          mkIfElse
-            (mkBinOp In key super)
-            (mkBinOp Add (mkLookup super key) value)
+          desugarIfElse
+            (desugarBinOp In key super)
+            (desugarBinOp Add (desugarLookup super key) value)
             value
         else value
     super = CVar $ s2n "super"
 
-mkObjComp (Field {..}) comp locals =
+desugarObjComp EField {..} comp locals =
   CComp (ObjC (bind (s2n "arr") (kv', Nothing))) arrComp
   where
     kv' =
-      mkKeyValue
-        ( Field
+      desugarField
+        ( EField
             { key = key',
               value = value',
               visibility,
@@ -160,38 +163,37 @@ mkObjComp (Field {..}) comp locals =
             }
         )
     bnds = NE.zip (fmap var comp) xs
-    key' = mkLet bnds key
+    key' = desugarLet bnds key
     value' = case locals of
-      [] -> mkLet bnds value
+      [] -> desugarLet bnds value
       -- we need to nest the let bindings due to the impl.
-      xs -> mkLet bnds $ mkLet (NE.fromList xs) value
-    xs = mkLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
-    arrComp = mkArrComp arr comp
+      xs -> desugarLet bnds $ desugarLet (NE.fromList xs) value
+    xs = desugarLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
+    arrComp = desugarArrComp arr comp
     arr = CArr $ NE.toList $ CVar . s2n . var <$> comp
 
 stdFunc :: Text -> Args Core -> Core
 stdFunc f =
   CApp
-    ( mkLookup
+    ( desugarLookup
         (CVar "std")
         (CLit $ String f)
     )
 
-mkFun ps e =
-  CFun $
-    Fun $
-      bind
-        ( rec $
-            fmap
-              ( \(n, a) ->
-                  (s2n n, Embed (fromMaybe (errNotBound n) a))
-              )
-              ps
-        )
-        e
+desugarFun ps e =
+  CLam $
+    bind
+      ( rec $
+          fmap
+            ( \(n, a) ->
+                (s2n n, Embed (fromMaybe (errNotBound n) a))
+            )
+            ps
+      )
+      e
   where
     errNotBound n =
-      mkErr $
+      desugarErr $
         CLit $
           String
             ( T.pack $
@@ -199,17 +201,15 @@ mkFun ps e =
                   pretty $ ParamNotBound (pretty n)
             )
 
-mkLet bnds e =
+desugarLet bnds e =
   CLet $
-    Let $
-      bind
-        ( rec $
-            toList
-              ( fmap
-                  ( \(n, a) ->
-                      (s2n n, Embed a)
-                  )
-                  bnds
-              )
-        )
-        e
+    bind
+      ( rec $
+          toList
+            ( fmap
+                ( Data.Bifunctor.bimap s2n Embed
+                )
+                bnds
+            )
+      )
+      e

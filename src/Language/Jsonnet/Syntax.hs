@@ -23,7 +23,7 @@ type Ident = String
 
 type Param a = (Ident, Maybe a)
 
-data Field a = Field
+data EField a = EField
   { key :: a,
     value :: a,
     visibility :: Visibility,
@@ -41,9 +41,9 @@ data Field a = Field
       Traversable
     )
 
-instance Alpha a => Alpha (Field a)
+instance Alpha a => Alpha (EField a)
 
-deriveShow1 ''Field
+deriveShow1 ''EField
 
 data ExprF a
   = ELit Literal
@@ -51,12 +51,16 @@ data ExprF a
   | EFun [Param a] a
   | EApply a (Args a)
   | ELocal
-      { bnds :: NonEmpty (Ident, a),
+      { -- | non-empty list of recursive bindings
+        bnds :: NonEmpty (Ident, a),
+        -- | body expression
         expr :: a
       }
   | EObj
-      { locals :: [(Ident, a)],
-        fields :: [Field a]
+      { -- |
+        locals :: [(Ident, a)],
+        -- |
+        fields :: [EField a]
         --asserts :: [Assert a]
       }
   | EArr [a]
@@ -67,20 +71,29 @@ data ExprF a
   | EIf a a
   | EIfElse a a a
   | ESlice
-      { expr :: a,
+      { -- |
+        expr :: a,
+        -- |
         start :: Maybe a,
+        -- |
         end :: Maybe a,
+        -- |
         step :: Maybe a
       }
   | EBinOp BinOp a a
   | EUnyOp UnyOp a
   | EArrComp
-      { expr :: a,
+      { -- |
+        expr :: a,
+        -- |
         comp :: NonEmpty (CompSpec a)
       }
   | EObjComp
-      { field :: Field a,
+      { -- |
+        field :: EField a,
+        -- |
         locals :: [(Ident, a)],
+        -- |
         comp :: NonEmpty (CompSpec a)
       }
   deriving
@@ -142,10 +155,24 @@ mkLookupF e = InL . ELookup e
 mkIndexF :: a -> a -> ExprF' a
 mkIndexF e = InL . EIndex e
 
-mkSliceF :: a -> Maybe a -> Maybe a -> Maybe a -> ExprF' a
+mkSliceF ::
+  -- |
+  a ->
+  -- |
+  Maybe a ->
+  -- |
+  Maybe a ->
+  -- |
+  Maybe a ->
+  ExprF' a
 mkSliceF e f g = InL . ESlice e f g
 
-mkObjectF :: [Field a] -> [(Ident, a)] -> ExprF' a
+mkObjectF ::
+  -- |
+  [EField a] ->
+  -- |
+  [(Ident, a)] ->
+  ExprF' a
 mkObjectF fs ls = InL $ EObj ls fs
 
 mkArrayF :: [a] -> ExprF' a
@@ -160,5 +187,12 @@ mkAssertF e m = InL . EAssert . Assert e m
 mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
 mkArrCompF e = InL . EArrComp e
 
-mkObjCompF :: Field a -> [(Ident, a)] -> NonEmpty (CompSpec a) -> ExprF' a
+mkObjCompF ::
+  -- |
+  EField a ->
+  -- |
+  [(Ident, a)] ->
+  -- |
+  NonEmpty (CompSpec a) ->
+  ExprF' a
 mkObjCompF f ls = InL . EObjComp f ls

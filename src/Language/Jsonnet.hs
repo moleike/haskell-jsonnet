@@ -4,6 +4,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.Jsonnet
   ( JsonnetM,
@@ -22,21 +23,25 @@ import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Functor.Identity
 import Data.Functor.Sum
+import qualified Data.Map.Lazy as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import qualified Data.Text.IO as T (readFile)
 import Debug.Trace
 import Language.Jsonnet.Annotate
 import qualified Language.Jsonnet.Check as Check
+import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
+import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Manifest (manifest)
+import Language.Jsonnet.Value
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
+import qualified Language.Jsonnet.Std.Lib as Lib
+import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
-import Language.Jsonnet.Value
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -56,8 +61,7 @@ newtype JsonnetM a = JsonnetM
     )
 
 data Config = Config
-  { fname :: FilePath,
-    stdlib :: Thunk
+  { fname :: FilePath
   }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
@@ -90,8 +94,14 @@ desugar = pure . Desugar.desugar
 -- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
-  --traceShowM expr
-  env <- singleton "std" <$> asks stdlib
-  JsonnetM $
-    lift $
-      runEval env ((eval >=> manifest) expr)
+  env <- singleton "std" <$> std
+  JsonnetM $ lift $ ExceptT $ runEvalM env (rnf expr)
+
+-- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
+--   the native (a small subset) with the interpreted (the splice mkStdlib)
+std :: JsonnetM Value
+std = JsonnetM $ lift $ ExceptT $ runEvalM M.empty stdlib
+  where
+    stdlib = whnf core >>= flip mergeObjects Lib.std
+    core = Desugar.desugar (annMap (const ()) $mkStdlib)
+    mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]

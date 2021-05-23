@@ -17,13 +17,12 @@ import Language.Jsonnet
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval (mergeWith)
 import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval
+import Language.Jsonnet.Value
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
-import Language.Jsonnet.Value
 import System.FilePath (replaceExtension, takeBaseName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
@@ -45,23 +44,13 @@ run conf = do
 goldenTests :: IO TestTree
 goldenTests = do
   jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
-  --let jsonnetFiles = ["/Users/alex/Development/jsonnet-hs/test/golden/error.array_large_index.jsonnet"]
-  stdlib <- mkThunk std
   return $
     testGroup
       "Jsonnet golden tests"
       [ goldenVsString
           (takeBaseName jsonnetFile) -- test name
           goldenFile -- golden file path
-          (run $ Config jsonnetFile stdlib)
+          (run $ Config jsonnetFile)
         | jsonnetFile <- jsonnetFiles,
           let goldenFile = replaceExtension jsonnetFile ".golden"
       ]
-
--- the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
--- the native (small, Haskell) with the interpreted (the splice mkStdlib)
-std :: Eval Value
-std = eval core >>= flip mergeObjects Lib.std
-  where
-    core = desugar (annMap (const ()) $mkStdlib)
-    mergeObjects (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)

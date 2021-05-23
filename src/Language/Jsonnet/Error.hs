@@ -5,8 +5,10 @@
 
 module Language.Jsonnet.Error where
 
+import Control.Exception
 import Data.Scientific (Scientific)
 import Data.Text (Text)
+import Data.Typeable (Typeable)
 import Data.Void (Void)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
@@ -39,7 +41,9 @@ data EvalError
   | StdError Doc
   | RuntimeError Doc
   | ManifestError Doc
-  deriving (Show)
+  deriving (Show, Typeable)
+
+instance Exception EvalError
 
 data ParserError
   = ParseError (ParseErrorBundle Text Void)

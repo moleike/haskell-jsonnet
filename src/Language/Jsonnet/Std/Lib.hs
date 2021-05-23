@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -10,6 +12,7 @@ module Language.Jsonnet.Std.Lib
   )
 where
 
+import Control.Lens (view)
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Aeson (FromJSON (..))
@@ -26,73 +29,55 @@ import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word
 import Language.Jsonnet.Common
-import Language.Jsonnet.Core (Fun (Fun), KeyValue (..))
+import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Parser.SrcSpan
+import Language.Jsonnet.Eval
 import Language.Jsonnet.Value
+import Language.Jsonnet.Parser.SrcSpan
 import System.FilePath.Posix (takeFileName)
 import Text.Megaparsec.Pos (SourcePos (..))
 import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
-import Control.Lens (view)
 
--- | The native subset of Jsonnet standard library
+-- | Jsonnet standard library built-in methods
 std :: Value
 std = VObj $ H.fromList $ map f xs
   where
-    f = \(k, v) -> (k, TV <$> Hideable v Hidden)
+    f = \(k, v) -> (k, VField (VStr k) v v Hidden)
     xs =
-      ("thisFile", inj <$> thisFile) :
-      map
-        (\(k, v) -> (k, pure v))
-        [ ("type", inj valueType),
-          ("primitiveEquals", inj primitiveEquals),
-          ("equals", inj equals),
-          ("length", inj length),
-          ("pow", inj ((^^) @Double @Int)),
-          ("exp", inj (exp @Double)),
-          ("log", inj (log @Double)),
-          ("exponent", inj (exponent @Double)),
-          ("mantissa", inj (significand @Double)),
-          ("floor", inj (floor @Double @Integer)),
-          ("ceil", inj (ceiling @Double @Integer)),
-          ("sqrt", inj (sqrt @Double)),
-          ("sin", inj (sin @Double)),
-          ("cos", inj (cos @Double)),
-          ("tan", inj (tan @Double)),
-          ("asin", inj (asin @Double)),
-          ("acos", inj (acos @Double)),
-          ("atan", inj (atan @Double)),
-          ("modulo", inj (mod @Integer)),
-          ("codepoint", inj (fromEnum . T.head)),
-          ("char", inj (T.singleton . toEnum)),
-          ("encodeUTF8", inj (B.unpack . T.encodeUtf8 :: Text -> [Word8])),
-          ("decodeUTF8", inj (T.decodeUtf8 . B.pack :: [Word8] -> Text)),
-          ("makeArray", inj makeArray),
-          ("filter", inj (filterM @Eval @Value)),
-          ("join", inj intercalate),
-          ("objectHasEx", inj objectHasEx),
-          ("objectFieldsEx", inj objectFieldsEx),
-          ("parseJson", inj (JSON.decodeStrict @Value))
-        ]
-
-primitiveEquals :: Value -> Value -> Eval Bool
-primitiveEquals VNull VNull = pure True
-primitiveEquals (VBool a) (VBool b) = pure (a == b)
-primitiveEquals (VStr a) (VStr b) = pure (a == b)
-primitiveEquals (VNum a) (VNum b) = pure (a == b)
-primitiveEquals a b =
-  throwE
-    ( StdError $
-        text $
-          T.unpack $
-            "primitiveEquals operates on primitive types "
-              <> valueType a
-              <> valueType b
-    )
+      [ ("type", inj showTy),
+        ("primitiveEquals", inj primitiveEquals),
+        ("equals", inj equals),
+        ("length", inj length),
+        ("pow", inj ((^^) @Double @Int)),
+        ("exp", inj (exp @Double)),
+        ("log", inj (log @Double)),
+        ("exponent", inj (exponent @Double)),
+        ("mantissa", inj (significand @Double)),
+        ("floor", inj (floor @Double @Integer)),
+        ("ceil", inj (ceiling @Double @Integer)),
+        ("sqrt", inj (sqrt @Double)),
+        ("sin", inj (sin @Double)),
+        ("cos", inj (cos @Double)),
+        ("tan", inj (tan @Double)),
+        ("asin", inj (asin @Double)),
+        ("acos", inj (acos @Double)),
+        ("atan", inj (atan @Double)),
+        ("modulo", inj (mod @Integer)),
+        ("codepoint", inj (fromEnum . T.head)),
+        ("char", inj (T.singleton . toEnum)),
+        ("encodeUTF8", inj (B.unpack . T.encodeUtf8 :: Text -> [Word8])),
+        ("decodeUTF8", inj (T.decodeUtf8 . B.pack :: [Word8] -> Text)),
+        ("makeArray", inj (makeArray @Eval)),
+        ("filter", inj (filterM @Eval @Value)),
+        ("join", inj intercalate),
+        ("objectHasEx", inj objectHasEx),
+        ("objectFieldsEx", inj objectFieldsEx),
+        ("parseJson", inj (JSON.decodeStrict @Value))
+      ]
 
 intercalate :: Value -> [Value] -> Eval Value
 intercalate sep arr = go sep (filter null arr)
@@ -103,40 +88,12 @@ intercalate sep arr = go sep (filter null arr)
     go sep@(VStr _) = app T.intercalate sep
     app f sep arr = inj <$> (f <$> proj sep <*> traverse proj arr)
 
-equals :: Value -> Value -> Eval Bool
-equals as@(VArr a) bs@(VArr b)
-  | P.length a == P.length b = do
-    as' <- proj as
-    bs' <- proj bs
-    allM (uncurry equals) (zip as' bs')
-  | P.length a /= P.length b = pure False
-equals (VObj a) (VObj b) = do
-  let fields = objectFieldsEx a False
-  if fields /= objectFieldsEx b False
-    then pure False
-    else allM objectFieldEquals fields
-  where
-    objectFieldEquals field = do
-      a' <- force (value $ a H.! field)
-      b' <- force (value $ b H.! field)
-      equals a' b'
-equals a b
-  | valueType a == valueType b = primitiveEquals a b
-equals _ _ = pure False
-
-objectFieldsEx :: Object -> Bool -> [Text]
-objectFieldsEx o True = L.sort (H.keys o) -- all fields
-objectFieldsEx o False = L.sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
-
-objectHasEx :: Object -> Text -> Bool -> Bool
-objectHasEx o f all = f `elem` objectFieldsEx o all
-
 length :: Value -> Eval Int
 length = \case
   VStr s -> pure $ T.length s
   VArr a -> pure $ P.length a
   VObj o -> pure $ P.length (H.keys o)
-  VClos (Fun f) _ -> do
+  VClos f _ -> do
     (ps, _) <- unbind f
     pure $ P.length (unrec ps)
   v ->
@@ -145,20 +102,11 @@ length = \case
           text $
             T.unpack $
               "length operates on strings, objects, functions and arrays, got "
-                <> valueType v
+              --   <> showTy v
       )
 
-makeArray :: Int -> (Int -> Eval Value) -> Eval (Vector Thunk)
-makeArray n f = traverse (mkThunk <$> f) (V.fromList [0 .. n - 1])
-
--- hacky way of returning the current file
-thisFile :: Eval (Maybe Text)
-thisFile = f <$> view currentPos
-  where
-    f = fmap (T.pack . takeFileName . sourceName . spanBegin)
-
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM p = foldrM (\a b -> (&& b) <$> p a) True
+makeArray :: Monad m => Int -> (Int -> m Value) -> m (Vector Value)
+makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 instance FromJSON Value where
   parseJSON = \case
@@ -166,13 +114,13 @@ instance FromJSON Value where
     JSON.Bool b -> pure $ VBool b
     JSON.Number n -> pure $ VNum n
     JSON.String s -> pure $ VStr s
-    JSON.Array a -> VArr <$> traverse (fmap mkThunk' . parseJSON) a
+    JSON.Array a -> VArr <$> traverse parseJSON a
     JSON.Object o -> VObj . f <$> traverse parseJSON o
     where
       f :: HashMap Text Value -> Object
       f o =
         H.fromList
-          [ (mkField k (mkThunk' v))
+          [ mkField k v
             | (k, v) <- H.toList o
           ]
-      mkField k v = (k, Hideable v Visible)
+      mkField k v = (k, VField (VStr k) v v Visible)

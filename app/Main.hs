@@ -22,11 +22,7 @@ import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval (mergeWith)
-import Language.Jsonnet.Eval.Monad
-import qualified Language.Jsonnet.Std.Lib as Lib
-import Language.Jsonnet.Std.TH (mkStdlib)
-import Language.Jsonnet.Value
+-- import Language.Jsonnet.Value
 import Options.Applicative
 import Paths_jsonnet (version)
 import Text.PrettyPrint.ANSI.Leijen (Pretty, pretty)
@@ -36,7 +32,10 @@ main = do
   runProgram =<< execParser options
   return ()
 
-runProgram :: Options -> IO ()
+runProgram ::
+  -- |
+  Options ->
+  IO ()
 runProgram opts@Options {..} = do
   src <- readSource input
   conf <- mkConfig opts
@@ -68,22 +67,12 @@ readSource = \case
   FileInput path -> TIO.readFile path
   ExecInput str -> pure (T.pack str)
 
--- the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
--- the native (a small subset) with the interpreted (the splice mkStdlib)
-
-std :: Eval Value
-std = eval core >>= flip mergeObjects Lib.std
-  where
-    core = desugar (annMap (const ()) $mkStdlib)
-    mergeObjects (VObj x) (VObj y) = pure $ VObj (x `mergeWith` y)
-
 mkConfig :: Options -> IO Config
 mkConfig Options {..} = do
   let fname = case input of
         Stdin -> ""
         FileInput path -> path
         ExecInput _ -> ""
-  stdlib <- mkThunk std
   pure Config {..}
 
 fileOutput :: Parser Output

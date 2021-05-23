@@ -1,9 +1,11 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module Language.Jsonnet.Core where
@@ -18,40 +20,45 @@ import Unbound.Generics.LocallyNameless
 
 type Param a = (Name a, Embed a)
 
-data KeyValue a = KeyValue a (Hideable a)
-  deriving (Show, Typeable, Generic)
+data CField = CField
+  { -- |
+    fieldKey :: Core,
+    -- |
+    fieldVal :: Core,
+    -- |
+    fieldVis :: Visibility
+  }
+  deriving (Show, Generic)
 
-instance Alpha a => Alpha (KeyValue a)
+mkField :: Core -> Core -> Visibility -> CField
+mkField = CField
 
-newtype Fun = Fun (Bind (Rec [Param Core]) Core)
-  deriving (Show, Typeable, Generic)
+--pattern CField k v h <- CField_ k _ v h
 
-instance Alpha Fun
-
-newtype Let
-  = Let (Bind (Rec [(Name Core, Embed Core)]) Core)
-  deriving (Show, Typeable, Generic)
-
-instance Alpha Let
+instance Alpha CField
 
 data Comp
   = ArrC (Bind (Name Core) (Core, Maybe Core))
-  | ObjC (Bind (Name Core) (KeyValue Core, Maybe Core))
+  | ObjC (Bind (Name Core) (CField, Maybe Core))
   deriving (Show, Typeable, Generic)
 
 instance Alpha Comp
 
-data Core
-  = CLoc SrcSpan Core
-  | CLit Literal
-  | CVar (Name Core)
-  | CFun Fun
-  | CPrim Prim
-  | CApp Core (Args Core)
-  | CLet Let
-  | CObj [KeyValue Core]
-  | CArr [Core]
-  | CComp Comp Core
+type Lam = Bind (Rec [Param Core]) Core
+
+type Let = Bind (Rec [(Name Core, Embed Core)]) Core
+
+data Core where
+  CLoc :: SrcSpan -> Core -> Core
+  CLit :: Literal -> Core
+  CVar :: Name Core -> Core
+  CLam :: Lam -> Core
+  CPrim :: Prim -> Core
+  CApp :: Core -> Args Core -> Core
+  CLet :: Let -> Core
+  CObj :: [CField] -> Core
+  CArr :: [Core] -> Core
+  CComp :: Comp -> Core -> Core
   deriving (Show, Typeable, Generic)
 
 instance Alpha Core

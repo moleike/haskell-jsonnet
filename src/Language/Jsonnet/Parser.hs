@@ -112,8 +112,7 @@ annotateLoc :: Parser (f a) -> Parser (AnnF f SrcSpan a)
 annotateLoc p = do
   begin <- getSourcePos
   res <- p
-  end <- getSourcePos
-  pure $ AnnF res $ SrcSpan begin end
+  AnnF res . SrcSpan begin <$> getSourcePos
 
 identifier :: Parser String
 identifier = do
@@ -172,7 +171,7 @@ verbatimString = char '@' *> (quoted (char '\'') <|> quoted (char '\"'))
     quoted c =
       c
         *> manyTill
-          ((c *> c) <|> anySingle)
+          (c *> c <|> anySingle)
           (try $ c <* notFollowedBy c)
 
 textBlock :: Parser String
@@ -239,8 +238,7 @@ assertP = Fix <$> annotateLoc assert
       cond <- keywordP "assert" *> exprP
       msg <- optional (colon *> exprP)
       _ <- symbol ";"
-      expr <- exprP
-      pure $ mkAssertF cond msg expr
+      mkAssertF cond msg <$> exprP
 
 ifElseP :: Parser Expr'
 ifElseP = Fix <$> annotateLoc ifElseExpr
@@ -301,8 +299,7 @@ localP = Fix <$> annotateLoc localExpr
     localExpr = do
       bnds <- localBndsP
       _ <- symbol ";"
-      expr <- exprP
-      pure $ mkLocalF bnds expr
+      mkLocalF bnds <$> exprP
 
 arrayP :: Parser Expr'
 arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
@@ -325,9 +322,9 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       key <- keyP
       (override, visibility) <-
         (,)
-          <$> option False ((symbol "+") $> True) <*> sepP
+          <$> option False (symbol "+" $> True) <*> sepP
       value <- exprP
-      pure $ Field {..}
+      pure $ EField {..}
     keyP = brackets exprP <|> unquoted <|> stringP
     methodP = do
       let override = False
@@ -335,11 +332,11 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       ps <- paramsP
       visibility <- sepP
       value <- function (pure ps) exprP
-      pure $ Field {..}
+      pure $ EField {..}
     sepP =
       try (symbol ":::" $> Forced)
         <|> try (symbol "::" $> Hidden)
-        <|> (symbol ":" $> Visible)
+        <|> symbol ":" $> Visible
     localP = do
       _ <- keywordP "local"
       try binding <|> localFunc
@@ -362,7 +359,7 @@ binary ::
 binary name f = InfixL (f <$ operator name)
   where
     operator sym = try $ symbol sym <* notFollowedBy opChar
-    opChar = oneOf (":~+&|^=<>*/%" :: [Char]) <?> "operator"
+    opChar = oneOf (":~+&|^=<>*/%" :: String) <?> "operator"
 
 prefix ::
   Text ->

@@ -43,7 +43,6 @@ library
     , Language.Jsonnet.Core
     , Language.Jsonnet.Check
     , Language.Jsonnet.Desugar
-    , Language.Jsonnet.Manifest
   autogen-modules:
       Paths_jsonnet
   other-modules:
@@ -86,11 +85,13 @@ library
 
 executable hs-jsonnet
   main-is: Main.hs
+  autogen-modules:
+      Paths_jsonnet
   other-modules:
       Paths_jsonnet
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     jsonnet,
     aeson                 >= 1.5.6 && < 1.6,
@@ -109,7 +110,7 @@ test-suite jsonnet-test
       Paths_jsonnet
   hs-source-dirs:
       test/golden
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
     , ansi-wl-pprint
