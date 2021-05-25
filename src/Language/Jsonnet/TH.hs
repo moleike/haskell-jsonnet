@@ -29,9 +29,6 @@ import Text.PrettyPrint.ANSI.Leijen (pretty)
 instance Data a => Lift (Arg a) where
   lift = liftData
 
-instance Data a => Lift (Hideable a) where
-  lift = liftData
-
 instance Lift SrcSpan where
   lift = liftData
 

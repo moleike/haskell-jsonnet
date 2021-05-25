@@ -15,6 +15,7 @@ import Control.Monad.Except
 import qualified Data.Aeson as JSON
 import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
+import Data.Traversable (for)
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.Foldable
@@ -352,17 +353,19 @@ whnfComp (ObjC bnd) cs = do
 mergeWith :: Object -> Object -> Eval Value
 mergeWith xs ys = mdo
   zs' <- mkIndirV $ VObj (H.unionWith f xs' ys')
-  xs' <- mapM (ref "self" zs') xs
+  xs' <- for xs (update self zs')
   ys' <- do
     xs'' <- mkIndirV (VObj xs')
-    ys'' <- mapM (ref "self" zs') ys
-    mapM (ref "super" xs'') ys''
+    ys'' <- for ys (update self zs')
+    for ys'' (update super xs'')
   pure zs'
   where
+    self = s2n "self"
+    super = s2n "super"
     f a b
       | hidden a && visible b = a
       | otherwise = b
-    ref name xs f@VField {..} = case fieldVal of
+    update name xs f@VField {..} = case fieldVal of
       VThunk c env -> do
         let env' = M.insert name xs env
         let fieldVal = VThunk c env'

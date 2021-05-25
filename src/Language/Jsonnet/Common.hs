@@ -6,6 +6,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Language.Jsonnet.Common where
 
@@ -169,7 +172,7 @@ data StackFrame a = StackFrame
   }
   deriving (Eq, Show)
 
-data Backtrace a = Backtrace [StackFrame a]
+newtype Backtrace a = Backtrace [StackFrame a]
   deriving (Eq, Show)
 
 data Visibility = Visible | Hidden | Forced
@@ -188,28 +191,3 @@ class HasVisibility a where
   visible :: a -> Bool
   forced :: a -> Bool
   hidden :: a -> Bool
-
-data Hideable a = Hideable {value :: a, visiblity :: Visibility}
-  deriving
-    ( Eq,
-      Read,
-      Show,
-      Generic,
-      Functor,
-      Foldable,
-      Traversable,
-      Typeable,
-      Data
-    )
-
-instance Alpha a => Alpha (Hideable a)
-
-instance HasVisibility (Hideable a) where
-  visible (Hideable _ Visible) = True
-  visible _ = False
-
-  forced (Hideable _ Forced) = True
-  forced _ = False
-
-  hidden (Hideable _ Hidden) = True
-  hidden _ = False

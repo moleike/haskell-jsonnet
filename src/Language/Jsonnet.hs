@@ -14,6 +14,7 @@ module Language.Jsonnet
     runJsonnetM,
     parse,
     evaluate,
+    desugar,
   )
 where
 
@@ -60,7 +61,7 @@ newtype JsonnetM a = JsonnetM
       MonadFail
     )
 
-data Config = Config
+newtype Config = Config
   { fname :: FilePath
   }
 
