@@ -35,14 +35,14 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import qualified Language.Jsonnet.Desugar as Desugar
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Value
+import Language.Jsonnet.Eval.Monad
 import qualified Language.Jsonnet.Parser as Parser
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
+import Language.Jsonnet.Value
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a

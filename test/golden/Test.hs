@@ -17,12 +17,12 @@ import Language.Jsonnet
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Value
+import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
+import Language.Jsonnet.Value
 import System.FilePath (replaceExtension, takeBaseName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)

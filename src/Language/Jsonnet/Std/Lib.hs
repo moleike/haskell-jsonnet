@@ -31,10 +31,10 @@ import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Value
+import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Parser.SrcSpan
+import Language.Jsonnet.Value
 import System.FilePath.Posix (takeFileName)
 import Text.Megaparsec.Pos (SourcePos (..))
 import Text.PrettyPrint.ANSI.Leijen (text)

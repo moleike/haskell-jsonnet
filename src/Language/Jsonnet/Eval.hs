@@ -15,7 +15,6 @@ import Control.Monad.Except
 import qualified Data.Aeson as JSON
 import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
-import Data.Traversable (for)
 import Data.Bits
 import Data.ByteString (ByteString)
 import Data.Foldable
@@ -31,6 +30,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
+import Data.Traversable (for)
 import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
 import Debug.Trace
@@ -38,8 +38,8 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Value
 import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Value
 import Text.PrettyPrint.ANSI.Leijen hiding (equals, (<$>))
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
@@ -109,6 +109,7 @@ withStackFrame (CLoc sp _) e =
 withStackFrame (CVar _) e = e
 --pushStackFrame (n, Nothing) e
 withStackFrame _ e = e
+
 --pushStackFrame (s2n "anonymous", Nothing) e
 
 whnfClos :: Env -> Lam -> [Arg Value] -> Eval Value
