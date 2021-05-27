@@ -8,6 +8,29 @@ A full-fledged Haskell implementation of the [Jsonnet][jsonnet] spec.
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
 We are using the same test suite used in the offical [C++][cpp-jsonnet] and [Go][go-jsonnet] implementation (which is fairly comprehensive).
 
+## Progress
+
+Here is the implementation status of the main language features:
+
+- [X] array and object comprehension
+- [X] array slices
+- [X] Python-style string formatting
+- [X] text blocks
+- [X] verbatim strings
+- [X] object-level locals
+- [ ] object-level asserts
+- [X] keyword parameters
+- [X] default arguments
+- [ ] top-level arguments
+- [ ] external variables
+- [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
+- [X] tailstrict annotation
+- [X] `self` keyword
+- [X] `super` keyword
+- [X] outermost object reference `$`
+- [X] mixin inheritence (operator `+`)
+- [X] field composition (operator `+:`)
+
 ## Build
 
 Using the [stack][stack] build tool:
@@ -96,31 +119,6 @@ std.manifestJsonEx(
 
 See the Standard library [documentation][stdlib] for more details.
 
-## Progress
-
-Here is the implementation status of the main language features:
-
-- [X] array and object comprehension
-- [X] array slices
-- [X] Python-style string formatting
-- [X] text blocks
-- [X] verbatim strings
-- [X] object-level locals
-- [ ] object-level asserts
-- [X] keyword parameters
-- [X] default arguments
-- [ ] top-level arguments
-- [ ] external variables
-- [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
-- [X] tailstrict annotation
-
-OO features are implemented but need some more work:
-
-- [X] `self` keyword
-- [X] `super` keyword
-- [X] outermost object reference `$`
-- [X] object composition (merging objects)
-- [X] field composition (`+:` field syntax)
 
 [//]: # "Implementation overview"
 
