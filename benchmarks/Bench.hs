@@ -36,6 +36,7 @@ main =
       bgroup
         "stdlib"
         [ bench "bench04" $ nfAppIO eval bench04
+        , bench "bench06" $ nfAppIO eval bench06
         ]
     ]
 
@@ -77,17 +78,36 @@ bench04 =
     std.foldl(function(e, res) e + res, std.makeArray(20000, function(i) 'aaaaa'), '')
   |]
 
+bench06 =
+  [jsonnet|
+    // A benchmark for builtin sort
+
+    local reverse = std.reverse;
+    local sort = std.sort;
+
+    true
+    && std.assertEqual(std.range(1, 500), sort(std.range(1, 500)))
+    && std.assertEqual(std.range(1, 1000), sort(std.range(1, 1000)))
+    && std.assertEqual(reverse(std.range(1, 1000)), sort(std.range(1, 1000), keyF=function(x) -x))
+    && std.assertEqual(std.range(1, 1000), sort(reverse(std.range(1, 1000))))
+    && std.assertEqual(std.makeArray(2000, function(i) std.floor((i + 2) / 2)), sort(std.range(1, 1000) + reverse(std.range(1, 1000))))
+  |]
+
 bench08 =
   [jsonnet|
-    local fibnext = {
-      a: super.a + super.b,
-      b: super.a,
-    };
     local fib(n) =
-      if n == 0 then
-        { a: 1, b: 1 }
-      else
-        fib(n - 1) + fibnext;
+      local fibnext = {
+        a: super.a + super.b,
+        b: super.a,
+      };
+
+      local go(n) =
+        if n == 0 then
+          { a: 1, b: 1 }
+        else
+          go(n - 1) + fibnext;
+
+      go(n).b;
 
     fib(25)
   |]
