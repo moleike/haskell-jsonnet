@@ -46,7 +46,6 @@ std.assertEqual(local A = { a1: 1, a2: self.a1, a3: A.a2 };
 std.assertEqual({ x: 1, y: self.x } + ({ x: 2 } + { x: 3, y: 5, z: super.y }), { x: 3, y: 5, z: 3 }) &&
 
 // multiple inheritance of empty middle
-
 std.assertEqual({ x: 1 } + ({} + { y: super.x }), { x: 1, y: 1 }) &&
 
 
@@ -74,7 +73,7 @@ std.assertEqual(e.c2, 1) &&
 std.assertEqual(e2.c2, 1) &&
 
 // $ is late-bound
-//std.assertEqual(({ x: 1, y: { a: $.x } } + { x: 2 }).y.a, 2) &&
+std.assertEqual(({ x: 1, y: { a: $.x } } + { x: 2 }).y.a, 2) &&
 
 // DAG
 //std.assertEqual({ x: 1, y: 2 } + (local A = { x: super.y, y: super.x }; A + A), { x: 1, y: 2 }) &&
