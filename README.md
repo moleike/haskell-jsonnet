@@ -25,11 +25,10 @@ Here is the implementation status of the main language features:
 - [ ] external variables
 - [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
 - [X] tailstrict annotation
-- [X] `self` keyword
-- [X] `super` keyword
 - [X] outermost object reference `$`
-- [X] mixin inheritence (operator `+`)
+- [X] mixin inheritence (operator `+` with `self` and `super`)
 - [X] field composition (operator `+:`)
+- [ ] multiple file output
 
 ## Build
 
