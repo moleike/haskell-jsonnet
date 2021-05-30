@@ -1,3 +1,14 @@
+{- |
+Module                  : Language.Jsonnet.Annotate
+Copyright               : (c) 2020-2021 Alexandre Moreno
+SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+Stability               : experimental
+Portability             : non-portable
+
+Annotated trees, based on fixplate
+
+-}
 {-# LANGUAGE PatternSynonyms #-}
 
 module Language.Jsonnet.Annotate where
@@ -6,9 +17,9 @@ import Control.Applicative (Const (..))
 import Data.Fix
 import Data.Functor.Product
 
--- | Annotated trees, based on fixplate
 type AnnF f a = Product (Const a) f
 
+-- | Annotated fixed-point type. Equivalent to CoFree f a
 type Ann f a = Fix (AnnF f a)
 
 pattern AnnF f a = Pair (Const a) f
@@ -25,7 +36,7 @@ attrib :: Ann f a -> a
 attrib (Fix (AnnF _ a)) = a
 
 inherit :: Functor f => (Fix f -> a -> (b, a)) -> a -> Fix f -> Ann f b
-inherit h root = go root
+inherit h = go
   where
     go p s@(Fix t) =
       let (b, a) =

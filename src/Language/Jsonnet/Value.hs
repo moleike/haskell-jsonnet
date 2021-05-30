@@ -1,3 +1,11 @@
+{- |
+Module                  : Language.Jsonnet.Value
+Copyright               : (c) 2020-2021 Alexandre Moreno
+SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+Stability               : experimental
+Portability             : non-portable
+-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -7,7 +15,6 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
--- |
 module Language.Jsonnet.Value where
 
 import Control.Lens (view)
