@@ -1,6 +1,6 @@
 cabal-version:  2.2
 name:           jsonnet
-version:        0.3.0.1
+version:        0.3.1.1
 synopsis:       Jsonnet implementaton in pure Haskell
 description:    Please see the README on GitHub at <https://github.com/moleike/jsonnet-haskell#readme>
 homepage:       https://github.com/moleike/haskell-jsonnet#readme
