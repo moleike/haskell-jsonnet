@@ -2,6 +2,7 @@
 
 [![Actions Status](https://github.com/moleike/haskell-jsonnet/workflows/build/badge.svg)](https://github.com/moleike/haskell-jsonnet/actions)
 [![Hackage](https://img.shields.io/hackage/v/jsonnet?style=flat)](https://hackage.haskell.org/package/jsonnet)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoleike%2Fhaskell-jsonnet.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoleike%2Fhaskell-jsonnet?ref=badge_shield)
 
 
 A full-fledged Haskell implementation of the [Jsonnet][jsonnet] spec.
@@ -156,3 +157,6 @@ Copyright © 2020–present Alexandre Moreno
 [go-jsonnet]: https://github.com/google/go-jsonnet
 [benchmark-gist]: https://gist.github.com/moleike/17d5de15be06b05ddad317fe1fcf95a5
 [stdlib]: https://jsonnet.org/ref/stdlib.html
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoleike%2Fhaskell-jsonnet.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoleike%2Fhaskell-jsonnet?ref=badge_large)
