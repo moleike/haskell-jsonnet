@@ -1,6 +1,6 @@
 cabal-version:  2.2
 name:           jsonnet
-version:        0.3.0.0
+version:        0.3.0.1
 synopsis:       Jsonnet implementaton in pure Haskell
 description:    Please see the README on GitHub at <https://github.com/moleike/jsonnet-haskell#readme>
 homepage:       https://github.com/moleike/haskell-jsonnet#readme
@@ -92,7 +92,7 @@ executable hs-jsonnet
       Paths_jsonnet
   hs-source-dirs:
       app
-  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       jsonnet,
       aeson,
@@ -111,7 +111,7 @@ test-suite jsonnet-test
       Paths_jsonnet
   hs-source-dirs:
       test/golden
-  ghc-options: -O2 -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
     , ansi-wl-pprint
