@@ -1,11 +1,3 @@
-{- |
-Module                  : Language.Jsonnet.Pretty
-Copyright               : (c) 2020-2021 Alexandre Moreno
-SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
--}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -13,6 +5,13 @@ Portability             : non-portable
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
+-- |
+-- Module                  : Language.Jsonnet.Pretty
+-- Copyright               : (c) 2020-2021 Alexandre Moreno
+-- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+-- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+-- Stability               : experimental
+-- Portability             : non-portable
 module Language.Jsonnet.Pretty where
 
 import qualified Data.Aeson as JSON

@@ -1,11 +1,3 @@
-{- |
-Module                  : Language.Jsonnet
-Copyright               : (c) 2020-2021 Alexandre Moreno
-SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
--}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -14,6 +6,13 @@ Portability             : non-portable
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- |
+-- Module                  : Language.Jsonnet
+-- Copyright               : (c) 2020-2021 Alexandre Moreno
+-- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+-- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+-- Stability               : experimental
+-- Portability             : non-portable
 module Language.Jsonnet
   ( JsonnetM,
     interpret,
@@ -51,6 +50,7 @@ import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
+import Data.Binary (decode)
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -112,5 +112,5 @@ std :: JsonnetM Value
 std = JsonnetM $ lift $ ExceptT $ runEvalM M.empty stdlib
   where
     stdlib = whnf core >>= flip mergeObjects Lib.std
-    core = Desugar.desugar (annMap (const ()) $mkStdlib)
+    core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]

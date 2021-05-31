@@ -1,14 +1,9 @@
-{- |
-Module                  : Language.Jsonnet.Core
-Copyright               : (c) 2020-2021 Alexandre Moreno
-SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
--}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTSyntax #-}
@@ -16,15 +11,25 @@ Portability             : non-portable
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
+-- |
+-- Module                  : Language.Jsonnet.Core
+-- Copyright               : (c) 2020-2021 Alexandre Moreno
+-- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+-- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+-- Stability               : experimental
+-- Portability             : non-portable
 module Language.Jsonnet.Core where
 
+import Data.Binary (Binary)
 import Data.Data (Data)
-import Data.String
+import Data.String ( IsString(..) )
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import Language.Jsonnet.Common
-import Language.Jsonnet.Parser.SrcSpan
+import Language.Jsonnet.Common ( Args, Prim, Literal, Visibility )
+import Language.Jsonnet.Parser.SrcSpan ( SrcSpan )
+import Text.Megaparsec.Pos (Pos, SourcePos)
 import Unbound.Generics.LocallyNameless
+    ( string2Name, Bind, Rec, Embed, Name, Alpha )
 
 type Param a = (Name a, Embed a)
 
@@ -36,21 +41,34 @@ data CField = CField
     -- |
     fieldVis :: Visibility
   }
-  deriving (Show, Generic)
+  deriving
+    ( Show,
+      Generic,
+      Alpha,
+      Binary
+    )
 
 mkField :: Core -> Core -> Visibility -> CField
 mkField = CField
 
---pattern CField k v h <- CField_ k _ v h
+instance Binary a => Binary (Name a)
 
-instance Alpha CField
+instance Binary a => Binary (Rec a)
+
+instance Binary a => Binary (Embed a)
+
+instance (Binary a, Binary b) => Binary (Bind a b)
 
 data Comp
   = ArrC (Bind (Name Core) (Core, Maybe Core))
   | ObjC (Bind (Name Core) (CField, Maybe Core))
-  deriving (Show, Typeable, Generic)
-
-instance Alpha Comp
+  deriving
+    ( Show,
+      Typeable,
+      Generic,
+      Alpha,
+      Binary
+    )
 
 type Lam = Bind (Rec [Param Core]) Core
 
@@ -67,9 +85,13 @@ data Core where
   CObj :: [CField] -> Core
   CArr :: [Core] -> Core
   CComp :: Comp -> Core -> Core
-  deriving (Show, Typeable, Generic)
-
-instance Alpha Core
+  deriving
+    ( Show,
+      Typeable,
+      Generic,
+      Alpha,
+      Binary
+    )
 
 --data Params
 --  = EmptyPs

@@ -1,11 +1,3 @@
-{- |
-Module                  : Language.Jsonnet.Common
-Copyright               : (c) 2020-2021 Alexandre Moreno
-SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
--}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -18,8 +10,16 @@ Portability             : non-portable
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+-- |
+-- Module                  : Language.Jsonnet.Common
+-- Copyright               : (c) 2020-2021 Alexandre Moreno
+-- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+-- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+-- Stability               : experimental
+-- Portability             : non-portable
 module Language.Jsonnet.Common where
 
+import Data.Binary (Binary)
 import Data.Data (Data)
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
@@ -42,6 +42,8 @@ data Literal
 
 makeClosedAlpha ''Literal
 
+instance Binary Literal
+
 instance Subst a Literal where
   subst _ _ = id
   substs _ = id
@@ -53,6 +55,8 @@ data Prim
   deriving (Show, Eq, Generic, Typeable, Data)
 
 instance Alpha Prim
+
+instance Binary Prim
 
 data BinOp
   = Add
@@ -79,6 +83,8 @@ data BinOp
 
 instance Alpha BinOp
 
+instance Binary BinOp
+
 data UnyOp
   = Compl
   | LNot
@@ -89,10 +95,14 @@ data UnyOp
 
 instance Alpha UnyOp
 
+instance Binary UnyOp
+
 data Strictness = Strict | Lazy
   deriving (Eq, Read, Show, Generic, Typeable, Data)
 
 instance Alpha Strictness
+
+instance Binary Strictness
 
 data Arg a = Pos a | Named String a
   deriving
@@ -111,6 +121,8 @@ data Arg a = Pos a | Named String a
 deriveShow1 ''Arg
 
 instance Alpha a => Alpha (Arg a)
+
+instance Binary a => Binary (Arg a)
 
 data Args a = Args
   { args :: [Arg a],
@@ -131,6 +143,8 @@ data Args a = Args
 deriveShow1 ''Args
 
 instance Alpha a => Alpha (Args a)
+
+instance Binary a => Binary (Args a)
 
 data Assert a = Assert
   { cond :: a,
@@ -194,6 +208,8 @@ data Visibility = Visible | Hidden | Forced
     )
 
 instance Alpha Visibility
+
+instance Binary Visibility
 
 class HasVisibility a where
   visible :: a -> Bool

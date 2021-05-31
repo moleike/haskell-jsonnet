@@ -1,11 +1,3 @@
-{- |
-Module                  : Language.Jsonnet.Syntax
-Copyright               : (c) 2020-2021 Alexandre Moreno
-SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
--}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -13,6 +5,13 @@ Portability             : non-portable
 {-# LANGUAGE OverloadedLabels #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- |
+-- Module                  : Language.Jsonnet.Syntax
+-- Copyright               : (c) 2020-2021 Alexandre Moreno
+-- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+-- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+-- Stability               : experimental
+-- Portability             : non-portable
 module Language.Jsonnet.Syntax where
 
 import Control.Applicative (Const (..))
