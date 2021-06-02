@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTSyntax #-}
@@ -18,14 +17,20 @@ module Language.Jsonnet.Core where
 
 import Data.Binary (Binary)
 import Data.Data (Data)
-import Data.String ( IsString(..) )
+import Data.String (IsString (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import Language.Jsonnet.Common ( Args, Prim, Literal, Visibility )
-import Language.Jsonnet.Parser.SrcSpan ( SrcSpan )
+import Language.Jsonnet.Common (Args, Literal, Prim, Visibility)
+import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 import Text.Megaparsec.Pos (Pos, SourcePos)
 import Unbound.Generics.LocallyNameless
-    ( string2Name, Bind, Rec, Embed, Name, Alpha )
+  ( Alpha,
+    Bind,
+    Embed,
+    Name,
+    Rec,
+    string2Name,
+  )
 
 type Param a = (Name a, Embed a)
 

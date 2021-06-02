@@ -29,6 +29,7 @@ import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
+import Data.Binary (decode)
 import Data.Functor.Identity
 import Data.Functor.Sum
 import qualified Data.Map.Lazy as M
@@ -50,7 +51,6 @@ import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
-import Data.Binary (decode)
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
