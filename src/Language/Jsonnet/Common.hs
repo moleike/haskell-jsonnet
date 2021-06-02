@@ -1,4 +1,5 @@
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -37,11 +38,17 @@ data Literal
   | Bool Bool
   | String Text
   | Number Scientific
-  deriving (Show, Eq, Ord, Generic, Typeable, Data)
+  deriving
+    ( Show,
+      Eq,
+      Ord,
+      Generic,
+      Typeable,
+      Data,
+      Binary
+    )
 
 makeClosedAlpha ''Literal
-
-instance Binary Literal
 
 instance Subst a Literal where
   subst _ _ = id
@@ -51,11 +58,15 @@ data Prim
   = UnyOp UnyOp
   | BinOp BinOp
   | Cond
-  deriving (Show, Eq, Generic, Typeable, Data)
-
-instance Alpha Prim
-
-instance Binary Prim
+  deriving
+    ( Show,
+      Eq,
+      Generic,
+      Typeable,
+      Data,
+      Alpha,
+      Binary
+    )
 
 data BinOp
   = Add
@@ -78,11 +89,15 @@ data BinOp
   | LOr
   | In
   | Lookup
-  deriving (Show, Eq, Generic, Typeable, Data)
-
-instance Alpha BinOp
-
-instance Binary BinOp
+  deriving
+    ( Show,
+      Eq,
+      Generic,
+      Typeable,
+      Data,
+      Alpha,
+      Binary
+    )
 
 data UnyOp
   = Compl
@@ -90,18 +105,28 @@ data UnyOp
   | Plus
   | Minus
   | Err
-  deriving (Show, Eq, Generic, Typeable, Data)
-
-instance Alpha UnyOp
-
-instance Binary UnyOp
+  deriving
+    ( Eq,
+      Show,
+      Read,
+      Generic,
+      Typeable,
+      Data,
+      Alpha,
+      Binary
+    )
 
 data Strictness = Strict | Lazy
-  deriving (Eq, Read, Show, Generic, Typeable, Data)
-
-instance Alpha Strictness
-
-instance Binary Strictness
+  deriving
+    ( Eq,
+      Show,
+      Read,
+      Generic,
+      Typeable,
+      Data,
+      Alpha,
+      Binary
+    )
 
 data Arg a = Pos a | Named String a
   deriving
@@ -114,14 +139,12 @@ data Arg a = Pos a | Named String a
       Generic1,
       Functor,
       Foldable,
-      Traversable
+      Traversable,
+      Alpha,
+      Binary
     )
 
 deriveShow1 ''Arg
-
-instance Alpha a => Alpha (Arg a)
-
-instance Binary a => Binary (Arg a)
 
 data Args a = Args
   { args :: [Arg a],
@@ -136,14 +159,12 @@ data Args a = Args
       Generic,
       Functor,
       Foldable,
-      Traversable
+      Traversable,
+      Alpha,
+      Binary
     )
 
 deriveShow1 ''Args
-
-instance Alpha a => Alpha (Args a)
-
-instance Binary a => Binary (Args a)
 
 data Assert a = Assert
   { cond :: a,
@@ -159,16 +180,18 @@ data Assert a = Assert
       Generic,
       Functor,
       Foldable,
-      Traversable
+      Traversable,
+      Alpha
     )
-
-instance Alpha a => Alpha (Assert a)
 
 deriveShow1 ''Assert
 
 data CompSpec a = CompSpec
-  { var :: String,
+  { -- |
+    var :: String,
+    -- |
     forspec :: a,
+    -- |
     ifspec :: Maybe a
   }
   deriving
@@ -180,12 +203,11 @@ data CompSpec a = CompSpec
       Generic,
       Functor,
       Foldable,
-      Traversable
+      Traversable,
+      Alpha
     )
 
 deriveShow1 ''CompSpec
-
-instance Alpha a => Alpha (CompSpec a)
 
 data StackFrame a = StackFrame
   { name :: Name a,
@@ -203,12 +225,10 @@ data Visibility = Visible | Hidden | Forced
       Show,
       Generic,
       Typeable,
-      Data
+      Data,
+      Alpha,
+      Binary
     )
-
-instance Alpha Visibility
-
-instance Binary Visibility
 
 class HasVisibility a where
   visible :: a -> Bool
