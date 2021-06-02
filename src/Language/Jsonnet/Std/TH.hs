@@ -1,6 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 -- |
 -- Module                  : Language.Jsonnet.Std.TH
 -- Copyright               : (c) 2020-2021 Alexandre Moreno

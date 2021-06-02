@@ -1,10 +1,5 @@
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -18,10 +13,8 @@ module Language.Jsonnet.Value where
 
 import Control.Lens (view)
 import Control.Monad.Except
-import Control.Monad.Reader
 import Data.HashMap.Lazy (HashMap)
 import Data.IORef
-import Data.Map.Lazy (Map)
 import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
@@ -30,7 +23,6 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
-import Unbound.Generics.LocallyNameless
 
 type Eval = EvalM Value
 
