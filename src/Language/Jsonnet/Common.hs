@@ -21,16 +21,13 @@ module Language.Jsonnet.Common where
 
 import Data.Binary (Binary)
 import Data.Data (Data)
-import Data.Functor.Classes
-import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
-import Data.String
 import Data.Text (Text)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
-import Language.Jsonnet.Parser.SrcSpan
-import Text.Show.Deriving
-import Unbound.Generics.LocallyNameless
+import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
+import Text.Show.Deriving (deriveShow1)
+import Unbound.Generics.LocallyNameless (Alpha (..), Name)
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
 data Literal
@@ -49,10 +46,6 @@ data Literal
     )
 
 makeClosedAlpha ''Literal
-
-instance Subst a Literal where
-  subst _ _ = id
-  substs _ = id
 
 data Prim
   = UnyOp UnyOp
