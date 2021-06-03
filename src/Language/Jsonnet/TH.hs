@@ -27,7 +27,7 @@ import qualified Data.Text as T
 import Instances.TH.Lift ()
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
-import Language.Jsonnet.Annotate (annMap)
+import Language.Jsonnet.Annotate (forget)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Desugar
@@ -98,21 +98,6 @@ liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
 liftDataWithText :: Data a => a -> Q Exp
 liftDataWithText = dataToExpQ (fmap liftText . cast)
 
-parse :: FilePath -> Text -> Q Exp
-parse path str = do
-  res <-
-    runIO $
-      parse' str >>= \case
-        Left err -> fail (show $ pretty err)
-        Right res -> pure res
-  liftDataWithText res
-  where
-    parse' =
-      runExceptT
-        . ( Parser.parse path
-              >=> Parser.resolveImports path
-          )
-
 parse0 :: FilePath -> Text -> Q Expr
 parse0 path str = do
   parse' str >>= \case
@@ -125,10 +110,18 @@ parse0 path str = do
               >=> Parser.resolveImports path
           )
 
--- | compiles a Jsonnet program down to a Core expression stripped of
---   annotations
+parse :: FilePath -> Text -> Q Exp
+parse path str =
+  parse0 path str
+    >>= liftDataWithText
+
+-- | compiles a Jsonnet program down to a binary-encoded Core expression
+--   with source spans stripped out. This is currently useful to preload
+--   the std library and have a faster startup
 compile :: FilePath -> Text -> Q Exp
-compile path str = do
-  ast <- parse0 path str
-  let core = desugar (annMap (const ()) ast)
-  lift $ encode core
+compile path str =
+  parse0 path str
+    >>= lift
+      . encode
+      . desugar
+      . forget
