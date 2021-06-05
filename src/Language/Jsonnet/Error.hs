@@ -27,6 +27,8 @@ data Error
   | EvalError EvalError (Backtrace Core)
   deriving (Show)
 
+instance Exception Error
+
 data EvalError
   = TypeMismatch
       { expected :: Text,

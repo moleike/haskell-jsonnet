@@ -96,18 +96,15 @@ bench06 =
 bench08 =
   [jsonnet|
     local fib(n) =
-      local fibnext = {
-        a: super.a + super.b,
-        b: super.a,
-      };
-
       local go(n) =
-        if n == 0 then
-          { a: 1, b: 1 }
+        if n <= 1 then
+          { ['fib0']: 1, ['fib1']: 1 }
         else
-          go(n - 1) + fibnext;
+          go(n - 1) {
+            ['fib'+n]: super['fib'+(n-1)] + super['fib'+(n-2)]
+          };
 
-      go(n).b;
+      go(n)['fib'+n];
 
     fib(25)
   |]

@@ -15,12 +15,8 @@ module Language.Jsonnet.Eval.Monad where
 import Control.Lens (locally, makeLenses, view)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
-  ( ExceptT (..),
-    MonadError (throwError),
-    MonadFix,
-    MonadIO,
-    runExceptT,
-  )
+import Control.Monad.Fix (MonadFix)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..))
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M (union)
@@ -29,12 +25,8 @@ import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Error (Error (EvalError), EvalError)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 import Unbound.Generics.LocallyNameless
-  ( Fresh,
-    FreshMT,
-    Name,
-    runFreshMT,
-    s2n,
-  )
+import Unbound.Generics.LocallyNameless.Name
+import Data.IORef
 
 type Ctx a = Map (Name Core) a
 
@@ -57,13 +49,15 @@ data EvalState a = EvalState
     -- | call-stack simulation
     _callStack :: CallStack,
     -- | source span of expression being evaluated
-    _currentPos :: Maybe SrcSpan
+    _currentPos :: Maybe SrcSpan,
+    -- | fresh names
+    _gen :: IORef Integer
   }
 
 makeLenses ''EvalState
 
 newtype EvalM a b = EvalM
-  { unEval :: ExceptT Error (ReaderT (EvalState a) (FreshMT IO)) b
+  { unEval :: ExceptT Error (ReaderT (EvalState a) IO) b
   }
   deriving
     ( Functor,
@@ -76,14 +70,22 @@ newtype EvalM a b = EvalM
       MonadCatch,
       MonadMask,
       MonadFail,
-      MonadFix,
-      Fresh
+      MonadFix
     )
 
+instance Fresh (EvalM a) where
+  fresh (Fn s _) = EvalM $ do
+    ref <- view gen
+    n <- liftIO $ readIORef ref
+    liftIO $ modifyIORef ref (+ 1)
+    return $ (Fn s n)
+  fresh nm@(Bn {}) = return nm
+
 runEvalM :: Ctx a -> EvalM a b -> IO (Either Error b)
-runEvalM ctx e = runFreshMT (runReaderT (runExceptT (unEval e)) st)
-  where
-    st = EvalState ctx emptyStack Nothing
+runEvalM ctx e = do
+  gen <- newIORef 0
+  let st = EvalState ctx emptyStack Nothing gen
+  (`runReaderT` st) (runExceptT (unEval e))
 
 throwE :: EvalError -> EvalM a b
 throwE e = throwError . EvalError e =<< getBacktrace

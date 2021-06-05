@@ -16,13 +16,11 @@
 module Language.Jsonnet.Core where
 
 import Data.Binary (Binary)
-import Data.Data (Data)
 import Data.String (IsString (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
 import Language.Jsonnet.Common (Args, Literal, Prim, Visibility)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Text.Megaparsec.Pos (Pos, SourcePos)
 import Unbound.Generics.LocallyNameless
   ( Alpha,
     Bind,
