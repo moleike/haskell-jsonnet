@@ -1,7 +1,7 @@
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE TemplateHaskell            #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Eval.Monad
@@ -12,28 +12,33 @@
 -- Portability             : non-portable
 module Language.Jsonnet.Eval.Monad where
 
-import Control.Lens (locally, makeLenses, view)
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
-import Control.Monad.Except
-import Control.Monad.Fix (MonadFix)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ReaderT (..))
-import Data.Map.Lazy (Map)
-import qualified Data.Map.Lazy as M (union)
-import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
-import Language.Jsonnet.Core (Core)
-import Language.Jsonnet.Error (Error (EvalError), EvalError)
-import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Name
-import Data.IORef
+import           Control.Lens                          (locally, makeLenses,
+                                                        view)
+import           Control.Monad.Catch                   (MonadCatch, MonadMask,
+                                                        MonadThrow)
+import           Control.Monad.Except
+import           Control.Monad.Fix                     (MonadFix)
+import           Control.Monad.IO.Class                (MonadIO, liftIO)
+import           Control.Monad.Reader                  (MonadReader,
+                                                        ReaderT (..))
+import           Data.IORef
+import           Data.Map.Lazy                         (Map)
+import qualified Data.Map.Lazy                         as M (union)
+import           Language.Jsonnet.Common               (Backtrace (..),
+                                                        StackFrame (..))
+import           Language.Jsonnet.Core                 (Core)
+import           Language.Jsonnet.Error                (Error (EvalError),
+                                                        EvalError)
+import           Language.Jsonnet.Parser.SrcSpan       (SrcSpan)
+import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Name
 
 type Ctx a = Map (Name Core) a
 
 -- | Simulate a call-stack to report stack traces
 data CallStack = CallStack
   { -- | source location of call-sites
-    _spans :: [Maybe SrcSpan],
+    _spans  :: [Maybe SrcSpan],
     -- | names of called functions
     _scopes :: [Name Core]
   }
@@ -45,13 +50,13 @@ emptyStack = CallStack [] [s2n "top-level"]
 
 data EvalState a = EvalState
   { -- | binding local variables to their values
-    _ctx :: Ctx a,
+    _ctx        :: Ctx a,
     -- | call-stack simulation
-    _callStack :: CallStack,
+    _callStack  :: CallStack,
     -- | source span of expression being evaluated
     _currentPos :: Maybe SrcSpan,
     -- | fresh names
-    _gen :: IORef Integer
+    _gen        :: IORef Integer
   }
 
 makeLenses ''EvalState
