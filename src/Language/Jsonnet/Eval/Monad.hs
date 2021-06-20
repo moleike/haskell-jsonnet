@@ -77,7 +77,7 @@ instance Fresh (EvalM a) where
   fresh (Fn s _) = EvalM $ do
     ref <- view gen
     n <- liftIO $ readIORef ref
-    liftIO $ modifyIORef ref (+ 1)
+    liftIO $ modifyIORef' ref (+ 1)
     return $ (Fn s n)
   fresh nm@(Bn {}) = return nm
 
