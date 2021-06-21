@@ -56,7 +56,7 @@ library
       bytestring                    >= 0.10.12 && < 0.11,
       containers                    >= 0.6.2 && < 0.7,
       scientific                    >= 0.3.7 && < 0.4,
-      hashable                      >= 1.3.2 && < 1.4,
+      hashable                      >= 1.3.0.0 && < 1.4,
       text                          >= 1.2.4 && < 1.3,
       template-haskell              >= 2.16.0 && < 2.18,
       data-fix                      >= 0.3.1 && < 0.4,
@@ -72,9 +72,9 @@ library
       lens                          >= 5.0.1 && < 5.1,
       semigroupoids                 >= 5.3.5 && < 5.4,
       megaparsec                    >= 9.0.1 && < 9.1,
-      parser-combinators            >= 1.3.0 && < 1.4,
+      parser-combinators            >= 1.2.1 && < 1.4,
       unbound-generics              >= 0.4.1 && < 0.5,
-      th-utilities                  == 0.2.4.2,
+      th-utilities                  >= 0.2.4.2,
       binary                        >= 0.8.8 && < 0.9,
       th-lift-instances             >= 0.1.18 && < 0.2
 
