@@ -40,6 +40,7 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
 
+ppNumber :: Scientific -> Doc ann
 ppNumber s
   | e < 0 || e > 1024 =
     pretty $
@@ -53,7 +54,7 @@ ppNumber s
 ppJson :: Int -> JSON.Value -> Doc ann
 ppJson i =
   \case
-    JSON.Null -> (pretty "null" :: Doc ann)
+    JSON.Null -> pretty "null"
     JSON.Number n -> ppNumber n
     JSON.Bool True -> pretty "true"
     JSON.Bool False -> pretty "false"
