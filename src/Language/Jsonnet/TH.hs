@@ -36,7 +36,7 @@ import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
-import Text.PrettyPrint.ANSI.Leijen (pretty)
+import Prettyprinter (pretty)
 
 instance Data a => Lift (Arg a) where
   lift = liftData

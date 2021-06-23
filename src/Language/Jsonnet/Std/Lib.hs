@@ -44,7 +44,6 @@ import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Value
 import System.FilePath.Posix (takeFileName)
 import Text.Megaparsec.Pos (SourcePos (..))
-import Text.PrettyPrint.ANSI.Leijen (text)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
@@ -105,11 +104,8 @@ length = \case
     pure $ P.length (unrec ps)
   v ->
     throwE
-      ( StdError $
-          text $
-            T.unpack $
-              "length operates on strings, objects, functions and arrays, got "
-              --   <> showTy v
+      ( StdError "length operates on strings, objects, functions and arrays, got "
+      --   <> showTy v
       )
 
 makeArray :: Monad m => Int -> (Int -> m Value) -> m (Vector Value)

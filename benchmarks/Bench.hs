@@ -8,7 +8,7 @@ import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
 import Test.Tasty.Bench
-import Text.PrettyPrint.ANSI.Leijen (Pretty, pretty)
+import Prettyprinter (Pretty, pretty)
 
 render :: Pretty a => a -> LBS.ByteString
 render = encodeUtf8 . pack . show . pretty
@@ -35,8 +35,8 @@ main =
         ],
       bgroup
         "stdlib"
-        [ bench "bench04" $ nfAppIO eval bench04
-        , bench "bench06" $ nfAppIO eval bench06
+        [ bench "bench04" $ nfAppIO eval bench04,
+          bench "bench06" $ nfAppIO eval bench06
         ]
     ]
 

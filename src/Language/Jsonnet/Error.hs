@@ -18,8 +18,8 @@ import Data.Void (Void)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Parser.SrcSpan
+import Prettyprinter (Doc)
 import Text.Megaparsec (ParseErrorBundle)
-import Text.PrettyPrint.ANSI.Leijen (Doc)
 
 data Error
   = ParserError ParserError
@@ -30,24 +30,21 @@ data Error
 instance Exception Error
 
 data EvalError
-  = TypeMismatch
-      { expected :: Text,
-        actual :: Text
-      }
-  | InvalidKey Doc
-  | DuplicateKey Doc
-  | NoSuchKey Doc
-  | InvalidIndex Doc
+  = TypeMismatch {expected :: Text, actual :: Text}
+  | InvalidKey Text
+  | DuplicateKey Text
+  | NoSuchKey Text
+  | InvalidIndex Text
   | IndexOutOfBounds Scientific
   | DivByZero
-  | VarNotFound Doc
-  | AssertionFailed Doc
+  | VarNotFound Text
+  | AssertionFailed Text
   | TooManyArgs Int
-  | ParamNotBound Doc
-  | BadParam Doc
-  | StdError Doc
-  | RuntimeError Doc
-  | ManifestError Doc
+  | ParamNotBound Text
+  | BadParam Text
+  | StdError Text
+  | RuntimeError Text
+  | ManifestError Text
   deriving (Show, Typeable)
 
 instance Exception EvalError

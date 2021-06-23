@@ -48,7 +48,7 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Value
-import Text.PrettyPrint.ANSI.Leijen hiding (equals, (<$>))
+import Prettyprinter hiding (equals)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
@@ -82,7 +82,7 @@ mkValue c = mkThunk c >>= mkIndirV
 lookupVar :: Name Core -> Eval Value
 lookupVar n = do
   rho <- view ctx
-  v <- liftMaybe (VarNotFound (pretty n)) (M.lookup n rho)
+  v <- liftMaybe (VarNotFound (n2s n)) (M.lookup n rho)
   whnfV v
 
 whnfLiteral :: Literal -> Value
@@ -162,7 +162,7 @@ splitArgs args bnds = do
     getNamed = traverse f ns
       where
         f (a, b) = case g a of
-          Nothing -> throwE $ BadParam (pretty a)
+          Nothing -> throwE $ BadParam (T.pack a)
           Just n -> pure (n, b)
         g a = find ((a ==) . name2String) pNames
 
@@ -226,7 +226,7 @@ whnfUnyOp Compl x = inj <$> fmap (complement @Int64) (proj' x)
 whnfUnyOp LNot x = inj <$> fmap not (proj' x)
 whnfUnyOp Minus x = inj <$> fmap (negate @Double) (proj' x)
 whnfUnyOp Plus x = inj <$> fmap (id @Double) (proj' x)
-whnfUnyOp Err x = (toString >=> throwE . RuntimeError . pretty) x
+whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
@@ -241,7 +241,7 @@ whnfCond c e1 e2 = do
 
 whnfLookup :: Value -> Value -> Eval Value
 whnfLookup (VObj o) (VStr s) =
-  whnfV . fieldValWHNF =<< liftMaybe (NoSuchKey (pretty s)) (H.lookup s o)
+  whnfV . fieldValWHNF =<< liftMaybe (NoSuchKey s) (H.lookup s o)
 whnfLookup (VArr a) (VNum i)
   | isInteger i =
     whnfV =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
@@ -423,12 +423,9 @@ primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
 primitiveEquals a b =
   throwE
-    ( StdError $
-        text $
-          T.unpack $
-            "primitiveEquals operates on primitive types "
-            --  <> showTy a
-            --  <> showTy b
+    ( StdError "primitiveEquals operates on primitive types "
+    --  <> showTy a
+    --  <> showTy b
     )
 
 equals :: Value -> Value -> Eval Bool

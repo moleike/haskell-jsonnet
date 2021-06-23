@@ -23,11 +23,11 @@ import Language.Jsonnet.Pretty ()
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
+import Prettyprinter (Pretty, pretty)
 import System.FilePath (replaceExtension, takeBaseName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
 import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
-import Text.PrettyPrint.ANSI.Leijen (Pretty, pretty)
 
 main :: IO ()
 main = goldenTests >>= defaultMain

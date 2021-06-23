@@ -18,6 +18,7 @@ import Control.Monad.Except
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..))
+import Data.IORef
 import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M (union)
 import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
@@ -26,7 +27,6 @@ import Language.Jsonnet.Error (Error (EvalError), EvalError)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Name
-import Data.IORef
 
 type Ctx a = Map (Name Core) a
 

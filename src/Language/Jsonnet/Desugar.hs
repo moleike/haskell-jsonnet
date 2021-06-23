@@ -31,7 +31,7 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
-import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
+import Prettyprinter
 import Unbound.Generics.LocallyNameless
 
 class Desugarer a where
@@ -192,7 +192,7 @@ desugarFun ps e =
       ( rec $
           fmap
             ( \(n, a) ->
-                (s2n n, Embed (fromMaybe (errNotBound n) a))
+                (s2n n, Embed (fromMaybe (errNotBound (T.pack n)) a))
             )
             ps
       )
@@ -204,7 +204,7 @@ desugarFun ps e =
           String
             ( T.pack $
                 show $
-                  pretty $ ParamNotBound (pretty n)
+                  pretty $ ParamNotBound n
             )
 
 desugarLet bnds e =

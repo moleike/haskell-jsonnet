@@ -25,7 +25,7 @@ import Language.Jsonnet.Eval
 -- import Language.Jsonnet.Value
 import Options.Applicative
 import Paths_jsonnet (version)
-import Text.PrettyPrint.ANSI.Leijen (Pretty, pretty)
+import Prettyprinter (Pretty, pretty)
 
 main :: IO ()
 main = do
