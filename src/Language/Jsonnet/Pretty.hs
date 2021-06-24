@@ -12,8 +12,11 @@
 -- Portability             : non-portable
 module Language.Jsonnet.Pretty where
 
+import Control.Applicative (Const (..))
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Text as JSON (encodeToLazyText)
+import Data.Fix
+import Data.Functor.Sum
 import qualified Data.HashMap.Lazy as H
 import Data.List (sortOn)
 import Data.Scientific (Scientific (..))
@@ -25,10 +28,12 @@ import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import qualified Data.Vector as V
 import Data.Void (Void)
 import GHC.IO.Exception (IOException (..))
+import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
---import Text.PrettyPrint.ANSI.Leijen hiding (encloseSep, (<$>))
+import Language.Jsonnet.Syntax
+import Language.Jsonnet.Syntax.Annotated
 import Prettyprinter
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
@@ -36,6 +41,16 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 
 (<$$>) :: Doc ann -> Doc ann -> Doc ann
 (<$$>) = \x y -> vcat [x, y]
+
+-- reserved keywords
+pnull, ptrue, pfalse, pif, pthen, pelse, pimport :: Doc ann
+pnull = pretty "null"
+ptrue = pretty "true"
+pfalse = pretty "false"
+pif = pretty "if"
+pthen = pretty "then"
+pelse = pretty "else"
+pimport = pretty "import"
 
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
@@ -52,15 +67,14 @@ ppNumber s
     e = base10Exponent s
 
 ppJson :: Int -> JSON.Value -> Doc ann
-ppJson i =
-  \case
-    JSON.Null -> pretty "null"
-    JSON.Number n -> ppNumber n
-    JSON.Bool True -> pretty "true"
-    JSON.Bool False -> pretty "false"
-    JSON.String s -> ppString s
-    JSON.Array a -> ppArray a
-    JSON.Object o -> ppObject o
+ppJson i = \case
+  JSON.Null -> pnull
+  JSON.Number n -> ppNumber n
+  JSON.Bool True -> ptrue
+  JSON.Bool False -> pfalse
+  JSON.String s -> ppString s
+  JSON.Array a -> ppArray a
+  JSON.Object o -> ppObject o
   where
     encloseSep l r s ds = case ds of
       [] -> l <> r
@@ -105,61 +119,59 @@ instance Pretty ParserError where
       <$$> indent 4 (pretty sp)
 
 instance Pretty CheckError where
-  pretty =
-    \case
-      DuplicateParam e ->
-        pretty "duplicate parameter"
-          <+> squotes (pretty e)
-      DuplicateBinding e ->
-        pretty "duplicate local var"
-          <+> squotes (pretty e)
-      PosAfterNamedParam ->
-        pretty "positional after named argument"
+  pretty = \case
+    DuplicateParam e ->
+      pretty "duplicate parameter"
+        <+> squotes (pretty e)
+    DuplicateBinding e ->
+      pretty "duplicate local var"
+        <+> squotes (pretty e)
+    PosAfterNamedParam ->
+      pretty "positional after named argument"
 
 instance Pretty EvalError where
-  pretty =
-    \case
-      TypeMismatch {..} ->
-        pretty "type mismatch:"
-          <+> pretty "expected"
-          <+> pretty (T.unpack expected)
-          <+> pretty "but got"
-          <+> pretty (T.unpack actual)
-      InvalidKey k ->
-        pretty "invalid key:"
-          <+> pretty k
-      InvalidIndex k ->
-        pretty "invalid index:"
-          <+> pretty k
-      NoSuchKey k ->
-        pretty "no such key:"
-          <+> pretty k
-      IndexOutOfBounds i ->
-        pretty "index out of bounds:"
-          <+> ppNumber i
-      DivByZero ->
-        pretty "divide by zero exception"
-      VarNotFound v ->
-        pretty "variable"
-          <+> squotes (pretty $ show v)
-          <+> pretty "is not defined"
-      AssertionFailed e ->
-        pretty "assertion failed:" <+> pretty e
-      StdError e -> pretty e
-      RuntimeError e -> pretty e
-      ParamNotBound s ->
-        pretty "parameter not bound:"
-          <+> pretty (show s)
-      BadParam s ->
-        pretty "function has no parameter"
-          <+> squotes (pretty s)
-      ManifestError e ->
-        pretty "manifest error:"
-          <+> pretty e
-      TooManyArgs n ->
-        pretty "too many args, function has"
-          <+> pretty n
-          <+> pretty "parameter(s)"
+  pretty = \case
+    TypeMismatch {..} ->
+      pretty "type mismatch:"
+        <+> pretty "expected"
+        <+> pretty (T.unpack expected)
+        <+> pretty "but got"
+        <+> pretty (T.unpack actual)
+    InvalidKey k ->
+      pretty "invalid key:"
+        <+> pretty k
+    InvalidIndex k ->
+      pretty "invalid index:"
+        <+> pretty k
+    NoSuchKey k ->
+      pretty "no such key:"
+        <+> pretty k
+    IndexOutOfBounds i ->
+      pretty "index out of bounds:"
+        <+> ppNumber i
+    DivByZero ->
+      pretty "divide by zero exception"
+    VarNotFound v ->
+      pretty "variable"
+        <+> squotes (pretty $ show v)
+        <+> pretty "is not defined"
+    AssertionFailed e ->
+      pretty "assertion failed:" <+> pretty e
+    StdError e -> pretty e
+    RuntimeError e -> pretty e
+    ParamNotBound s ->
+      pretty "parameter not bound:"
+        <+> pretty (show s)
+    BadParam s ->
+      pretty "function has no parameter"
+        <+> squotes (pretty s)
+    ManifestError e ->
+      pretty "manifest error:"
+        <+> pretty e
+    TooManyArgs n ->
+      pretty "too many args, function has"
+        <+> pretty n
+        <+> pretty "parameter(s)"
 
 instance Pretty (StackFrame a) where
   pretty StackFrame {..} =
@@ -172,14 +184,34 @@ instance Pretty (Backtrace a) where
   pretty (Backtrace xs) = vcat $ pretty <$> xs
 
 instance Pretty Error where
-  pretty =
-    \case
-      EvalError e bt ->
-        pretty "Runtime error:"
-          <+> pretty e
-          <$$> indent 2 (pretty bt)
-      ParserError e -> pretty e
-      CheckError e sp ->
-        pretty "Static error:"
-          <+> pretty e
-          <$$> indent 2 (pretty sp)
+  pretty = \case
+    EvalError e bt ->
+      pretty "Runtime error:"
+        <+> pretty e
+        <$$> indent 2 (pretty bt)
+    ParserError e -> pretty e
+    CheckError e sp ->
+      pretty "Static error:"
+        <+> pretty e
+        <$$> indent 2 (pretty sp)
+
+instance Pretty Literal where
+  pretty = \case
+    Null -> pnull
+    Bool True -> ptrue
+    Bool False -> pfalse
+    -- FIXME strings need extra source info (quotes, verbatim, etc.)
+    String t -> pretty t
+    Number n -> ppNumber n
+
+-- TODO unfinished printer for AST
+instance Pretty Expr' where
+  pretty = foldFix go
+    where
+      go (AnnF (InR (Const (Import fp))) _) = pimport <+> pretty fp
+      go (AnnF (InL e) _) = case e of
+        ELit l -> pretty l
+        EIdent i -> pretty i
+        EIf c t -> pif <+> c <+> pthen <+> t
+        EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
+        _ -> pretty "fixme"
