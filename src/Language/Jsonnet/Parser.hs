@@ -214,15 +214,16 @@ stringP =
       )
 
 numberP :: Parser Expr'
-numberP = Fix <$> annotateLoc number
+numberP = Fix <$> annotateLoc number <?> "number"
   where
     number = mkFloatF <$> lexeme L.scientific
 
 identP :: Parser Expr'
-identP = Fix <$> annotateLoc (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier))
+identP = Fix <$> annotateLoc
+  (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier)) <?> "identifier"
 
 booleanP :: Parser Expr'
-booleanP = Fix <$> annotateLoc boolean
+booleanP = Fix <$> annotateLoc boolean <?> "bool"
   where
     boolean =
       keywordP "true" $> mkBoolF True
