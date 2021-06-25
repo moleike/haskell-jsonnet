@@ -15,10 +15,13 @@ module Language.Jsonnet.Pretty where
 import Control.Applicative (Const (..))
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Text as JSON (encodeToLazyText)
+import Data.Bifunctor (first)
+import Data.Bool (bool)
 import Data.Fix
 import Data.Functor.Sum
 import qualified Data.HashMap.Lazy as H
 import Data.List (sortOn)
+import qualified Data.List.NonEmpty as NE
 import Data.Scientific (Scientific (..))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -43,7 +46,7 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 (<$$>) = \x y -> vcat [x, y]
 
 -- reserved keywords
-pnull, ptrue, pfalse, pif, pthen, pelse, pimport :: Doc ann
+pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal :: Doc ann
 pnull = pretty "null"
 ptrue = pretty "true"
 pfalse = pretty "false"
@@ -51,6 +54,8 @@ pif = pretty "if"
 pthen = pretty "then"
 pelse = pretty "else"
 pimport = pretty "import"
+perror = pretty "error"
+plocal = pretty "local"
 
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
@@ -209,9 +214,54 @@ instance Pretty Expr' where
   pretty = foldFix go
     where
       go (AnnF (InR (Const (Import fp))) _) = pimport <+> pretty fp
-      go (AnnF (InL e) _) = case e of
-        ELit l -> pretty l
-        EIdent i -> pretty i
-        EIf c t -> pif <+> c <+> pthen <+> t
-        EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
-        _ -> pretty "fixme"
+      go (AnnF (InL e) _) = ppExpr e
+
+instance Pretty Expr where
+  pretty = foldFix go
+    where
+      go (AnnF e _) = ppExpr e
+
+instance Pretty Visibility where
+  pretty Visible = pretty ":"
+  pretty Hidden = pretty "::"
+  pretty Forced = pretty ":::"
+
+ppObject l o = encloseSep lbrace rbrace comma (ppLocal l : (ppField <$> o))
+  where
+    ppField EField {..} =
+      surround (ppOverride <> pretty visibility) key value
+      where
+        ppOverride = pretty (bool "" "+" override)
+
+    ppLocal :: [(Ident, Doc ann)] -> Doc ann
+    ppLocal xs =
+      concatWith
+        (surround comma)
+        ((plocal <+>) . uncurry (surround equals) <$> xs')
+      where
+        xs' = first pretty <$> xs
+
+ppLocal :: [(Ident, Doc ann)] -> Doc ann -> Doc ann
+ppLocal xs e =
+  plocal
+    <+> concatWith
+      (surround comma)
+      (uncurry (surround equals) <$> xs')
+      <> semi
+    <+> e
+  where
+    xs' = first pretty <$> xs
+
+ppExpr :: ExprF (Doc ann) -> Doc ann
+ppExpr = \case
+  ELit l -> pretty l
+  EIdent i -> pretty i
+  EIf c t -> pif <+> c <+> pthen <+> t
+  EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
+  EArr a -> encloseSep lbracket rbracket comma a
+  EObj l o -> ppObject l o
+  ELocal xs e -> ppLocal (NE.toList xs) e
+  EErr a -> perror <+> a
+  EIndex a b -> enclose a b dot
+  ELookup a b -> a <> brackets b
+  _ -> pretty "fixme"
