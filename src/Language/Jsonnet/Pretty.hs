@@ -15,7 +15,7 @@ module Language.Jsonnet.Pretty where
 import Control.Applicative (Const (..))
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.Text as JSON (encodeToLazyText)
-import Data.Bifunctor (first)
+import Data.Bifunctor (bimap, first)
 import Data.Bool (bool)
 import Data.Fix
 import Data.Functor.Sum
@@ -46,7 +46,7 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 (<$$>) = \x y -> vcat [x, y]
 
 -- reserved keywords
-pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal :: Doc ann
+pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal, pfunction :: Doc ann
 pnull = pretty "null"
 ptrue = pretty "true"
 pfalse = pretty "false"
@@ -56,6 +56,7 @@ pelse = pretty "else"
 pimport = pretty "import"
 perror = pretty "error"
 plocal = pretty "local"
+pfunction = pretty "function"
 
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
@@ -226,35 +227,70 @@ instance Pretty Visibility where
   pretty Hidden = pretty "::"
   pretty Forced = pretty ":::"
 
-ppObject l o = encloseSep lbrace rbrace comma (ppLocal l : (ppField <$> o))
+commaSep :: [Doc ann] -> Doc ann
+commaSep = concatWith (surround comma)
+
+ppObject l o =
+  encloseSep
+    lbrace
+    rbrace
+    comma
+    (mcons (ppLocal l) (ppField <$> o))
   where
+    mcons ma as = maybe as (: as) ma
     ppField EField {..} =
       surround (ppOverride <> pretty visibility) key value
       where
         ppOverride = pretty (bool "" "+" override)
 
-    ppLocal :: [(Ident, Doc ann)] -> Doc ann
+    ppLocal :: [(Ident, Doc ann)] -> Maybe (Doc ann)
+    ppLocal [] = Nothing
     ppLocal xs =
-      concatWith
-        (surround comma)
-        ((plocal <+>) . uncurry (surround equals) <$> xs')
+      Just $ commaSep ((plocal <+>) . uncurry (surround equals) <$> xs')
       where
         xs' = first pretty <$> xs
 
 ppLocal :: [(Ident, Doc ann)] -> Doc ann -> Doc ann
 ppLocal xs e =
   plocal
-    <+> concatWith
-      (surround comma)
-      (uncurry (surround equals) <$> xs')
+    <+> commaSep (uncurry (surround equals) <$> xs')
       <> semi
     <+> e
   where
     xs' = first pretty <$> xs
 
+instance Pretty BinOp where
+  pretty = \case
+    Add -> pretty "+"
+    Sub -> pretty "-"
+    Mul -> pretty "*"
+    Div -> pretty "/"
+    Mod -> pretty "%"
+    Lt -> pretty "<"
+    Le -> pretty "<="
+    Gt -> pretty ">"
+    Ge -> pretty ">="
+    Eq -> pretty "=="
+    Ne -> pretty "!="
+    And -> pretty "&"
+    Or -> pretty "|"
+    Xor -> pretty "^"
+    ShiftL -> pretty "<<"
+    ShiftR -> pretty ">>"
+    LAnd -> pretty "&&"
+    LOr -> pretty "||"
+    In -> pretty "in"
+
+ppFun :: [Param (Doc ann)] -> Doc ann -> Doc ann
+ppFun ps e = pfunction <> parens (commaSep ps') <+> e
+  where
+    f = maybe mempty (equals <>)
+    ps' = uncurry (<>) . bimap pretty f <$> ps
+
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case
   ELit l -> pretty l
+  EFun ps e -> ppFun ps e
   EIdent i -> pretty i
   EIf c t -> pif <+> c <+> pthen <+> t
   EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
@@ -264,4 +300,5 @@ ppExpr = \case
   EErr a -> perror <+> a
   EIndex a b -> enclose a b dot
   ELookup a b -> a <> brackets b
+  EBinOp o a b -> parens (a <+> pretty o <+> b)
   _ -> pretty "fixme"
