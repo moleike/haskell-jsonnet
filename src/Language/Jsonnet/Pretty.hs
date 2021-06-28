@@ -21,6 +21,7 @@ import Data.Fix
 import Data.Functor.Sum
 import qualified Data.HashMap.Lazy as H
 import Data.List (sortOn)
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 import Data.Scientific (Scientific (..))
 import Data.Text (Text)
@@ -46,7 +47,7 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 (<$$>) = \x y -> vcat [x, y]
 
 -- reserved keywords
-pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal, pfunction :: Doc ann
+pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal, pfunction, passert, pfor, pin :: Doc ann
 pnull = pretty "null"
 ptrue = pretty "true"
 pfalse = pretty "false"
@@ -57,6 +58,9 @@ pimport = pretty "import"
 perror = pretty "error"
 plocal = pretty "local"
 pfunction = pretty "function"
+passert = pretty "assert"
+pfor = pretty "for"
+pin = pretty "in"
 
 instance Pretty (Name a) where
   pretty v = pretty (name2String v)
@@ -89,7 +93,7 @@ ppJson i = \case
       where
         prop (k, v) = ppString k <> colon <+> ppJson i v
         xs = map prop (sortOn fst $ H.toList o)
-    ppArray a = encloseSep lbracket rbracket comma xs
+    ppArray a = bracketSep comma xs
       where
         xs = map (ppJson i) (V.toList a)
     ppString = pretty . LT.unpack . JSON.encodeToLazyText
@@ -206,43 +210,31 @@ instance Pretty Literal where
     Null -> pnull
     Bool True -> ptrue
     Bool False -> pfalse
-    -- FIXME strings need extra source info (quotes, verbatim, etc.)
-    String t -> pretty t
+    String t -> squotes (pretty t)
     Number n -> ppNumber n
 
--- TODO unfinished printer for AST
-instance Pretty Expr' where
-  pretty = foldFix go
-    where
-      go (AnnF (InR (Const (Import fp))) _) = pimport <+> pretty fp
-      go (AnnF (InL e) _) = ppExpr e
-
-instance Pretty Expr where
-  pretty = foldFix go
-    where
-      go (AnnF e _) = ppExpr e
-
 instance Pretty Visibility where
-  pretty Visible = pretty ":"
-  pretty Hidden = pretty "::"
-  pretty Forced = pretty ":::"
+  pretty = \case
+    Visible -> pretty ":"
+    Hidden -> pretty "::"
+    Forced -> pretty ":::"
 
 commaSep :: [Doc ann] -> Doc ann
 commaSep = concatWith (surround comma)
+
+ppField EField {..} =
+  surround (ppOverride <> pretty visibility) (brackets key) value
+  where
+    ppOverride = pretty (bool "" "+" override)
 
 ppObject l o =
   encloseSep
     lbrace
     rbrace
     comma
-    (mcons (ppLocal l) (ppField <$> o))
+    (mcons (ppLocal l) o)
   where
     mcons ma as = maybe as (: as) ma
-    ppField EField {..} =
-      surround (ppOverride <> pretty visibility) key value
-      where
-        ppOverride = pretty (bool "" "+" override)
-
     ppLocal :: [(Ident, Doc ann)] -> Maybe (Doc ann)
     ppLocal [] = Nothing
     ppLocal xs =
@@ -258,6 +250,13 @@ ppLocal xs e =
     <+> e
   where
     xs' = first pretty <$> xs
+
+instance Pretty UnyOp where
+  pretty = \case
+    Compl -> pretty "~"
+    LNot -> pretty "!"
+    Plus -> pretty "+"
+    Minus -> pretty "-"
 
 instance Pretty BinOp where
   pretty = \case
@@ -287,18 +286,61 @@ ppFun ps e = pfunction <> parens (commaSep ps') <+> e
     f = maybe mempty (equals <>)
     ps' = uncurry (<>) . bimap pretty f <$> ps
 
+ppMaybeDoc :: Maybe (Doc ann) -> Doc ann
+ppMaybeDoc = maybe mempty id
+
+bracketSep :: Doc ann -> [Doc ann] -> Doc ann
+bracketSep = encloseSep lbracket rbracket
+
+parensSep :: Doc ann -> [Doc ann] -> Doc ann
+parensSep = encloseSep lparen rparen
+
+instance Pretty Expr' where
+  pretty = foldFix go
+    where
+      go = \case
+        AnnF (InR (Const (Import fp))) _ -> pimport <+> pretty fp
+        AnnF (InL e) _ -> ppExpr e
+
+instance Pretty Expr where
+  pretty = foldFix go
+    where
+      go (AnnF e _) = ppExpr e
+
+ppArgs :: Args (Doc ann) -> Doc ann
+ppArgs (Args args strict) = parensSep comma (ppArg <$> args)
+
+ppArg :: Arg (Doc ann) -> Doc ann
+ppArg (Pos a) = a
+ppArg (Named n a) = (surround equals) (pretty n) a
+
+ppCompSpec :: NonEmpty (CompSpec (Doc ann)) -> Doc ann
+ppCompSpec cs = hsep $ f <$> (NE.toList cs)
+  where
+    f (CompSpec v f c) =
+      pfor
+        <+> (pretty v)
+        <+> pin
+        <+> f
+        <+> (ppMaybeDoc $ (pif <+>) <$> c)
+
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case
   ELit l -> pretty l
   EFun ps e -> ppFun ps e
+  EApply a args -> a <> ppArgs args
   EIdent i -> pretty i
   EIf c t -> pif <+> c <+> pthen <+> t
   EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
-  EArr a -> encloseSep lbracket rbracket comma a
-  EObj l o -> ppObject l o
+  EArr a -> bracketSep comma a
+  EObj ls o -> ppObject ls (ppField <$> o)
   ELocal xs e -> ppLocal (NE.toList xs) e
   EErr a -> perror <+> a
+  EAssert (Assert c m e) -> passert <+> c <> (ppMaybeDoc $ (colon <>) <$> m) <> semi <+> e
   EIndex a b -> enclose a b dot
   ELookup a b -> a <> brackets b
+  EUnyOp o a -> parens (pretty o <> a)
   EBinOp o a b -> parens (a <+> pretty o <+> b)
-  _ -> pretty "fixme"
+  ESlice a b e s -> a <> bracketSep colon (ppMaybeDoc <$> [b, e, s])
+  EArrComp e cs -> lbracket <> e <+> ppCompSpec cs <> rbracket
+  EObjComp f ls cs -> ppObject ls [ppField f <+> ppCompSpec cs]
