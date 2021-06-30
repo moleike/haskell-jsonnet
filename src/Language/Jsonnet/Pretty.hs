@@ -93,7 +93,7 @@ ppJson i = \case
       where
         prop (k, v) = ppString k <> colon <+> ppJson i v
         xs = map prop (sortOn fst $ H.toList o)
-    ppArray a = bracketSep comma xs
+    ppArray a = encloseSep lbracket rbracket comma xs
       where
         xs = map (ppJson i) (V.toList a)
     ppString = pretty . LT.unpack . JSON.encodeToLazyText
@@ -222,6 +222,16 @@ instance Pretty Visibility where
 commaSep :: [Doc ann] -> Doc ann
 commaSep = concatWith (surround comma)
 
+bracketSep :: Doc ann -> [Doc ann] -> Doc ann
+bracketSep = encloseSep lbracket rbracket
+
+parensSep :: Doc ann -> [Doc ann] -> Doc ann
+parensSep = encloseSep lparen rparen
+
+braceSep :: Doc ann -> [Doc ann] -> Doc ann
+braceSep = encloseSep lbrace rbrace
+
+
 ppField EField {..} =
   surround (ppOverride <> pretty visibility) (brackets key) value
   where
@@ -288,12 +298,6 @@ ppFun ps e = pfunction <> parens (commaSep ps') <+> e
 
 ppMaybeDoc :: Maybe (Doc ann) -> Doc ann
 ppMaybeDoc = maybe mempty id
-
-bracketSep :: Doc ann -> [Doc ann] -> Doc ann
-bracketSep = encloseSep lbracket rbracket
-
-parensSep :: Doc ann -> [Doc ann] -> Doc ann
-parensSep = encloseSep lparen rparen
 
 instance Pretty Expr' where
   pretty = foldFix go
