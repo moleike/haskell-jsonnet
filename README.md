@@ -1,8 +1,7 @@
 # haskell-jsonnet
 
 [![Actions Status](https://github.com/moleike/haskell-jsonnet/workflows/build/badge.svg)](https://github.com/moleike/haskell-jsonnet/actions)
-[![Hackage](https://img.shields.io/hackage/v/jsonnet?style=flat)](https://hackage.haskell.org/package/jsonnet)
-
+[![Hackage](https://img.shields.io/hackage/v/jsonnet.svg?logo=haskell)](https://hackage.haskell.org/package/jsonnet)
 
 A full-fledged Haskell implementation of the [Jsonnet][jsonnet] spec.
 For an introduction to the language itself, see the [tutorial][tutorial] or language [reference][reference].
