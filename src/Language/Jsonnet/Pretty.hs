@@ -19,6 +19,7 @@ import Data.Bifunctor (bimap, first)
 import Data.Bool (bool)
 import Data.Fix
 import Data.Functor.Sum
+import Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Lazy as H
 import Data.List (sortOn)
 import Data.List.NonEmpty (NonEmpty)
@@ -37,7 +38,7 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
-import Language.Jsonnet.Syntax.Annotated
+import qualified Language.Jsonnet.Syntax.Annotated as Ann
 import Prettyprinter
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
@@ -185,10 +186,10 @@ instance Pretty EvalError where
 
 instance Pretty (StackFrame a) where
   pretty StackFrame {..} =
-    pretty span <+> (f $ name2String name)
+    pretty span <+> f (name2String name)
     where
       f "top-level" = mempty
-      f x = pretty "function" <+> (angles $ pretty x)
+      f x = pretty "function" <+> angles (pretty x)
 
 instance Pretty (Backtrace a) where
   pretty (Backtrace xs) = vcat $ pretty <$> xs
@@ -204,14 +205,6 @@ instance Pretty Error where
       pretty "Static error:"
         <+> pretty e
         <$$> indent 2 (pretty sp)
-
-instance Pretty Literal where
-  pretty = \case
-    Null -> pnull
-    Bool True -> ptrue
-    Bool False -> pfalse
-    String t -> squotes (pretty t)
-    Number n -> ppNumber n
 
 instance Pretty Visibility where
   pretty = \case
@@ -231,11 +224,11 @@ parensSep = encloseSep lparen rparen
 braceSep :: Doc ann -> [Doc ann] -> Doc ann
 braceSep = encloseSep lbrace rbrace
 
-
 ppField EField {..} =
-  surround (ppOverride <> pretty visibility) (brackets key) value
+  surround (ppOverride <> pretty visibility) key' value
   where
     ppOverride = pretty (bool "" "+" override)
+    key' = bool key (brackets key) computed
 
 ppObject l o =
   encloseSep
@@ -297,54 +290,63 @@ ppFun ps e = pfunction <> parens (commaSep ps') <+> e
     ps' = uncurry (<>) . bimap pretty f <$> ps
 
 ppMaybeDoc :: Maybe (Doc ann) -> Doc ann
-ppMaybeDoc = maybe mempty id
+ppMaybeDoc = fromMaybe mempty
 
-instance Pretty Expr' where
+instance Pretty Ann.Expr' where
+  pretty = pretty . forget'
+
+instance Pretty (Fix ExprF') where
   pretty = foldFix go
     where
       go = \case
-        AnnF (InR (Const (Import fp))) _ -> pimport <+> pretty fp
-        AnnF (InL e) _ -> ppExpr e
+        InR (Const (Import fp)) -> pimport <+> squotes (pretty fp)
+        InL e -> ppExpr e
 
-instance Pretty Expr where
-  pretty = foldFix go
-    where
-      go (AnnF e _) = ppExpr e
+instance Pretty (Fix ExprF) where
+  pretty = foldFix ppExpr
+
+instance Pretty Ann.Expr where
+  pretty = pretty . forget'
 
 ppArgs :: Args (Doc ann) -> Doc ann
 ppArgs (Args args strict) = parensSep comma (ppArg <$> args)
 
 ppArg :: Arg (Doc ann) -> Doc ann
 ppArg (Pos a) = a
-ppArg (Named n a) = (surround equals) (pretty n) a
+ppArg (Named n a) = surround equals (pretty n) a
 
 ppCompSpec :: NonEmpty (CompSpec (Doc ann)) -> Doc ann
-ppCompSpec cs = hsep $ f <$> (NE.toList cs)
+ppCompSpec cs = hsep $ f <$> NE.toList cs
   where
     f (CompSpec v f c) =
       pfor
-        <+> (pretty v)
+        <+> pretty v
         <+> pin
-        <+> f
-        <+> (ppMaybeDoc $ (pif <+>) <$> c)
+        <+> parens f
+        <+> ppMaybeDoc ((pif <+>) <$> c)
 
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case
-  ELit l -> pretty l
+  ENull -> pnull
+  EBool True -> ptrue
+  EBool False -> pfalse
+  EStr s Unquoted -> pretty s
+  EStr s Quoted  -> squotes (pretty s)
+  ENum n -> ppNumber n
   EFun ps e -> ppFun ps e
-  EApply a args -> a <> ppArgs args
+  EApply a args -> parens a <> ppArgs args
   EIdent i -> pretty i
-  EIf c t -> pif <+> c <+> pthen <+> t
-  EIfElse c t e -> pif <+> c <+> pthen <+> t <+> pelse <+> e
+  EIf c t -> pif <+> c <+> pthen <+> parens t
+  EIfElse c t e -> pif <+> c <+> pthen <+> parens t <+> pelse <+> parens e
   EArr a -> bracketSep comma a
   EObj ls o -> ppObject ls (ppField <$> o)
-  ELocal xs e -> ppLocal (NE.toList xs) e
-  EErr a -> perror <+> a
-  EAssert (Assert c m e) -> passert <+> c <> (ppMaybeDoc $ (colon <>) <$> m) <> semi <+> e
-  EIndex a b -> enclose a b dot
-  ELookup a b -> a <> brackets b
+  ELocal xs e -> ppLocal (NE.toList xs) (parens e)
+  EErr a -> perror <+> parens a
+  EAssert (Assert c m e) -> passert <+> c <> ppMaybeDoc ((colon <>) <$> m) <> semi <+> e
+  EIndex a b -> parens a <> brackets b
+  ELookup a b -> enclose a b dot
   EUnyOp o a -> parens (pretty o <> a)
-  EBinOp o a b -> parens (a <+> pretty o <+> b)
-  ESlice a b e s -> a <> bracketSep colon (ppMaybeDoc <$> [b, e, s])
+  EBinOp o a b -> parens (parens a <+> pretty o <+> parens b)
+  ESlice a b e s -> parens a <> bracketSep colon (ppMaybeDoc <$> [b, e, s])
   EArrComp e cs -> lbracket <> e <+> ppCompSpec cs <> rbracket
   EObjComp f ls cs -> ppObject ls [ppField f <+> ppCompSpec cs]

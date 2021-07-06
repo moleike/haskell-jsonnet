@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
-module Main where
+module Language.Jsonnet.Test.Golden where
 
 import Control.Monad
 import Control.Monad.Except
@@ -28,9 +28,6 @@ import System.FilePath (replaceExtension, takeBaseName)
 import Test.Tasty (TestTree, defaultMain, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
 import Test.Tasty.HUnit (assertEqual, assertFailure, testCase)
-
-main :: IO ()
-main = goldenTests >>= defaultMain
 
 render :: Pretty a => a -> LBS.ByteString
 render = encodeUtf8 . pack . show . pretty

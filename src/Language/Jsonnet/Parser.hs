@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Parser
@@ -14,6 +15,7 @@
 module Language.Jsonnet.Parser
   ( parse,
     resolveImports,
+    reservedKeywords,
   )
 where
 
@@ -200,7 +202,7 @@ textBlock = do
     sc'' x = void $ count' 0 (unPos x - 1) (oneOf [' ', '\t'])
 
 unquoted :: Parser Expr'
-unquoted = Fix <$> annotateLoc (mkStrF <$> identifier)
+unquoted = Fix <$> annotateLoc (mkStrF <$> identifier <*> pure Unquoted)
 
 stringP :: Parser Expr'
 stringP =
@@ -211,7 +213,9 @@ stringP =
                   <|> stringLiteral
                   <|> textBlock
               )
+          <*> pure Quoted
       )
+    <?> "string"
 
 numberP :: Parser Expr'
 numberP = Fix <$> annotateLoc number <?> "number"
@@ -219,8 +223,11 @@ numberP = Fix <$> annotateLoc number <?> "number"
     number = mkFloatF <$> lexeme L.scientific
 
 identP :: Parser Expr'
-identP = Fix <$> annotateLoc
-  (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier)) <?> "identifier"
+identP =
+  Fix
+    <$> annotateLoc
+      (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier))
+    <?> "identifier"
 
 booleanP :: Parser Expr'
 booleanP = Fix <$> annotateLoc boolean <?> "bool"
@@ -249,7 +256,7 @@ assertP = Fix <$> annotateLoc assert
       mkAssertF cond msg <$> exprP
 
 ifElseP :: Parser Expr'
-ifElseP = Fix <$> annotateLoc ifElseExpr
+ifElseP = Fix <$> annotateLoc ifElseExpr <?> "if"
   where
     ifElseExpr = do
       cond <- keywordP "if" *> exprP
@@ -267,7 +274,10 @@ function ::
   Parser [Param Expr'] ->
   Parser Expr' ->
   Parser Expr'
-function ps expr = Fix <$> annotateLoc (mkFunF <$> ps <*> expr)
+function ps expr =
+  Fix
+    <$> annotateLoc (mkFunF <$> ps <*> expr)
+    <?> "function"
 
 functionP :: Parser Expr'
 functionP = keywordP "function" *> function paramsP exprP
@@ -302,7 +312,7 @@ localBndsP = do
   (try binding <|> localFunc) `NE.sepBy1` comma
 
 localP :: Parser Expr'
-localP = Fix <$> annotateLoc localExpr
+localP = Fix <$> annotateLoc localExpr <?> "local"
   where
     localExpr = do
       bnds <- localBndsP
@@ -310,7 +320,7 @@ localP = Fix <$> annotateLoc localExpr
       mkLocalF bnds <$> exprP
 
 arrayP :: Parser Expr'
-arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
+arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array)) <?> "array"
   where
     array = mkArrayF <$> (exprP `sepEndBy` comma)
     arrayComp = do
@@ -319,7 +329,7 @@ arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array))
       return $ mkArrCompF expr comps
 
 objectP :: Parser Expr'
-objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
+objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
       xs <- eitherP localP fieldP `sepEndBy` comma
@@ -327,13 +337,13 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       pure $ mkObjectF fs ls
     fieldP = try methodP <|> pairP
     pairP = do
-      key <- keyP
+      (key, computed) <- keyP
       (override, visibility) <-
         (,)
           <$> option False (symbol "+" $> True) <*> sepP
       value <- exprP
       pure $ EField {..}
-    keyP = brackets exprP <|> unquoted <|> stringP
+    keyP = ((, True) <$> brackets exprP) <|> ((, False) <$> (unquoted <|> stringP))
     methodP = do
       let override = False
       key <- unquoted
@@ -356,7 +366,7 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object))
       return $ mkObjCompF expr (locals1 <> locals2) comps
 
 importP :: Parser Expr'
-importP = Fix <$> annotateLoc importDecl
+importP = Fix <$> annotateLoc importDecl <?> "import"
   where
     importDecl = mkImportF <$> (keywordP "import" *> stringLiteral)
 
@@ -446,7 +456,7 @@ indexP :: Parser (Expr' -> Expr')
 indexP = flip mkIndex <$> brackets exprP
 
 lookupP :: Parser (Expr' -> Expr')
-lookupP = flip mkLookup <$> (symbol "." *> unquoted)
+lookupP = flip mkLookup <$> (symbol "." *> unquoted) <?> "."
 
 -- arguments are many postional followed by many named
 -- just like Python

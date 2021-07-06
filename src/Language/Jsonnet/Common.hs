@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -21,6 +22,8 @@ module Language.Jsonnet.Common where
 
 import Data.Binary (Binary)
 import Data.Data (Data)
+import Data.Functor.Classes
+import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
 import Data.Text (Text)
 import qualified Data.Text as T (pack)
@@ -33,6 +36,17 @@ import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
 n2s :: Name a -> Text
 n2s = T.pack . name2String
+
+data Quoting = Quoted | Unquoted
+  deriving
+    ( Show,
+      Eq,
+      Ord,
+      Generic,
+      Typeable,
+      Data,
+      Binary
+    )
 
 data Literal
   = Null
@@ -89,6 +103,8 @@ data BinOp
   deriving
     ( Show,
       Eq,
+      Enum,
+      Bounded,
       Generic,
       Typeable,
       Data,
@@ -106,6 +122,8 @@ data UnyOp
     ( Eq,
       Show,
       Read,
+      Enum,
+      Bounded,
       Generic,
       Typeable,
       Data,
@@ -140,8 +158,9 @@ data Arg a = Pos a | Named String a
       Alpha,
       Binary
     )
-
-deriveShow1 ''Arg
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault Arg
 
 data Args a = Args
   { args :: [Arg a],
@@ -154,14 +173,16 @@ data Args a = Args
       Typeable,
       Data,
       Generic,
+      Generic1,
       Functor,
       Foldable,
       Traversable,
       Alpha,
       Binary
     )
-
-deriveShow1 ''Args
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault Args
 
 data Assert a = Assert
   { cond :: a,
@@ -175,13 +196,15 @@ data Assert a = Assert
       Typeable,
       Data,
       Generic,
+      Generic1,
       Functor,
       Foldable,
       Traversable,
       Alpha
     )
-
-deriveShow1 ''Assert
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault Assert
 
 data CompSpec a = CompSpec
   { -- |
@@ -198,13 +221,15 @@ data CompSpec a = CompSpec
       Typeable,
       Data,
       Generic,
+      Generic1,
       Functor,
       Foldable,
       Traversable,
       Alpha
     )
-
-deriveShow1 ''CompSpec
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault CompSpec
 
 data StackFrame a = StackFrame
   { name :: Name a,
@@ -220,6 +245,8 @@ data Visibility = Visible | Hidden | Forced
     ( Eq,
       Read,
       Show,
+      Enum,
+      Bounded,
       Generic,
       Typeable,
       Data,

@@ -30,8 +30,8 @@ annMap g = go
 forget :: Functor f => Ann f a -> Ann f ()
 forget = annMap (const ())
 
---forget :: Functor f => Ann f a -> Fix f
---forget (Fix (AnnF f _)) = Fix $ fmap forget f
+forget' :: Functor f => Ann f a -> Fix f
+forget' (Fix (AnnF f _)) = Fix $ fmap forget' f
 
 attrib :: Ann f a -> a
 attrib (Fix (AnnF _ a)) = a

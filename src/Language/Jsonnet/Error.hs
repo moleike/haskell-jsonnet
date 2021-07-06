@@ -25,7 +25,7 @@ data Error
   = ParserError ParserError
   | CheckError CheckError (Maybe SrcSpan)
   | EvalError EvalError (Backtrace Core)
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance Exception Error
 
@@ -45,7 +45,7 @@ data EvalError
   | StdError Text
   | RuntimeError Text
   | ManifestError Text
-  deriving (Show, Typeable)
+  deriving (Eq, Show, Typeable)
 
 instance Exception EvalError
 
@@ -58,4 +58,4 @@ data CheckError
   = DuplicateParam String
   | PosAfterNamedParam
   | DuplicateBinding String
-  deriving (Show)
+  deriving (Eq, Show)

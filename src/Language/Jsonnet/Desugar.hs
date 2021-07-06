@@ -57,7 +57,10 @@ zipWithOutermost = annZip . inherit go False
 
 alg :: Bool -> ExprF Core -> Core
 alg outermost = \case
-  ELit l -> CLit l
+  ENull -> CLit Null
+  EBool b -> CLit (Bool b)
+  EStr s _ -> CLit (String s)
+  ENum n -> CLit (Number n)
   EIdent i -> CVar (s2n i)
   EFun ps e -> desugarFun ps e
   EApply e es -> CApp e es
@@ -124,7 +127,7 @@ desugarObj outermost locals fields = obj
       xs -> desugarLet (NE.fromList xs) v
 
     fields' =
-      (\(EField key val v o) -> EField key (f val) v o) <$> fields
+      (\(EField key val comp v o) -> EField key (f val) comp v o) <$> fields
 
 desugarAssert :: Assert Core -> Core
 desugarAssert (Assert c m e) =

@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTSyntax #-}
 {-# LANGUAGE OverloadedLabels #-}
@@ -17,14 +19,17 @@ module Language.Jsonnet.Syntax where
 
 import Control.Applicative (Const (..))
 import Data.Data (Data)
+import Data.Eq.Deriving
+import Data.Functor.Classes
+import Data.Functor.Classes.Generic
 import Data.Functor.Sum
 import Data.List.NonEmpty
 import Data.Scientific (Scientific)
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Common
-import Text.Show.Deriving
 import Unbound.Generics.LocallyNameless
 
 type Ident = String
@@ -34,27 +39,32 @@ type Param a = (Ident, Maybe a)
 data EField a = EField
   { key :: a,
     value :: a,
+    computed :: Bool,
     visibility :: Visibility,
     override :: Bool
   }
-  deriving
+  deriving stock
     ( Eq,
       Read,
       Show,
       Typeable,
       Data,
       Generic,
+      Generic1,
       Functor,
       Foldable,
       Traversable
     )
-
-instance Alpha a => Alpha (EField a)
-
-deriveShow1 ''EField
+  deriving anyclass (Alpha)
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault EField
 
 data ExprF a
-  = ELit Literal
+  = ENull
+  | EBool Bool
+  | ENum Scientific
+  | EStr Text Quoting
   | EIdent Ident
   | EFun [Param a] a
   | EApply a (Args a)
@@ -104,17 +114,20 @@ data ExprF a
         -- |
         comp :: NonEmpty (CompSpec a)
       }
-  deriving
-    ( Show,
+  deriving stock
+    ( Eq,
+      Show,
       Functor,
       Foldable,
       Traversable,
       Generic,
+      Generic1,
       Typeable,
       Data
     )
-
-deriveShow1 ''ExprF
+  deriving
+    (Eq1, Show1)
+    via FunctorClassesDefault ExprF
 
 newtype Import = Import FilePath
   deriving (Show, Eq)
@@ -125,19 +138,22 @@ mkImportF :: String -> ExprF' a
 mkImportF = InR . Const . Import
 
 mkNullF :: ExprF' a
-mkNullF = (InL . ELit) Null
+mkNullF = InL ENull
 
 mkIntF :: Integral b => b -> ExprF' a
-mkIntF = InL . ELit . Number . fromIntegral
+mkIntF = InL . ENum . fromIntegral
 
 mkFloatF :: Scientific -> ExprF' a
-mkFloatF = InL . ELit . Number
+mkFloatF = InL . ENum
 
-mkStrF :: String -> ExprF' a
-mkStrF = InL . ELit . String . T.pack
+mkTextF :: Text -> Quoting -> ExprF' a
+mkTextF s = InL . EStr s
+
+mkStrF :: String -> Quoting -> ExprF' a
+mkStrF s = mkTextF (T.pack s)
 
 mkBoolF :: Bool -> ExprF' a
-mkBoolF = InL . ELit . Bool
+mkBoolF = InL . EBool
 
 mkIdentF :: Ident -> ExprF' a
 mkIdentF = InL . EIdent
