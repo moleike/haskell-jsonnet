@@ -12,6 +12,7 @@ import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Char8 as LC (putStrLn)
 import Data.Maybe
+import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8Builder)
@@ -22,10 +23,14 @@ import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
--- import Language.Jsonnet.Value
+import Language.Jsonnet.Value (ExtVars(..))
 import Options.Applicative
 import Paths_jsonnet (version)
 import Prettyprinter (Pretty, pretty)
+import qualified Text.Megaparsec as MP
+import qualified Text.Megaparsec.Char as MPC
+import Data.Bifunctor (first, second, bimap)
+import Data.Void (Void)
 
 main :: IO ()
 main = do
@@ -73,7 +78,8 @@ mkConfig Options {..} = do
         Stdin -> ""
         FileInput path -> path
         ExecInput _ -> ""
-  pure Config {..}
+  extVars' <- constructExtVars extVars
+  pure Config { fname = fname, extVars = extVars' }
 
 fileOutput :: Parser Output
 fileOutput =
@@ -108,7 +114,33 @@ parseOpts = do
           <> short 'S'
           <> help "Expect a string, manifest as plain text"
       )
-  pure Options {..}
+  extStrs <- parseExtStr
+  extCodes <- parseExtCode
+  pure Options { extVars = extStrs <> extCodes, .. }
+
+parseExtStr :: Parser [(Text, ExtVar)]
+parseExtStr =
+  many $
+    option
+      (second ExtStr <$> extVarParser)
+      ( long "ext-str" <> help "External string variable" )
+
+parseExtCode :: Parser [(Text, ExtVar)]
+parseExtCode =
+  many $
+    option
+      (second ExtCode <$> extVarParser)
+      ( long "ext-code" <> help "External code variable" )
+
+extVarParser :: ReadM (Text, Text)
+extVarParser = eitherReader f
+  where
+    f = first MP.errorBundlePretty . MP.runParser pair ""
+
+    pair :: MP.Parsec Void String (Text, Text)
+    pair = bimap T.pack T.pack <$> liftA2 (,)
+      (MP.someTill MPC.asciiChar (MPC.char '='))
+      (MP.someTill MPC.asciiChar MP.eof)
 
 mkInput :: Bool -> Maybe String -> Input
 mkInput exec = \case
@@ -146,7 +178,8 @@ options =
 data Options = Options
   { output :: Output,
     format :: Format,
-    input :: Input
+    input :: Input,
+    extVars :: [(Text, ExtVar)]
   }
 
 data Input

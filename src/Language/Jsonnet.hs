@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- Module                  : Language.Jsonnet
@@ -22,9 +23,13 @@ module Language.Jsonnet
     parse,
     evaluate,
     desugar,
+    ExtVar (..),
+    interpretExtVar,
+    constructExtVars,
   )
 where
 
+import Control.Exception (throwIO)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.Reader
@@ -51,6 +56,8 @@ import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
+import Prettyprinter (pretty)
+import System.Exit (die)
 
 newtype JsonnetM a = JsonnetM
   { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -69,8 +76,9 @@ newtype JsonnetM a = JsonnetM
       MonadFail
     )
 
-newtype Config = Config
+data Config = Config
   { fname :: FilePath
+  , extVars :: ExtVars
   }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
@@ -109,8 +117,38 @@ evaluate expr = do
 -- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
 --   the native (a small subset) with the interpreted (the splice mkStdlib)
 std :: JsonnetM Value
-std = JsonnetM $ lift $ ExceptT $ runEvalM M.empty stdlib
+std = do
+  extVars <- asks extVars
+  let stdlib = whnf core >>= flip mergeObjects (Lib.std extVars)
+  JsonnetM $ lift $ ExceptT $ runEvalM M.empty stdlib
   where
-    stdlib = whnf core >>= flip mergeObjects Lib.std
     core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
+
+data ExtVar
+  = ExtStr !Text
+  | ExtCode !Text
+
+interpretExtVar :: ExtVar -> IO Value
+interpretExtVar (ExtStr s) = pure $ VStr s
+interpretExtVar (ExtCode s) =
+  either dieError pure =<< interpretToValue s
+  where
+    interpretToValue :: Text -> IO (Either Error Value)
+    interpretToValue =
+      runJsonnetM (Config "External variable" (ExtVars mempty))
+        . (parse >=> check >=> desugar >=> evaluateToValue)
+
+    evaluateToValue :: Core -> JsonnetM Value
+    evaluateToValue expr = do
+      env <- singleton "std" <$> std
+      JsonnetM $ lift $ ExceptT $ runEvalM env (whnf expr)
+
+    dieError :: Error -> IO a
+    dieError = die . show . pretty
+
+constructExtVars :: [(Text, ExtVar)] -> IO ExtVars
+constructExtVars = fmap (ExtVars . M.fromList) . traverse interpretExtVarPair
+  where
+    interpretExtVarPair :: (Text, ExtVar) -> IO (Text, Value)
+    interpretExtVarPair (s, extVar) = (s,) <$> interpretExtVar extVar
