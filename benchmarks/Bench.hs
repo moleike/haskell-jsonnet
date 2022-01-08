@@ -13,7 +13,7 @@ import Prettyprinter (Pretty, pretty)
 render :: Pretty a => a -> LBS.ByteString
 render = encodeUtf8 . pack . show . pretty
 
-conf = Config ""
+conf = Config "" mempty
 
 eval :: Expr -> IO LBS.ByteString
 eval expr = do

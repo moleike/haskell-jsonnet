@@ -136,7 +136,7 @@ interpretExtVar (ExtCode s) =
   where
     interpretToValue :: Text -> IO (Either Error Value)
     interpretToValue =
-      runJsonnetM (Config "External variable" (ExtVars mempty))
+      runJsonnetM (Config "External variable" mempty)
         . (parse >=> check >=> desugar >=> evaluateToValue)
 
     evaluateToValue :: Core -> JsonnetM Value
