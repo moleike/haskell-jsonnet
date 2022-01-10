@@ -25,6 +25,7 @@ module Language.Jsonnet
     desugar,
     ExtVar (..),
     ExtVarType (..),
+    ExtVarContent (..),
     interpretExtVar,
     constructExtVars,
   )
@@ -41,7 +42,7 @@ import Data.Functor.Sum
 import qualified Data.Map.Lazy as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
-import qualified Data.Text.IO as T (readFile)
+import qualified Data.Text.IO as T
 import Debug.Trace
 import Language.Jsonnet.Annotate
 import qualified Language.Jsonnet.Check as Check
@@ -127,19 +128,28 @@ std = do
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
 
 data ExtVar = ExtVar
-  { extVarType :: !ExtVarType
-  , extVarText :: !Text
+  { extVarType :: !ExtVarType,
+    extVarContent :: !ExtVarContent
   }
+
+data ExtVarContent
+  = Inline !Text
+  | File !FilePath
 
 data ExtVarType
   = ExtStr
   | ExtCode
 
 interpretExtVar :: ExtVar -> IO Value
-interpretExtVar (ExtVar ExtStr s) = pure $ VStr s
-interpretExtVar (ExtVar ExtCode s) =
-  either dieError pure =<< interpretToValue s
+interpretExtVar = \case
+  ExtVar ExtStr s -> VStr <$> readExtVarContent s
+  ExtVar ExtCode s -> either dieError pure <=< interpretToValue <=< readExtVarContent $ s
   where
+    readExtVarContent :: ExtVarContent -> IO Text
+    readExtVarContent = \case
+      Inline s -> pure s
+      File p -> T.readFile p
+
     interpretToValue :: Text -> IO (Either Error Value)
     interpretToValue =
       runJsonnetM (Config "External variable" mempty)

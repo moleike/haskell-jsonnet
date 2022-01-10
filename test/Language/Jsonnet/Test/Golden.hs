@@ -44,7 +44,7 @@ run conf = do
 extVars :: ExtVars
 extVars = ExtVars $ M.fromList
   [ ("var1", VStr "test"),
-    ("var2", unsafePerformIO $ interpretExtVar (ExtCode "{x:1,y:2}"))
+    ("var2", unsafePerformIO $ interpretExtVar (ExtVar ExtCode (Inline "{x:1,y:2}")))
   ]
 
 goldenTests :: IO TestTree
