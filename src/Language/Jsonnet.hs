@@ -24,6 +24,7 @@ module Language.Jsonnet
     evaluate,
     desugar,
     ExtVar (..),
+    ExtVarType (..),
     interpretExtVar,
     constructExtVars,
   )
@@ -125,13 +126,18 @@ std = do
     core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
 
-data ExtVar
-  = ExtStr !Text
-  | ExtCode !Text
+data ExtVar = ExtVar
+  { extVarType :: !ExtVarType
+  , extVarText :: !Text
+  }
+
+data ExtVarType
+  = ExtStr
+  | ExtCode
 
 interpretExtVar :: ExtVar -> IO Value
-interpretExtVar (ExtStr s) = pure $ VStr s
-interpretExtVar (ExtCode s) =
+interpretExtVar (ExtVar ExtStr s) = pure $ VStr s
+interpretExtVar (ExtVar ExtCode s) =
   either dieError pure =<< interpretToValue s
   where
     interpretToValue :: Text -> IO (Either Error Value)
