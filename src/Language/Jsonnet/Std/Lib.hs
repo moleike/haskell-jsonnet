@@ -28,8 +28,8 @@ import qualified Data.ByteString as B
 import Data.Foldable (foldrM)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
-import qualified Data.Map.Strict as M
 import qualified Data.List as L (intercalate, sort)
+import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T

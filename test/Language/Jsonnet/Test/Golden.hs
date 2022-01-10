@@ -42,10 +42,12 @@ run conf = do
 
 -- Adapted from the C++ test suite
 extVars :: ExtVars
-extVars = ExtVars $ M.fromList
-  [ ("var1", VStr "test"),
-    ("var2", unsafePerformIO $ interpretExtVar (ExtVar ExtCode (Inline "{x:1,y:2}")))
-  ]
+extVars =
+  ExtVars $
+    M.fromList
+      [ ("var1", VStr "test"),
+        ("var2", unsafePerformIO $ interpretExtVar (ExtVar ExtCode (Inline "{x:1,y:2}")))
+      ]
 
 goldenTests :: IO TestTree
 goldenTests = do

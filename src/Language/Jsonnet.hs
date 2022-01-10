@@ -79,8 +79,8 @@ newtype JsonnetM a = JsonnetM
     )
 
 data Config = Config
-  { fname :: FilePath
-  , extVars :: ExtVars
+  { fname :: FilePath,
+    extVars :: ExtVars
   }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)

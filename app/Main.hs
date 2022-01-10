@@ -9,31 +9,31 @@ module Main where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
+import Data.Bifunctor (bimap, first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Char8 as LC (putStrLn)
-import Data.Maybe
 import qualified Data.Map.Strict as M
+import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8Builder)
 import qualified Data.Text.IO as TIO
 import Data.Version (showVersion)
+import Data.Void (Void)
 import Language.Jsonnet
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Value (ExtVars(..))
+import Language.Jsonnet.Value (ExtVars (..))
 import Options.Applicative
 import Paths_jsonnet (version)
 import Prettyprinter (Pretty, pretty)
-import qualified Text.Megaparsec as MP
-import qualified Text.Megaparsec.Char as MPC
-import Data.Bifunctor (first, second, bimap)
-import Data.Void (Void)
 import System.Environment (lookupEnv)
 import System.Exit (die)
+import qualified Text.Megaparsec as MP
+import qualified Text.Megaparsec.Char as MPC
 
 main :: IO ()
 main = do
@@ -89,9 +89,8 @@ mkConfig Options {..} = do
         Stdin -> ""
         FileInput path -> path
         ExecInput _ -> ""
-  exts <- traverse mkExtVar extVars
-  extVars' <- constructExtVars exts
-  pure Config { fname = fname, extVars = extVars' }
+  extVars' <- constructExtVars =<< traverse mkExtVar extVars
+  pure Config {fname = fname, extVars = extVars'}
 
 fileOutput :: Parser Output
 fileOutput =
@@ -130,7 +129,7 @@ parseOpts = do
   extStrFiles <- parseExtStrFile
   extCodes <- parseExtCode
   extCodeFiles <- parseExtCodeFile
-  pure Options { extVars = extStrs <> extStrFiles <> extCodes <> extCodeFiles, .. }
+  pure Options {extVars = extStrs <> extStrFiles <> extCodes <> extCodeFiles, ..}
 
 parseExtStr :: Parser [(Text, Either ExtVarType ExtVar)]
 parseExtStr =
@@ -189,7 +188,7 @@ extVarParser = eitherReader f
     pair = second (Just . Inline . T.pack) <$> parsePair
 
     envVar :: MP.Parsec Void String (Text, Maybe ExtVarContent)
-    envVar = (, Nothing) . T.pack <$> MP.someTill MPC.asciiChar MP.eof
+    envVar = (,Nothing) . T.pack <$> MP.someTill MPC.asciiChar MP.eof
 
 extVarFileParser :: ReadM (Text, ExtVarContent)
 extVarFileParser = eitherReader f
@@ -197,9 +196,12 @@ extVarFileParser = eitherReader f
     f = first MP.errorBundlePretty . MP.runParser (second File <$> parsePair) ""
 
 parsePair :: MP.Parsec Void String (Text, String)
-parsePair = first T.pack <$> liftA2 (,)
-  (MP.someTill MPC.asciiChar (MPC.char '='))
-  (MP.someTill MPC.asciiChar MP.eof)
+parsePair =
+  first T.pack
+    <$> liftA2
+      (,)
+      (MP.someTill MPC.asciiChar (MPC.char '='))
+      (MP.someTill MPC.asciiChar MP.eof)
 
 mkInput :: Bool -> Maybe String -> Input
 mkInput exec = \case
@@ -238,8 +240,8 @@ data Options = Options
   { output :: Output,
     format :: Format,
     input :: Input,
+    -- | ExtVarType determines the interpretation of the environment variable
     extVars :: [(Text, Either ExtVarType ExtVar)]
-    -- ^ ExtVarType determines the interpretation of the environment variable
   }
 
 data Input

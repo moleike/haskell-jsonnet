@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Value
@@ -32,7 +32,7 @@ type Eval = EvalM Value
 type Env = Ctx Value
 
 newtype ExtVars = ExtVars (Map Text Value)
-                deriving newtype (Semigroup, Monoid)
+  deriving newtype (Semigroup, Monoid)
 
 data Value
   = VNull

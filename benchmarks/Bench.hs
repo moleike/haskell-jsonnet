@@ -7,8 +7,8 @@ import Language.Jsonnet
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
-import Test.Tasty.Bench
 import Prettyprinter (Pretty, pretty)
+import Test.Tasty.Bench
 
 render :: Pretty a => a -> LBS.ByteString
 render = encodeUtf8 . pack . show . pretty
