@@ -38,6 +38,7 @@ data EvalError
   | IndexOutOfBounds Scientific
   | DivByZero
   | VarNotFound Text
+  | ExtVarNotFound Text
   | AssertionFailed Text
   | TooManyArgs Int
   | ParamNotBound Text

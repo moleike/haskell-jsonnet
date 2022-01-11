@@ -100,7 +100,9 @@ executable hs-jsonnet
       aeson,
       base,
       bytestring,
+      containers,
       text,
+      megaparsec,
       mtl,
       prettyprinter,
       optparse-applicative >= 0.16.1 && < 0.17
@@ -119,6 +121,7 @@ test-suite jsonnet-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base
+    , containers
     , prettyprinter
     , jsonnet
     , mtl

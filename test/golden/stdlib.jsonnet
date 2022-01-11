@@ -395,6 +395,12 @@ std.assertEqual(std.reverse([[1, 2, 3]]), [[1, 2, 3]]) &&
 //    std.assertEqual(std.thisFile, 'stdlib.jsonnet')
 //) &&
 
+std.assertEqual(std.extVar('var1'), 'test') &&
+
+std.assertEqual(std.extVar('var2'), { x: 1, y: 2 }) &&
+// std.assertEqual(std.toString(std.extVar('var2')), '{"x": 1, "y": 2}') &&
+// std.assertEqual(std.extVar('var2') { x+: 2 }.x, 3) &&
+
 local some_toml = {
   key: 'value',
   simple: { t: 5 },

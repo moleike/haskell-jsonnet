@@ -29,6 +29,7 @@ import Data.Foldable (foldrM)
 import Data.HashMap.Lazy (HashMap)
 import qualified Data.HashMap.Lazy as H
 import qualified Data.List as L (intercalate, sort)
+import qualified Data.Map.Strict as M
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -49,8 +50,8 @@ import Prelude hiding (length)
 import qualified Prelude as P (length)
 
 -- | Jsonnet standard library built-in methods
-std :: Value
-std = VObj $ H.fromList $ map f xs
+std :: ExtVars -> Value
+std extVars = VObj $ H.fromList $ map f xs
   where
     f = \(k, v) -> (k, VField (VStr k) v v Hidden)
     xs =
@@ -82,8 +83,12 @@ std = VObj $ H.fromList $ map f xs
         ("join", inj intercalate),
         ("objectHasEx", inj objectHasEx),
         ("objectFieldsEx", inj objectFieldsEx),
-        ("parseJson", inj (JSON.decodeStrict @Value))
+        ("parseJson", inj (JSON.decodeStrict @Value)),
+        ("extVar", inj (lookupExtVar extVars))
       ]
+
+lookupExtVar :: ExtVars -> Text -> Eval Value
+lookupExtVar (ExtVars extVars) s = liftMaybe (ExtVarNotFound s) (M.lookup s extVars)
 
 intercalate :: Value -> [Value] -> Eval Value
 intercalate sep arr = go sep (filter null arr)

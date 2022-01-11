@@ -3,29 +3,37 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
+import Data.Bifunctor (bimap, first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Char8 as LC (putStrLn)
+import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8Builder)
 import qualified Data.Text.IO as TIO
 import Data.Version (showVersion)
+import Data.Void (Void)
 import Language.Jsonnet
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
--- import Language.Jsonnet.Value
+import Language.Jsonnet.Value (ExtVars (..))
 import Options.Applicative
 import Paths_jsonnet (version)
 import Prettyprinter (Pretty, pretty)
+import System.Environment (lookupEnv)
+import System.Exit (die)
+import qualified Text.Megaparsec as MP
+import qualified Text.Megaparsec.Char as MPC
 
 main :: IO ()
 main = do
@@ -67,13 +75,22 @@ readSource = \case
   FileInput path -> TIO.readFile path
   ExecInput str -> pure (T.pack str)
 
+mkExtVar :: (Text, Either ExtVarType ExtVar) -> IO (Text, ExtVar)
+mkExtVar = \case
+  (s, Right extVar) -> pure (s, extVar)
+  (envVar, Left extVarType) ->
+    lookupEnv (T.unpack envVar) >>= \case
+      Just extVar -> pure $ (envVar, ExtVar extVarType (Inline (T.pack extVar)))
+      Nothing -> die "No env variable"
+
 mkConfig :: Options -> IO Config
 mkConfig Options {..} = do
   let fname = case input of
         Stdin -> ""
         FileInput path -> path
         ExecInput _ -> ""
-  pure Config {..}
+  extVars' <- constructExtVars =<< traverse mkExtVar extVars
+  pure Config {fname = fname, extVars = extVars'}
 
 fileOutput :: Parser Output
 fileOutput =
@@ -108,7 +125,83 @@ parseOpts = do
           <> short 'S'
           <> help "Expect a string, manifest as plain text"
       )
-  pure Options {..}
+  extStrs <- parseExtStr
+  extStrFiles <- parseExtStrFile
+  extCodes <- parseExtCode
+  extCodeFiles <- parseExtCodeFile
+  pure Options {extVars = extStrs <> extStrFiles <> extCodes <> extCodeFiles, ..}
+
+parseExtStr :: Parser [(Text, Either ExtVarType ExtVar)]
+parseExtStr =
+  many $
+    option
+      (second (interpretAs ExtStr) <$> extVarParser)
+      ( long "ext-str"
+          <> short 'V'
+          <> metavar "VAR=VALUE"
+          <> help "External string variable"
+      )
+
+parseExtStrFile :: Parser [(Text, Either ExtVarType ExtVar)]
+parseExtStrFile =
+  many $
+    option
+      (second (Right . ExtVar ExtStr) <$> extVarFileParser)
+      ( long "ext-str-file"
+          <> help "External string variable as file"
+          <> metavar "FILE"
+          <> action "file"
+      )
+
+parseExtCode :: Parser [(Text, Either ExtVarType ExtVar)]
+parseExtCode =
+  many $
+    option
+      (second (interpretAs ExtCode) <$> extVarParser)
+      ( long "ext-code"
+          <> metavar "VAR=EXPR"
+          <> help "External code variable"
+      )
+
+parseExtCodeFile :: Parser [(Text, Either ExtVarType ExtVar)]
+parseExtCodeFile =
+  many $
+    option
+      (second (Right . ExtVar ExtCode) <$> extVarFileParser)
+      ( long "ext-code-file"
+          <> help "External code variable as file"
+          <> metavar "FILE"
+          <> action "file"
+      )
+
+interpretAs :: ExtVarType -> Maybe ExtVarContent -> Either ExtVarType ExtVar
+interpretAs t = \case
+  Nothing -> Left t
+  Just s -> Right $ ExtVar t s
+
+extVarParser :: ReadM (Text, Maybe ExtVarContent)
+extVarParser = eitherReader f
+  where
+    f = first MP.errorBundlePretty . MP.runParser (MP.try pair <|> envVar) ""
+
+    pair :: MP.Parsec Void String (Text, Maybe ExtVarContent)
+    pair = second (Just . Inline . T.pack) <$> parsePair
+
+    envVar :: MP.Parsec Void String (Text, Maybe ExtVarContent)
+    envVar = (,Nothing) . T.pack <$> MP.someTill MPC.asciiChar MP.eof
+
+extVarFileParser :: ReadM (Text, ExtVarContent)
+extVarFileParser = eitherReader f
+  where
+    f = first MP.errorBundlePretty . MP.runParser (second File <$> parsePair) ""
+
+parsePair :: MP.Parsec Void String (Text, String)
+parsePair =
+  first T.pack
+    <$> liftA2
+      (,)
+      (MP.someTill MPC.asciiChar (MPC.char '='))
+      (MP.someTill MPC.asciiChar MP.eof)
 
 mkInput :: Bool -> Maybe String -> Input
 mkInput exec = \case
@@ -146,7 +239,9 @@ options =
 data Options = Options
   { output :: Output,
     format :: Format,
-    input :: Input
+    input :: Input,
+    -- | ExtVarType determines the interpretation of the environment variable
+    extVars :: [(Text, Either ExtVarType ExtVar)]
   }
 
 data Input

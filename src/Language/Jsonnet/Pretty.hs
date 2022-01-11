@@ -166,6 +166,10 @@ instance Pretty EvalError where
       pretty "variable"
         <+> squotes (pretty $ show v)
         <+> pretty "is not defined"
+    ExtVarNotFound v ->
+      pretty "external variable"
+        <+> squotes (pretty v)
+        <+> pretty "is not defined"
     AssertionFailed e ->
       pretty "assertion failed:" <+> pretty e
     StdError e -> pretty e

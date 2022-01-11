@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- |
@@ -15,6 +17,7 @@ import Control.Lens (view)
 import Control.Monad.Except
 import Data.HashMap.Lazy (HashMap)
 import Data.IORef
+import Data.Map.Strict (Map)
 import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
@@ -27,6 +30,9 @@ import Language.Jsonnet.Pretty ()
 type Eval = EvalM Value
 
 type Env = Ctx Value
+
+newtype ExtVars = ExtVars (Map Text Value)
+  deriving newtype (Semigroup, Monoid)
 
 data Value
   = VNull
