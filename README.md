@@ -50,7 +50,9 @@ Using the [stack][stack] build tool:
 ```console
 % hs-jsonnet --help
 Usage: hs-jsonnet [-v|--version] [-e|--exec] [<filename>] 
-                  [-o|--output-file <filename>] [-S|--string]
+                  [-o|--output-file <filename>] [-S|--string] 
+                  [-V|--ext-str VAR=VALUE] [--ext-str-file FILE] 
+                  [--ext-code VAR=EXPR] [--ext-code-file FILE]
 
 Available options:
   -v,--version             Print version of the program
@@ -60,6 +62,10 @@ Available options:
   -o,--output-file <filename>
                            Write to the output file rather than stdout
   -S,--string              Expect a string, manifest as plain text
+  -V,--ext-str VAR=VALUE   External string variable
+  --ext-str-file FILE      External string variable as file
+  --ext-code VAR=EXPR      External code variable
+  --ext-code-file FILE     External code variable as file
 ```
 
 ## Output formats
