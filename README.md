@@ -21,8 +21,8 @@ Here is the implementation status of the main language features:
 - [X] keyword parameters
 - [X] default arguments
 - [ ] top-level arguments
-- [ ] external variables
-- [X] hidden fields ([@CristhianMotoche](https://github.com/CristhianMotoche)) 
+- [X] external variables
+- [X] hidden fields 
 - [X] tailstrict annotation
 - [X] outermost object reference `$`
 - [X] mixin inheritence (operator `+` with `self` and `super`)
