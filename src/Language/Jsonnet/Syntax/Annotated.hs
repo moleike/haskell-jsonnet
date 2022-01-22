@@ -29,9 +29,9 @@ mkApply a@(Fix (AnnF _ ann)) args =
 --mkApply a@(Fix (AnnF _ ann)) b =
 --  Fix $ AnnF (InL $ EApply a b) (fold1 (ann <| fmap attrib (fromList b)))
 
-mkLookup :: Expr' -> Expr' -> Expr'
-mkLookup a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =
-  Fix $ AnnF (InL $ ELookup a b) (ann1 <> ann2)
+mkLookup :: Expr' -> (Ident, SrcSpan) -> Expr'
+mkLookup a@(Fix (AnnF _ ann1)) (ident, ann2) =
+  Fix $ AnnF (InL $ ELookup a ident) (ann1 <> ann2)
 
 mkIndex :: Expr' -> Expr' -> Expr'
 mkIndex a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =

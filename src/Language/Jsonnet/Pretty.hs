@@ -348,7 +348,7 @@ ppExpr = \case
   EErr a -> perror <+> parens a
   EAssert (Assert c m e) -> passert <+> c <> ppMaybeDoc ((colon <>) <$> m) <> semi <+> e
   EIndex a b -> parens a <> brackets b
-  ELookup a b -> enclose a b dot
+  ELookup a i -> enclose a (pretty i) dot
   EUnyOp o a -> parens (pretty o <> a)
   EBinOp o a b -> parens (parens a <+> pretty o <+> parens b)
   ESlice a b e s -> parens a <> bracketSep colon (ppMaybeDoc <$> [b, e, s])

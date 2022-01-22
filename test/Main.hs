@@ -16,8 +16,6 @@ main = do
   defaultMain $
     testGroup
       "tests"
-      -- Roundtrip test is temporarily commented out, see:
-      -- https://github.com/moleike/haskell-jsonnet/issues/45
-      [ -- testRoundtripGroup,
+      [ testRoundtripGroup,
         goldenTests'
       ]

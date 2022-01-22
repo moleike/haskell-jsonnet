@@ -83,7 +83,7 @@ data ExprF a
       }
   | EArr [a]
   | EErr a
-  | ELookup a a
+  | ELookup a Ident
   | EIndex a a
   | EAssert (Assert a)
   | EIf a a
@@ -173,7 +173,7 @@ mkIfElseF c a = InL . EIfElse c a
 mkLocalF :: NonEmpty (Ident, a) -> a -> ExprF' a
 mkLocalF n = InL . ELocal n
 
-mkLookupF :: a -> a -> ExprF' a
+mkLookupF :: a -> Ident -> ExprF' a
 mkLookupF e = InL . ELookup e
 
 mkIndexF :: a -> a -> ExprF' a

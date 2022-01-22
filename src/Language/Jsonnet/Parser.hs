@@ -456,7 +456,15 @@ indexP :: Parser (Expr' -> Expr')
 indexP = flip mkIndex <$> brackets exprP
 
 lookupP :: Parser (Expr' -> Expr')
-lookupP = flip mkLookup <$> (symbol "." *> unquoted) <?> "."
+lookupP = flip mkLookup <$> (symbol "." *> annotatedIdent) <?> "."
+  where
+    annotatedIdent :: Parser (Ident, SrcSpan)
+    annotatedIdent = do
+      begin <- getSourcePos
+      res <- identifier
+      end <- getSourcePos
+      let sourceSpan = SrcSpan begin end
+      pure (res, sourceSpan)
 
 -- arguments are many postional followed by many named
 -- just like Python

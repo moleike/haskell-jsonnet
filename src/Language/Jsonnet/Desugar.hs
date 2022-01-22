@@ -74,7 +74,7 @@ alg outermost = \case
   EIf c t -> desugarIfElse c t (CLit Null)
   EArr e -> CArr e
   EObj {..} -> desugarObj outermost locals fields
-  ELookup e1 e2 -> desugarLookup e1 e2
+  ELookup e1 i -> desugarLookup e1 (CLit (String (T.pack i)))
   EIndex e1 e2 -> desugarLookup e1 e2
   EErr e -> desugarErr e
   EAssert e -> desugarAssert e

@@ -70,7 +70,7 @@ genIndex :: Gen (Fix ExprF')
 genIndex = Gen.subterm2 genExpr genExpr (\a b -> Fix (mkIndexF a b))
 
 genLookup :: Gen (Fix ExprF')
-genLookup = Gen.subterm2 genIdent genUnquoted (\a b -> Fix (mkLookupF a b))
+genLookup = Fix <$> (mkLookupF <$> genIdent <*> genString)
 
 genAssert :: Gen (Fix ExprF')
 genAssert =
