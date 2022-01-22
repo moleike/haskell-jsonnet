@@ -334,8 +334,7 @@ ppExpr = \case
   ENull -> pnull
   EBool True -> ptrue
   EBool False -> pfalse
-  EStr s Unquoted -> pretty s
-  EStr s Quoted  -> squotes (pretty s)
+  EStr s -> squotes (pretty s)
   ENum n -> ppNumber n
   EFun ps e -> ppFun ps e
   EApply a args -> parens a <> ppArgs args

@@ -201,8 +201,8 @@ textBlock = do
     sc'' :: Pos -> Parser ()
     sc'' x = void $ count' 0 (unPos x - 1) (oneOf [' ', '\t'])
 
-unquoted :: Parser Expr'
-unquoted = Fix <$> annotateLoc (mkStrF <$> identifier <*> pure Unquoted)
+identStringP :: Parser Expr'
+identStringP = Fix <$> annotateLoc (mkStrF <$> identifier)
 
 stringP :: Parser Expr'
 stringP =
@@ -213,7 +213,6 @@ stringP =
                   <|> stringLiteral
                   <|> textBlock
               )
-          <*> pure Quoted
       )
     <?> "string"
 
@@ -343,10 +342,11 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
           <$> option False (symbol "+" $> True) <*> sepP
       value <- exprP
       pure $ EField {..}
-    keyP = ((, True) <$> brackets exprP) <|> ((, False) <$> (unquoted <|> stringP))
+    keyP = ((,True) <$> brackets exprP) <|> ((,False) <$> (identStringP <|> stringP))
     methodP = do
       let override = False
-      key <- unquoted
+          computed = False
+      key <- identStringP
       ps <- paramsP
       visibility <- sepP
       value <- function (pure ps) exprP

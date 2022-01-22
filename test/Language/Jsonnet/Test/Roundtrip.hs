@@ -90,10 +90,7 @@ genLocal =
         )
 
 genLitStr :: Gen (Fix ExprF')
-genLitStr = Fix <$> (mkTextF <$> genText <*> pure Quoted)
-
-genUnquoted :: Gen (Fix ExprF')
-genUnquoted = Fix <$> (mkTextF <$> genText <*> pure Unquoted)
+genLitStr = Fix <$> (mkTextF <$> genText)
 
 genLiteral :: Gen (Fix ExprF')
 genLiteral =

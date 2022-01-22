@@ -37,17 +37,6 @@ import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 n2s :: Name a -> Text
 n2s = T.pack . name2String
 
-data Quoting = Quoted | Unquoted
-  deriving
-    ( Show,
-      Eq,
-      Ord,
-      Generic,
-      Typeable,
-      Data,
-      Binary
-    )
-
 data Literal
   = Null
   | Bool Bool

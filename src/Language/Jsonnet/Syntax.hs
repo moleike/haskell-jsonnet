@@ -64,7 +64,7 @@ data ExprF a
   = ENull
   | EBool Bool
   | ENum Scientific
-  | EStr Text Quoting
+  | EStr Text
   | EIdent Ident
   | EFun [Param a] a
   | EApply a (Args a)
@@ -146,10 +146,10 @@ mkIntF = InL . ENum . fromIntegral
 mkFloatF :: Scientific -> ExprF' a
 mkFloatF = InL . ENum
 
-mkTextF :: Text -> Quoting -> ExprF' a
-mkTextF s = InL . EStr s
+mkTextF :: Text -> ExprF' a
+mkTextF = InL . EStr
 
-mkStrF :: String -> Quoting -> ExprF' a
+mkStrF :: String -> ExprF' a
 mkStrF s = mkTextF (T.pack s)
 
 mkBoolF :: Bool -> ExprF' a
