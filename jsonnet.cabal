@@ -98,6 +98,7 @@ executable hs-jsonnet
   build-depends:
       jsonnet,
       aeson,
+      aeson-pretty,
       base,
       bytestring,
       containers,

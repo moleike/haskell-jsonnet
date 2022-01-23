@@ -9,6 +9,7 @@ module Main where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.Encode.Pretty as JSON
 import Data.Bifunctor (bimap, first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
@@ -48,17 +49,22 @@ runProgram opts@Options {..} = do
   src <- readSource input
   conf <- mkConfig opts
   outp <- interpret conf src
-  either printError (printResult output format) outp
+  either printError (printResult output outputMode format) outp
 
-printResult :: Output -> Format -> JSON.Value -> IO ()
-printResult outp Json val =
-  writeOutput (JSON.encode val) outp
-printResult outp Plaintext (JSON.String s) =
+printResult :: Output -> OutputMode -> Format -> JSON.Value -> IO ()
+printResult outp outputMode Json val =
+  writeOutput (encode val) outp
+  where
+    encode = case outputMode of
+      Pretty -> JSON.encodePretty
+      Compact -> JSON.encode
+
+printResult outp _ Plaintext (JSON.String s) =
   writeOutput (encodeToLazyByteString s) outp
   where
     encodeToLazyByteString =
       toLazyByteString . encodeUtf8Builder
-printResult _ Plaintext _ =
+printResult _ _ Plaintext _ =
   print "Runtime error: expected string result"
 
 writeOutput :: L.ByteString -> Output -> IO ()
@@ -117,6 +123,13 @@ parseOpts :: Parser Options
 parseOpts = do
   input <- mkInput <$> exec <*> fileInput
   output <- fileOutput
+  outputMode <-
+    flag
+      Pretty
+      Compact
+      ( long "compact"
+          <> help "Produce a compact JSON output"
+      )
   format <-
     flag
       Json
@@ -238,6 +251,7 @@ options =
 
 data Options = Options
   { output :: Output,
+    outputMode :: OutputMode,
     format :: Format,
     input :: Input,
     -- | ExtVarType determines the interpretation of the environment variable
@@ -253,6 +267,11 @@ data Input
 data Output
   = FileOutput FilePath
   | Stdout
+  deriving (Eq, Show)
+
+data OutputMode
+  = Pretty
+  | Compact
   deriving (Eq, Show)
 
 data Format = Json | Plaintext
