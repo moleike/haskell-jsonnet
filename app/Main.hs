@@ -9,7 +9,6 @@ module Main where
 
 import Control.Monad.Except
 import qualified Data.Aeson as JSON
-import qualified Data.Aeson.Encode.Pretty as JSON
 import Data.Bifunctor (bimap, first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
@@ -51,19 +50,18 @@ runProgram opts@Options {..} = do
   outp <- interpret conf src
   either printError (printResult output outputMode format) outp
 
+encodeToLazyByteString :: Text -> L.ByteString
+encodeToLazyByteString = toLazyByteString . encodeUtf8Builder
+
 printResult :: Output -> OutputMode -> Format -> JSON.Value -> IO ()
 printResult outp outputMode Json val =
   writeOutput (encode val) outp
   where
     encode = case outputMode of
-      Pretty -> JSON.encodePretty
+      Pretty -> encodeToLazyByteString . T.pack . show . pretty
       Compact -> JSON.encode
-
 printResult outp _ Plaintext (JSON.String s) =
   writeOutput (encodeToLazyByteString s) outp
-  where
-    encodeToLazyByteString =
-      toLazyByteString . encodeUtf8Builder
 printResult _ _ Plaintext _ =
   print "Runtime error: expected string result"
 
