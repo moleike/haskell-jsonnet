@@ -48,17 +48,21 @@ runProgram opts@Options {..} = do
   src <- readSource input
   conf <- mkConfig opts
   outp <- interpret conf src
-  either printError (printResult output format) outp
+  either printError (printResult output outputMode format) outp
 
-printResult :: Output -> Format -> JSON.Value -> IO ()
-printResult outp Json val =
-  writeOutput (JSON.encode val) outp
-printResult outp Plaintext (JSON.String s) =
-  writeOutput (encodeToLazyByteString s) outp
+encodeToLazyByteString :: Text -> L.ByteString
+encodeToLazyByteString = toLazyByteString . encodeUtf8Builder
+
+printResult :: Output -> OutputMode -> Format -> JSON.Value -> IO ()
+printResult outp outputMode Json val =
+  writeOutput (encode val) outp
   where
-    encodeToLazyByteString =
-      toLazyByteString . encodeUtf8Builder
-printResult _ Plaintext _ =
+    encode = case outputMode of
+      Pretty -> encodeToLazyByteString . T.pack . show . pretty
+      Compact -> JSON.encode
+printResult outp _ Plaintext (JSON.String s) =
+  writeOutput (encodeToLazyByteString s) outp
+printResult _ _ Plaintext _ =
   print "Runtime error: expected string result"
 
 writeOutput :: L.ByteString -> Output -> IO ()
@@ -117,6 +121,13 @@ parseOpts :: Parser Options
 parseOpts = do
   input <- mkInput <$> exec <*> fileInput
   output <- fileOutput
+  outputMode <-
+    flag
+      Pretty
+      Compact
+      ( long "compact"
+          <> help "Produce a compact JSON output"
+      )
   format <-
     flag
       Json
@@ -238,6 +249,7 @@ options =
 
 data Options = Options
   { output :: Output,
+    outputMode :: OutputMode,
     format :: Format,
     input :: Input,
     -- | ExtVarType determines the interpretation of the environment variable
@@ -253,6 +265,11 @@ data Input
 data Output
   = FileOutput FilePath
   | Stdout
+  deriving (Eq, Show)
+
+data OutputMode
+  = Pretty
+  | Compact
   deriving (Eq, Show)
 
 data Format = Json | Plaintext
