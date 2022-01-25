@@ -59,7 +59,7 @@ alg :: Bool -> ExprF Core -> Core
 alg outermost = \case
   ENull -> CLit Null
   EBool b -> CLit (Bool b)
-  EStr s _ -> CLit (String s)
+  EStr s -> CLit (String s)
   ENum n -> CLit (Number n)
   EIdent i -> CVar (s2n i)
   EFun ps e -> desugarFun ps e
@@ -74,7 +74,7 @@ alg outermost = \case
   EIf c t -> desugarIfElse c t (CLit Null)
   EArr e -> CArr e
   EObj {..} -> desugarObj outermost locals fields
-  ELookup e1 e2 -> desugarLookup e1 e2
+  ELookup e1 i -> desugarLookup e1 (CLit (String (T.pack i)))
   EIndex e1 e2 -> desugarLookup e1 e2
   EErr e -> desugarErr e
   EAssert e -> desugarAssert e
@@ -168,7 +168,8 @@ desugarObjComp EField {..} comp locals =
             { key = key',
               value = value',
               visibility,
-              override
+              override,
+              computed
             }
         )
     bnds = NE.zip (fmap var comp) xs

@@ -64,7 +64,7 @@ data ExprF a
   = ENull
   | EBool Bool
   | ENum Scientific
-  | EStr Text Quoting
+  | EStr Text
   | EIdent Ident
   | EFun [Param a] a
   | EApply a (Args a)
@@ -83,7 +83,7 @@ data ExprF a
       }
   | EArr [a]
   | EErr a
-  | ELookup a a
+  | ELookup a Ident
   | EIndex a a
   | EAssert (Assert a)
   | EIf a a
@@ -146,10 +146,10 @@ mkIntF = InL . ENum . fromIntegral
 mkFloatF :: Scientific -> ExprF' a
 mkFloatF = InL . ENum
 
-mkTextF :: Text -> Quoting -> ExprF' a
-mkTextF s = InL . EStr s
+mkTextF :: Text -> ExprF' a
+mkTextF = InL . EStr
 
-mkStrF :: String -> Quoting -> ExprF' a
+mkStrF :: String -> ExprF' a
 mkStrF s = mkTextF (T.pack s)
 
 mkBoolF :: Bool -> ExprF' a
@@ -173,7 +173,7 @@ mkIfElseF c a = InL . EIfElse c a
 mkLocalF :: NonEmpty (Ident, a) -> a -> ExprF' a
 mkLocalF n = InL . ELocal n
 
-mkLookupF :: a -> a -> ExprF' a
+mkLookupF :: a -> Ident -> ExprF' a
 mkLookupF e = InL . ELookup e
 
 mkIndexF :: a -> a -> ExprF' a
