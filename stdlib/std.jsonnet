@@ -56,14 +56,14 @@ limitations under the License.
 
   lstripChars(str, chars)::
     if std.length(str) > 0 && std.member(chars, str[0]) then
-      std.lstripChars(str[1:], chars)
+      std.lstripChars(str[1:], chars) tailstrict
     else
       str,
 
   rstripChars(str, chars)::
     local len = std.length(str);
     if len > 0 && std.member(chars, str[len - 1]) then
-      std.rstripChars(str[:len - 1], chars)
+      std.rstripChars(str[:len - 1], chars) tailstrict
     else
       str,
 
@@ -110,26 +110,38 @@ limitations under the License.
     parse_nat(str, 16),
 
   split(str, c)::
-    assert std.isString(str) : 'std.split first parameter should be a string, got ' + std.type(str);
-    assert std.isString(c) : 'std.split second parameter should be a string, got ' + std.type(c);
-    assert std.length(c) == 1 : 'std.split second parameter should have length 1, got ' + std.length(c);
+    assert std.isString(str) : 'std.split first parameter must be a String, got ' + std.type(str);
+    assert std.isString(c) : 'std.split second parameter must be a String, got ' + std.type(c);
+    assert std.length(c) >= 1 : 'std.split second parameter must have length 1 or greater, got ' + std.length(c);
     std.splitLimit(str, c, -1),
 
   splitLimit(str, c, maxsplits)::
-    assert std.isString(str) : 'std.splitLimit first parameter should be a string, got ' + std.type(str);
-    assert std.isString(c) : 'std.splitLimit second parameter should be a string, got ' + std.type(c);
-    assert std.length(c) == 1 : 'std.splitLimit second parameter should have length 1, got ' + std.length(c);
-    assert std.isNumber(maxsplits) : 'std.splitLimit third parameter should be a number, got ' + std.type(maxsplits);
-    local aux(str, delim, i, arr, v) =
-      local c = str[i];
-      local i2 = i + 1;
-      if i >= std.length(str) then
-        arr + [v]
-      else if c == delim && (maxsplits == -1 || std.length(arr) < maxsplits) then
-        aux(str, delim, i2, arr + [v], '') tailstrict
+    assert std.isString(str) : 'str.splitLimit first parameter must be a String, got ' + std.type(str);
+    assert std.isString(c) : 'str.splitLimit second parameter must be a String, got ' + std.type(c);
+    assert std.length(c) >= 1 : 'std.splitLimit second parameter must have length 1 or greater, got ' + std.length(c);
+    assert std.isNumber(maxsplits) : 'str.splitLimit third parameter must be a Number, got ' + std.type(maxsplits);
+    local strLen = std.length(str);
+    local cLen = std.length(c);
+    local aux(idx, ret, val) =
+      if idx >= strLen then
+        ret + [val]
+      else if str[idx : idx + cLen : 1] == c &&
+              (maxsplits == -1 || std.length(ret) < maxsplits) then
+        aux(idx + cLen, ret + [val], '')
       else
-        aux(str, delim, i2, arr, v + c) tailstrict;
-    aux(str, c, 0, [], ''),
+        aux(idx + 1, ret, val + str[idx]);
+    aux(0, [], ''),
+
+  splitLimitR(str, c, maxsplits)::
+    assert std.isString(str) : 'str.splitLimitR first parameter must be a String, got ' + std.type(str);
+    assert std.isString(c) : 'str.splitLimitR second parameter must be a String, got ' + std.type(c);
+    assert std.length(c) >= 1 : 'std.splitLimitR second parameter must have length 1 or greater, got ' + std.length(c);
+    assert std.isNumber(maxsplits) : 'str.splitLimitR third parameter must be a Number, got ' + std.type(maxsplits);
+    if maxsplits == -1 then
+      std.splitLimit(str, c, -1)
+    else
+      local revStr(str) = std.join('', std.reverse(str));
+      std.map(function(e) revStr(e), std.reverse(std.splitLimit(revStr(str), revStr(c), maxsplits))),
 
   strReplace(str, from, to)::
     assert std.isString(str);
@@ -491,7 +503,7 @@ limitations under the License.
     // min_digits must be a whole number >= 0. It's the number of zeroes to pad with.
     // blank must be a boolean, if true adds an additional ' ' in front of a positive number, so
     // that it is aligned with negative numbers with the same number of digits.
-    // plus must be a boolean, if true adds a '+' in front of a postive number, so that it is
+    // plus must be a boolean, if true adds a '+' in front of a positive number, so that it is
     // aligned with negative numbers with the same number of digits.  This takes precedence over
     // blank, if both are true.
     // radix must be a whole number >1 and <= 10.  It is the base of the system of numerals.
@@ -881,7 +893,7 @@ limitations under the License.
       escapeKeyToml(key) =
         local bare_allowed = std.set(std.stringChars("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"));
         if std.setUnion(std.set(std.stringChars(key)), bare_allowed) == bare_allowed then key else escapeStringToml(key),
-      isTableArray(v) = std.isArray(v) && std.length(v) > 0 && std.foldl(function(a, b) a && std.isObject(b), v, true),
+      isTableArray(v) = std.isArray(v) && std.length(v) > 0 && std.all(std.map(std.isObject, v)),
       isSection(v) = std.isObject(v) || isTableArray(v),
       renderValue(v, indexedPath, inline, cindent) =
         if v == true then
@@ -1041,7 +1053,122 @@ limitations under the License.
         std.join('', lines);
     aux(value, [], ''),
 
-  manifestYamlDoc(value, indent_array_in_object=false)::
+  manifestYamlDoc(value, indent_array_in_object=false, quote_keys=true)::
+    local onlyChars(charSet, strSet) =
+      if std.length(std.setInter(charSet, strSet)) == std.length(strSet) then
+        true
+      else false;
+    local isReserved(key) =
+      // NOTE: These values are checked for case insensitively.
+      // While this approach results in some false positives, it eliminates
+      // the risk of missing a permutation.
+      local reserved = [
+        // Boolean types taken from https://yaml.org/type/bool.html
+        'true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n',
+        // Numerical words taken from https://yaml.org/type/float.html
+        '.nan', '-.inf', '+.inf', '.inf', 'null', 
+        // Invalid keys that contain no invalid characters
+        '-', '---', '',
+      ];
+      local bad = [word for word in reserved if word == std.asciiLower(key)];
+      if std.length(bad) > 0 then
+        true
+      else false;
+    local typeMatch(m_key, type) =
+      // Look for positive or negative numerical types (ex: 0x)
+      if std.substr(m_key, 0, 2) == type || std.substr(m_key, 0, 3) == '-' + type then
+        true
+      else false;
+    local bareSafe(key) =
+      /*
+      For a key to be considered safe to emit without quotes, the following must be true
+        - All characters must match [a-zA-Z0-9_/\-]
+        - Not match the integer format defined in https://yaml.org/type/int.html
+        - Not match the float format defined in https://yaml.org/type/float.html
+        - Not match the timestamp format defined in https://yaml.org/type/timestamp.html
+        - Not match the boolean format defined in https://yaml.org/type/bool.html
+        - Not match the null format defined in https://yaml.org/type/null.html
+        - Not match (ignoring case) any reserved words which pass the above tests.
+          Reserved words are defined in isReserved() above.
+
+      Since the remaining YAML types require characters outside the set chosen as valid
+      for the elimination of quotes from the YAML output, the remaining types listed at
+      https://yaml.org/type/ are by default always quoted.
+      */
+      local letters = std.set(std.stringChars('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-/'));
+      local digits = std.set(std.stringChars('0123456789'));
+      local intChars = std.set(digits + std.stringChars('_-'));
+      local binChars = std.set(intChars + std.stringChars('b'));
+      local hexChars = std.set(digits + std.stringChars('abcdefx_-'));
+      local floatChars = std.set(digits + std.stringChars('e._-'));
+      local dateChars = std.set(digits + std.stringChars('-'));
+      local safeChars = std.set(letters + floatChars);
+      local keyLc = std.asciiLower(key);
+      local keyChars = std.stringChars(key);
+      local keySet = std.set(keyChars);
+      local keySetLc = std.set(std.stringChars(keyLc));
+      // Check for unsafe characters
+      if ! onlyChars(safeChars, keySet) then
+        false
+      // Check for reserved words
+      else if isReserved(key) then
+        false
+      /* Check for timestamp values.  Since spaces and colons are already forbidden,
+         all that could potentially pass is the standard date format (ex MM-DD-YYYY, YYYY-DD-MM, etc).
+         This check is even more conservative: Keys that meet all of the following:
+           - all characters match [0-9\-]
+           - has exactly 2 dashes
+         are considered dates.
+      */
+      else if onlyChars(dateChars, keySet) 
+          && std.length(std.findSubstr('-', key)) == 2 then
+        false
+      /* Check for integers.  Keys that meet all of the following:
+           - all characters match [0-9_\-]
+           - has at most 1 dash
+         are considered integers.
+      */
+      else if onlyChars(intChars, keySetLc)
+          && std.length(std.findSubstr('-', key)) < 2 then
+        false
+      /* Check for binary integers.  Keys that meet all of the following:
+           - all characters match [0-9b_\-]
+           - has at least 3 characters
+           - starts with (-)0b
+         are considered binary integers.
+      */
+      else if onlyChars(binChars, keySetLc)
+          && std.length(key) > 2
+          && typeMatch(key, '0b') then
+        false
+      /* Check for floats. Keys that meet all of the following:
+           - all characters match [0-9e._\-]
+           - has at most a single period
+           - has at most two dashes
+           - has at most 1 'e'
+         are considered floats.
+      */
+      else if onlyChars(floatChars, keySetLc)
+          && std.length(std.findSubstr('.', key)) == 1
+          && std.length(std.findSubstr('-', key)) < 3 
+          && std.length(std.findSubstr('e', keyLc)) < 2 then
+        false
+      /* Check for hexadecimals.  Keys that meet all of the following:
+           - all characters match [0-9a-fx_\-]
+           - has at most 1 dash
+           - has at least 3 characters
+           - starts with (-)0x
+         are considered hexadecimals.
+      */
+      else if onlyChars(hexChars, keySetLc) 
+          && std.length(std.findSubstr('-', key)) < 2
+          && std.length(keyChars) > 2
+          && typeMatch(key, '0x') then
+        false
+      // All checks pass. Key is safe for emission without quotes.
+      else true;
+    local escapeKeyYaml(key) =
+      if bareSafe(key) then key else std.escapeStringJson(key);
     local aux(v, path, cindent) =
       if v == true then
         'true'
@@ -1117,19 +1244,19 @@ limitations under the License.
               space: ' ',
             };
           local lines = [
-            std.escapeStringJson(k) + ':' + param.space + aux(v[k], path + [k], param.new_indent)
+            (if quote_keys then std.escapeStringJson(k) else escapeKeyYaml(k)) + ':' + param.space + aux(v[k], path + [k], param.new_indent)
             for k in std.objectFields(v)
             for param in [params(v[k])]
           ];
           std.join('\n' + cindent, lines);
     aux(value, [], ''),
 
-  manifestYamlStream(value, indent_array_in_object=false, c_document_end=true)::
+  manifestYamlStream(value, indent_array_in_object=false, c_document_end=true, quote_keys=true)::
     if !std.isArray(value) then
       error 'manifestYamlStream only takes arrays, got ' + std.type(value)
     else
       '---\n' + std.join(
-        '\n---\n', [std.manifestYamlDoc(e, indent_array_in_object) for e in value]
+        '\n---\n', [std.manifestYamlDoc(e, indent_array_in_object, quote_keys) for e in value]
       ) + if c_document_end then '\n...\n' else '\n',
 
 
@@ -1183,7 +1310,7 @@ limitations under the License.
   base64(input)::
     local bytes =
       if std.isString(input) then
-        std.map(function(c) std.codepoint(c), input)
+        std.map(std.codepoint, input)
       else
         input;
 
@@ -1220,7 +1347,7 @@ limitations under the License.
           base64_table[(arr[i + 2] & 63)];
         aux(arr, i + 3, r + str) tailstrict;
 
-    local sanity = std.foldl(function(r, a) r && (a < 256), bytes, true);
+    local sanity = std.all([a < 256 for a in bytes]);
     if !sanity then
       error 'Can only base64 encode strings / arrays of single bytes.'
     else
@@ -1250,7 +1377,7 @@ limitations under the License.
 
   base64Decode(str)::
     local bytes = std.base64DecodeBytes(str);
-    std.join('', std.map(function(b) std.char(b), bytes)),
+    std.join('', std.map(std.char, bytes)),
 
   reverse(arr)::
     local l = std.length(arr);
@@ -1379,6 +1506,9 @@ limitations under the License.
     else
       patch,
 
+  get(o, f, default = null, inc_hidden = true)::
+    if std.objectHasEx(o, f, inc_hidden) then o[f] else default,
+
   objectFields(o)::
     std.objectFieldsEx(o, false),
 
@@ -1476,19 +1606,49 @@ limitations under the License.
     else
       std.filter(function(i) arr[i] == value, std.range(0, std.length(arr) - 1)),
 
+  all(arr)::
+    assert std.isArray(arr) : 'all() parameter should be an array, got ' + std.type(arr);
+    local arrLen = std.length(arr);
+    local aux(idx) =
+      if idx >= arrLen then
+        true
+      else
+        local e = arr[idx];
+        assert std.isBoolean(e) : std.format('element "%s" of type %s is not a boolean', e, std.type(e));
+        if !e then
+          false
+        else
+          aux(idx + 1) tailstrict;
+    aux(0),
+
+  any(arr)::
+    assert std.isArray(arr) : 'any() parameter should be an array, got ' + std.type(arr);
+    local arrLen = std.length(arr);
+    local aux(idx) =
+      if idx >= arrLen then
+        false
+      else
+        local e = arr[idx];
+        assert std.isBoolean(e) : std.format('element "%s" of type %s is not a boolean', e, std.type(e));
+        if e then
+          true
+        else
+          aux(idx + 1) tailstrict;
+    aux(0),
+
   // Three way comparison.
   // TODO(sbarzowski): consider exposing and documenting it properly
   __compare(v1, v2)::
-      local t1 = std.type(v1), t2 = std.type(v2);
-      if t1 != t2 then
-        error "Comparison requires matching types. Got " + t1 + " and " + t2
-      else if t1 == "array" then
-        std.__compare_array(v1, v2)
-      else if t1 == "function" || t1 == "object" || t1 == "bool" then
-        error "Values of type " + t1 + " are not comparable."
-      else if v1 < v2 then -1
-      else if v1 > v2 then 1
-      else 0,
+    local t1 = std.type(v1), t2 = std.type(v2);
+    if t1 != t2 then
+      error 'Comparison requires matching types. Got ' + t1 + ' and ' + t2
+    else if t1 == 'array' then
+      std.__compare_array(v1, v2)
+    else if t1 == 'function' || t1 == 'object' || t1 == 'boolean' then
+      error 'Values of type ' + t1 + ' are not comparable.'
+    else if v1 < v2 then -1
+    else if v1 > v2 then 1
+    else 0,
 
   __compare_array(arr1, arr2)::
     local len1 = std.length(arr1), len2 = std.length(arr2);
