@@ -520,6 +520,7 @@ reservedKeywords =
     "if",
     "import",
     "importstr",
+    "importbin",
     "in",
     "local",
     "null",
