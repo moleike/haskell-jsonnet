@@ -17,6 +17,7 @@
 -- Portability             : non-portable
 module Language.Jsonnet.TH where
 
+import Control.Monad ((>=>))
 import Control.Monad.Except hiding (lift)
 import Data.Binary (Binary, encode)
 import Data.Data

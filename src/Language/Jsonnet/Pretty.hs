@@ -14,6 +14,8 @@ module Language.Jsonnet.Pretty where
 
 import Control.Applicative (Const (..))
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.Key as Key
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.Aeson.Text as JSON (encodeToLazyText)
 import Data.Bifunctor (bimap, first)
 import Data.Bool (bool)
@@ -83,7 +85,7 @@ ppJson i = \case
   JSON.Number n -> ppNumber n
   JSON.Bool True -> ptrue
   JSON.Bool False -> pfalse
-  JSON.String s -> ppString s
+  JSON.String s -> ppString (Key.fromText s)
   JSON.Array a -> ppArray a
   JSON.Object o -> ppObject o
   where
@@ -93,7 +95,7 @@ ppJson i = \case
     ppObject o = encloseSep lbrace rbrace comma xs
       where
         prop (k, v) = ppString k <> colon <+> ppJson i v
-        xs = map prop (sortOn fst $ H.toList o)
+        xs = map prop (sortOn fst $ KeyMap.toList o)
     ppArray a = encloseSep lbracket rbracket comma xs
       where
         xs = map (ppJson i) (V.toList a)

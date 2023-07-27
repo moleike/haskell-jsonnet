@@ -5,29 +5,22 @@
 
 packages:
 - completed:
-    hackage: unbound-generics-0.4.1@sha256:5020e8397dad610846cbd5bdc855e20edf9b9cb74f93f6c09488bba21118c409,5485
+    hackage: unbound-generics-0.4.3@sha256:12209c0049000d0dd8c3eb6013d0278a8b269a2421d9758083aab9f58c4b6b4c,5446
     pantry-tree:
-      size: 3046
-      sha256: 3f6a21308ef8d6e6127448715671ef4cd21d71b81198c77d58f55008aee988f8
+      sha256: 0a62d14242839c1295c1f6763a0d435f1f3fe7d89829add21ea6d008e8cd52e2
+      size: 3171
   original:
-    hackage: unbound-generics-0.4.1@sha256:5020e8397dad610846cbd5bdc855e20edf9b9cb74f93f6c09488bba21118c409,5485
+    hackage: unbound-generics-0.4.3
 - completed:
-    hackage: data-fix-0.3.0@sha256:058a266d1e658500e0ffb8babe68195b0ce06a081dcfc3814afc784b083fd9a5,1645
+    hackage: ansi-wl-pprint-0.6.9@sha256:fb737bc96e2aef34ad595d54ced7a73f648c521ebcb00fe0679aff45ccd49212,2448
     pantry-tree:
-      size: 261
-      sha256: 6cf43af344624e087dbe2f1e96e985de6142e85bb02db8449df6d72bee3c1013
+      sha256: ebb02b32915c04146b193949c3c48d9e8200c152f38947e8d23ca25b0997e188
+      size: 472
   original:
-    hackage: data-fix-0.3.0@sha256:058a266d1e658500e0ffb8babe68195b0ce06a081dcfc3814afc784b083fd9a5,1645
-- completed:
-    hackage: th-utilities-0.2.4.1@sha256:b37d23c8bdabd678aee5a36dd4373049d4179e9a85f34eb437e9cd3f04f435ca,1869
-    pantry-tree:
-      size: 882
-      sha256: 0f2cadecd5bf76c605a2768f3b150318750258fd82bde4d8e206651802106065
-  original:
-    hackage: th-utilities-0.2.4.1@sha256:b37d23c8bdabd678aee5a36dd4373049d4179e9a85f34eb437e9cd3f04f435ca,1869
+    hackage: ansi-wl-pprint-0.6.9@sha256:fb737bc96e2aef34ad595d54ced7a73f648c521ebcb00fe0679aff45ccd49212,2448
 snapshots:
 - completed:
-    size: 567675
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/17/13.yaml
-    sha256: 84fa3ab606af79b1239ec213e8db5d49e4857f461eda9ac61fe589c967643b7d
-  original: lts-17.13
+    sha256: a6f197e8f08784dde10ad7d8b915b45b66553dbf1f200ec8077b2574d393e5ae
+    size: 554267
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/7/19.yaml
+  original: nightly-2023-07-19

@@ -15,6 +15,7 @@ module Language.Jsonnet.Value where
 
 import Control.Lens (view)
 import Control.Monad.Except
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.HashMap.Lazy (HashMap)
 import Data.IORef
 import Data.Map.Strict (Map)

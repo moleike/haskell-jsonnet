@@ -24,6 +24,7 @@ import Control.Monad.Except
 import Control.Monad.State
 import Data.Aeson (FromJSON (..))
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.KeyMap as KeyMap
 import qualified Data.ByteString as B
 import Data.Foldable (foldrM)
 import Data.HashMap.Lazy (HashMap)
@@ -79,7 +80,7 @@ std extVars = VObj $ H.fromList $ map f xs
         ("encodeUTF8", inj (B.unpack . T.encodeUtf8 :: Text -> [Word8])),
         ("decodeUTF8", inj (T.decodeUtf8 . B.pack :: [Word8] -> Text)),
         ("makeArray", inj (makeArray @Eval)),
-        ("filter", inj (filterM @Eval @Value)),
+        ("filter", inj (V.filterM @Eval @Value)),
         ("join", inj intercalate),
         ("objectHasEx", inj objectHasEx),
         ("objectFieldsEx", inj objectFieldsEx),
@@ -123,7 +124,7 @@ instance FromJSON Value where
     JSON.Number n -> pure $ VNum n
     JSON.String s -> pure $ VStr s
     JSON.Array a -> VArr <$> traverse parseJSON a
-    JSON.Object o -> VObj . f <$> traverse parseJSON o
+    JSON.Object o -> VObj . f <$> traverse parseJSON (KeyMap.toHashMapText o)
     where
       f :: HashMap Text Value -> Object
       f o =

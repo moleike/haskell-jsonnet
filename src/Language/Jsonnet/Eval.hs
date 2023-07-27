@@ -19,11 +19,15 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Lens (locally, view)
+import Control.Monad ((>=>), join, forM, (<=<))
 import Control.Monad.Except
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.KeyMap as KeyMap
 import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
-import Data.Bits
+import qualified Data.Bits as Bits
+import Data.Bits ((.&.), (.|.))
 import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.HashMap.Lazy (HashMap)
@@ -206,9 +210,9 @@ whnfBinOp Le e1 e2 = liftF2 ((<=) @Double) e1 e2
 whnfBinOp Ge e1 e2 = liftF2 ((>=) @Double) e1 e2
 whnfBinOp And e1 e2 = liftF2 ((.&.) @Int64) e1 e2
 whnfBinOp Or e1 e2 = liftF2 ((.|.) @Int64) e1 e2
-whnfBinOp Xor e1 e2 = liftF2 (xor @Int64) e1 e2
-whnfBinOp ShiftL e1 e2 = liftF2 (shiftL @Int64) e1 e2
-whnfBinOp ShiftR e1 e2 = liftF2 (shiftR @Int64) e1 e2
+whnfBinOp Xor e1 e2 = liftF2 (Bits.xor @Int64) e1 e2
+whnfBinOp ShiftL e1 e2 = liftF2 (Bits.shiftL @Int64) e1 e2
+whnfBinOp ShiftR e1 e2 = liftF2 (Bits.shiftR @Int64) e1 e2
 whnfBinOp In s o = liftF2 (\o s -> objectHasEx o s True) o s
 
 whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
@@ -222,7 +226,7 @@ append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 whnfUnyOp :: UnyOp -> Value -> Eval Value
-whnfUnyOp Compl x = inj <$> fmap (complement @Int64) (proj' x)
+whnfUnyOp Compl x = inj <$> fmap (Bits.complement @Int64) (proj' x)
 whnfUnyOp LNot x = inj <$> fmap not (proj' x)
 whnfUnyOp Minus x = inj <$> fmap (negate @Double) (proj' x)
 whnfUnyOp Plus x = inj <$> fmap (id @Double) (proj' x)
@@ -401,7 +405,7 @@ manifest = \case
   VBool b -> pure (JSON.Bool b)
   VStr s -> pure (JSON.String s)
   VNum n -> pure (JSON.Number n)
-  VObj vs -> JSON.Object <$> mapM manifest (visibleKeys vs)
+  VObj vs -> JSON.Object . KeyMap.fromHashMapText <$> mapM manifest (visibleKeys vs)
   VArr vs -> JSON.Array <$> mapM manifest vs
   VClos {} -> throwE (ManifestError "function")
   VFun _ -> throwE (ManifestError "function")

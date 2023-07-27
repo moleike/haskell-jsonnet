@@ -32,6 +32,8 @@ module Language.Jsonnet
 where
 
 import Control.Exception (throwIO)
+import Control.Monad ((>=>), (<=<))
+import Control.Monad.Fix (MonadFix)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
 import Control.Monad.Reader

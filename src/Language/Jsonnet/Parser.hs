@@ -25,6 +25,7 @@ import Control.Monad
 import Control.Monad.Combinators.Expr
 import qualified Control.Monad.Combinators.NonEmpty as NE
 import Control.Monad.Except
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Char
 import Data.Either
 import Data.Fix
