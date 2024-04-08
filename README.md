@@ -11,7 +11,7 @@ We are using the same test suite used in the offical [C++][cpp-jsonnet] and [Go]
 
 Here is the implementation status of the main language features:
 
-- [X] array and object comprehension (but see [#46](issues/46))
+- [X] array and object comprehension (but see [#46](https://github.com/moleike/haskell-jsonnet/issues/46))
 - [X] array slices
 - [X] Python-style string formatting
 - [X] text blocks
