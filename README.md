@@ -28,7 +28,7 @@ Here is the implementation status of the main language features:
 - [X] mixin inheritence (operator `+` with `self` and `super`)
 - [X] field composition (operator `+:`)
 - [ ] multiple file output (https://github.com/moleike/haskell-jsonnet/issues/32)
-- [ ] verbatim imports (https://github.com/moleike/haskell-jsonnet/issues/52)
+- [ ] verbatim imports (https://github.com/moleike/haskell-jsonnet/issues/52 and https://github.com/moleike/haskell-jsonnet/issues/58)
 
 ## Build
 
