@@ -11,23 +11,24 @@ We are using the same test suite used in the offical [C++][cpp-jsonnet] and [Go]
 
 Here is the implementation status of the main language features:
 
-- [X] array and object comprehension (but see [#46](https://github.com/moleike/haskell-jsonnet/issues/46))
+- [X] array and object comprehension (but see https://github.com/moleike/haskell-jsonnet/issues/46)
 - [X] array slices
 - [X] Python-style string formatting
 - [X] text blocks
 - [X] verbatim strings
 - [X] object-level locals
-- [ ] object-level asserts
+- [ ] object-level asserts (https://github.com/moleike/haskell-jsonnet/issues/39)
 - [X] keyword parameters
 - [X] default arguments
-- [ ] top-level arguments
+- [ ] top-level arguments (https://github.com/moleike/haskell-jsonnet/issues/24)
 - [X] external variables (by Berk Özkütük)
 - [X] hidden fields (by Cristhian Motoche)
 - [X] tailstrict annotation
 - [X] outermost object reference `$`
 - [X] mixin inheritence (operator `+` with `self` and `super`)
 - [X] field composition (operator `+:`)
-- [ ] multiple file output
+- [ ] multiple file output (https://github.com/moleike/haskell-jsonnet/issues/32)
+- [ ] verbatim imports (https://github.com/moleike/haskell-jsonnet/issues/52)
 
 ## Build
 
