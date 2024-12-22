@@ -11,12 +11,10 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        haskellPackages = pkgs.haskell.packages.ghc962;
+        haskellPackages = pkgs.haskell.packages.ghc98;
 
         overlay = self: super: {
-          # Required for ghcid
-          shelly = pkgs.haskell.lib.dontCheck super.shelly_1_12_1;
-          ghcid = pkgs.haskell.lib.dontCheck super.ghcid;
+          unbound-generics = pkgs.haskell.lib.unmarkBroken super.unbound-generics;
         };
 
         haskellPackages' = haskellPackages.extend overlay;
