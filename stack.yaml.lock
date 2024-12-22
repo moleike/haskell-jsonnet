@@ -3,24 +3,10 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages:
-- completed:
-    hackage: unbound-generics-0.4.3@sha256:12209c0049000d0dd8c3eb6013d0278a8b269a2421d9758083aab9f58c4b6b4c,5446
-    pantry-tree:
-      sha256: 0a62d14242839c1295c1f6763a0d435f1f3fe7d89829add21ea6d008e8cd52e2
-      size: 3171
-  original:
-    hackage: unbound-generics-0.4.3
-- completed:
-    hackage: ansi-wl-pprint-0.6.9@sha256:fb737bc96e2aef34ad595d54ced7a73f648c521ebcb00fe0679aff45ccd49212,2448
-    pantry-tree:
-      sha256: ebb02b32915c04146b193949c3c48d9e8200c152f38947e8d23ca25b0997e188
-      size: 472
-  original:
-    hackage: ansi-wl-pprint-0.6.9@sha256:fb737bc96e2aef34ad595d54ced7a73f648c521ebcb00fe0679aff45ccd49212,2448
+packages: []
 snapshots:
 - completed:
-    sha256: a6f197e8f08784dde10ad7d8b915b45b66553dbf1f200ec8077b2574d393e5ae
-    size: 554267
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2023/7/19.yaml
-  original: nightly-2023-07-19
+    sha256: 18514ff1ed00330c922bd8d28d88a54670a9849f17eb07dc78391a94d576749d
+    size: 678854
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/23/1.yaml
+  original: lts-23.1
