@@ -23,7 +23,18 @@ source-repository head
   type: git
   location: https://github.com/moleike/haskell-jsonnet
 
+common common-extensions
+  default-language: GHC2021
+  default-extensions:
+      LambdaCase
+      DerivingStrategies
+      DeriveAnyClass
+      DerivingVia
+      RecordWildCards
+
 library
+  import:
+      common-extensions
   exposed-modules:
       Language.Jsonnet
     , Language.Jsonnet.Error
@@ -79,9 +90,9 @@ library
       binary                        >= 0.8.8 && < 0.9,
       th-lift-instances             >= 0.1.18 && < 0.2
 
-  default-language: GHC2021
-
 executable hs-jsonnet
+  import:
+      common-extensions
   main-is: Main.hs
   autogen-modules:
       Paths_jsonnet
@@ -101,9 +112,10 @@ executable hs-jsonnet
       mtl,
       prettyprinter,
       optparse-applicative >= 0.16.1 && < 0.19
-  default-language: Haskell2010
 
 test-suite jsonnet-test
+  import:
+      common-extensions
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
@@ -130,9 +142,10 @@ test-suite jsonnet-test
     , tasty-hunit
     , hedgehog
     , tasty-hedgehog
-  default-language: GHC2021
 
 benchmark jsonnet-bench
+  import:
+      common-extensions
   main-is: Bench.hs
   type: exitcode-stdio-1.0
   hs-source-dirs:
@@ -144,5 +157,4 @@ benchmark jsonnet-bench
     , bytestring
     , text
     , prettyprinter
-  default-language: GHC2021
   ghc-options: "-with-rtsopts=-A32m --nonmoving-gc"

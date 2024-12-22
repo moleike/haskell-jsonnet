@@ -1,8 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 -- |
 -- Module                  : Language.Jsonnet.Pretty
 -- Copyright               : (c) 2020-2021 Alexandre Moreno

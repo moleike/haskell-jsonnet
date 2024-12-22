@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-
 -- |
 -- Module                  : Language.Jsonnet.Check
 -- Copyright               : (c) 2020-2021 Alexandre Moreno

@@ -1,6 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- |
 -- Module                  : Language.Jsonnet.TH
