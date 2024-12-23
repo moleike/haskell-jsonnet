@@ -35,9 +35,16 @@ common common-extensions
       DerivingVia
       RecordWildCards
 
+common common-warnings
+  ghc-options:
+    -Wall -Wcompat -Widentities -Wincomplete-record-updates
+    -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+    -Wno-unused-do-bind -Wunused-packages
+
 library
   import:
       common-extensions
+    , common-warnings
   exposed-modules:
       Language.Jsonnet
     , Language.Jsonnet.Error
@@ -95,6 +102,7 @@ library
 executable hs-jsonnet
   import:
       common-extensions
+    , common-warnings
   main-is: Main.hs
   autogen-modules:
       Paths_jsonnet
@@ -118,6 +126,7 @@ executable hs-jsonnet
 test-suite jsonnet-test
   import:
       common-extensions
+    , common-warnings
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
@@ -148,6 +157,7 @@ test-suite jsonnet-test
 benchmark jsonnet-bench
   import:
       common-extensions
+    , common-warnings
   main-is: Bench.hs
   type: exitcode-stdio-1.0
   hs-source-dirs:
