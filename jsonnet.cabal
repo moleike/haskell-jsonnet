@@ -18,6 +18,9 @@ extra-doc-files:
     CHANGELOG.md
 extra-source-files:
     stdlib/std.jsonnet
+    test/golden/*.jsonnet
+    test/golden/*.golden
+    test/golden/**/*.libsonnet
 
 source-repository head
   type: git
