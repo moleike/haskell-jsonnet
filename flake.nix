@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
-        haskellPackages = pkgs.haskell.packages.ghc98;
+        haskellPackages = pkgs.haskell.packages.ghc910;
 
         overlay = self: super: {
           unbound-generics = pkgs.haskell.lib.unmarkBroken super.unbound-generics;
