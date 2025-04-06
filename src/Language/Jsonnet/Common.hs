@@ -20,7 +20,6 @@ import qualified Data.Text as T (pack)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Text.Show.Deriving (deriveShow1)
 import Unbound.Generics.LocallyNameless (Alpha (..), Name, name2String)
 import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 

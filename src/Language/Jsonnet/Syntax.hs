@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-partial-fields #-}
 -- |
 -- Module                  : Language.Jsonnet.Syntax
 -- Copyright               : (c) 2020-2021 Alexandre Moreno
@@ -9,7 +10,6 @@ module Language.Jsonnet.Syntax where
 
 import Control.Applicative (Const (..))
 import Data.Data (Data)
-import Data.Eq.Deriving
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import Data.Functor.Sum

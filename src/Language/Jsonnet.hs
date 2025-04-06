@@ -25,7 +25,6 @@ module Language.Jsonnet
   )
 where
 
-import Control.Exception (throwIO)
 import Control.Monad ((>=>), (<=<))
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
@@ -33,14 +32,10 @@ import Control.Monad.Except
 import Control.Monad.Reader
 import qualified Data.Aeson as JSON
 import Data.Binary (decode)
-import Data.Functor.Identity
-import Data.Functor.Sum
 import qualified Data.Map.Lazy as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import qualified Data.Text.IO as T
-import Debug.Trace
-import Language.Jsonnet.Annotate
 import qualified Language.Jsonnet.Check as Check
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
@@ -49,12 +44,11 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
 import qualified Language.Jsonnet.Parser as Parser
-import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Pretty (prettyError)
 import qualified Language.Jsonnet.Std.Lib as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value
-import Prettyprinter (pretty)
 import System.Exit (die)
 
 newtype JsonnetM a = JsonnetM
@@ -157,7 +151,7 @@ interpretExtVar = \case
       JsonnetM $ lift $ ExceptT $ runEvalM env (whnf expr)
 
     dieError :: Error -> IO a
-    dieError = die . show . pretty
+    dieError = die . show . prettyError
 
 constructExtVars :: [(Text, ExtVar)] -> IO ExtVars
 constructExtVars = fmap (ExtVars . M.fromList) . traverse interpretExtVarPair

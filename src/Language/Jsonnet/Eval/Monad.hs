@@ -79,9 +79,9 @@ instance Fresh (EvalM a) where
   fresh nm@(Bn {}) = return nm
 
 runEvalM :: Ctx a -> EvalM a b -> IO (Either Error b)
-runEvalM ctx e = do
-  gen <- newIORef 0
-  let st = EvalState ctx emptyStack Nothing gen
+runEvalM ctx' e = do
+  gen' <- newIORef 0
+  let st = EvalState ctx' emptyStack Nothing gen'
   (`runReaderT` st) (runExceptT (unEval e))
 
 throwE :: EvalError -> EvalM a b
@@ -94,9 +94,9 @@ withEnv :: Ctx a -> EvalM a b -> EvalM a b
 withEnv = locally ctx . const
 
 pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a b -> EvalM a b
-pushStackFrame (name, span) =
+pushStackFrame (name, span') =
   locally (callStack . scopes) (name :)
-    . locally (callStack . spans) (span :)
+    . locally (callStack . spans) (span' :)
 
 getBacktrace :: EvalM a (Backtrace Core)
 getBacktrace = do
@@ -105,5 +105,5 @@ getBacktrace = do
   pure $
     Backtrace $
       case sequence sp of
-        Just sp -> zipWith StackFrame sc sp
+        Just sp' -> zipWith StackFrame sc sp'
         Nothing -> []

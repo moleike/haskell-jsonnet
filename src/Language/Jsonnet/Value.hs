@@ -8,7 +8,6 @@
 module Language.Jsonnet.Value where
 
 import Control.Lens (view)
-import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.HashMap.Lazy (HashMap)
 import Data.IORef
@@ -18,9 +17,13 @@ import Data.Text (Text)
 import Data.Vector (Vector)
 import GHC.Generics
 import Language.Jsonnet.Common
-import Language.Jsonnet.Core
+import Language.Jsonnet.Core hiding (mkField)
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
+import Data.Aeson (FromJSON (..))
+import qualified Data.Aeson as JSON
+import qualified Data.Aeson.KeyMap as KeyMap
+import qualified Data.HashMap.Lazy as H
 
 type Eval = EvalM Value
 
@@ -41,6 +44,23 @@ data Value
   | VPrim !Prim
   | VClos !Lam !Env
   | VFun !Fun
+
+instance FromJSON Value where
+  parseJSON = \case
+    JSON.Null -> pure VNull
+    JSON.Bool b -> pure $ VBool b
+    JSON.Number n -> pure $ VNum n
+    JSON.String s -> pure $ VStr s
+    JSON.Array a -> VArr <$> traverse parseJSON a
+    JSON.Object o -> VObj . f <$> traverse parseJSON (KeyMap.toHashMapText o)
+    where
+      f :: HashMap Text Value -> Object
+      f o =
+        H.fromList
+          [ mkField k v
+            | (k, v) <- H.toList o
+          ]
+      mkField k v = (k, VField (VStr k) v v Visible)
 
 data VField = VField
   { -- |

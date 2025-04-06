@@ -20,6 +20,8 @@ type AnnF f a = Product (Const a) f
 -- | Annotated fixed-point type. Equivalent to CoFree f a
 type Ann f a = Fix (AnnF f a)
 
+{-# COMPLETE AnnF #-}
+pattern AnnF :: f a -> ann -> AnnF f ann a
 pattern AnnF f a = Pair (Const a) f
 
 annMap :: Functor f => (a -> b) -> Ann f a -> Ann f b

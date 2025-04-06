@@ -10,26 +10,19 @@
 module Language.Jsonnet.TH where
 
 import Control.Monad ((>=>))
-import Control.Monad.Except hiding (lift)
-import Data.Binary (Binary, encode)
+import Control.Monad.Except
+import Data.Binary (encode)
 import Data.Data
-import Data.Functor.Product
-import Data.Scientific (Scientific)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Instances.TH.Lift ()
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Jsonnet.Annotate (forget)
-import Language.Jsonnet.Common
-import Language.Jsonnet.Core
 import Language.Jsonnet.Desugar
 import qualified Language.Jsonnet.Parser as Parser
-import Language.Jsonnet.Parser.SrcSpan
-import Language.Jsonnet.Pretty ()
-import Language.Jsonnet.Syntax
+import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Syntax.Annotated
-import Prettyprinter (pretty)
 
 liftText :: Text -> Q Exp
 liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
@@ -41,7 +34,7 @@ liftDataWithText = dataToExpQ (fmap liftText . cast)
 parse0 :: FilePath -> Text -> Q Expr
 parse0 path str = do
   parse' str >>= \case
-    Left err -> fail (show $ pretty err)
+    Left err -> fail (show $ prettyError err)
     Right res -> pure res
   where
     parse' =

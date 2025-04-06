@@ -17,15 +17,13 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T (pack)
-import Debug.Trace
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
-import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Pretty (prettyEvalError)
 import Language.Jsonnet.Syntax
-import Prettyprinter
 import Unbound.Generics.LocallyNameless
 
 class Desugarer a where
@@ -76,6 +74,7 @@ alg outermost = \case
   EArrComp {expr, comp} -> desugarArrComp expr comp
   EObjComp {field, comp, locals} -> desugarObjComp field comp locals
 
+desugarSlice :: Core -> Maybe Core -> Maybe Core -> Maybe Core -> Core
 desugarSlice expr start end step =
   stdFunc
     "slice"
@@ -105,6 +104,7 @@ desugarBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
 desugarUnyOp :: UnyOp -> Core -> Core
 desugarUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
 
+desugarObj :: Bool -> [(String, Core)] -> [EField Core] -> Core
 desugarObj outermost locals fields = obj
   where
     obj = CObj (desugarField <$> fields')
@@ -153,6 +153,7 @@ desugarField EField {..} = mkField key value' visibility
         else value
     super = CVar $ s2n "super"
 
+desugarObjComp :: EField Core -> NonEmpty (CompSpec Core) -> [(String, Core)] -> Core
 desugarObjComp EField {..} comp locals =
   CComp (ObjC (bind (s2n "arr") (kv', Nothing))) arrComp
   where
@@ -171,8 +172,8 @@ desugarObjComp EField {..} comp locals =
     value' = case locals of
       [] -> desugarLet bnds value
       -- we need to nest the let bindings due to the impl.
-      xs -> desugarLet bnds $ desugarLet (NE.fromList xs) value
-    xs = desugarLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral <$> [0 ..]
+      xs' -> desugarLet bnds $ desugarLet (NE.fromList xs') value
+    xs = desugarLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral @Integer <$> [0 ..]
     arrComp = desugarArrComp arr comp
     arr = CArr $ NE.toList $ CVar . s2n . var <$> comp
 
@@ -184,6 +185,7 @@ stdFunc f =
         (CLit $ String f)
     )
 
+desugarFun :: [(String, Maybe Core)] -> Core -> Core
 desugarFun ps e =
   CLam $
     bind
@@ -202,9 +204,10 @@ desugarFun ps e =
           String
             ( T.pack $
                 show $
-                  pretty $ ParamNotBound n
+                  prettyEvalError $ ParamNotBound n
             )
 
+desugarLet :: NonEmpty (String, Core) -> Core -> Core
 desugarLet bnds e =
   CLet $
     bind
