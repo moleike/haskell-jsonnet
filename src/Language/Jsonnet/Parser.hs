@@ -74,10 +74,15 @@ resolveImports ::
 resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const (Import fp'))) a) =
-      resolveImports fp'
-        =<< parse fp'
-        =<< readImportFile fp' a
+    go (AnnF (InR (Const import')) a) =
+      case import' of
+        Import fp' -> do
+          resolveImports fp'
+            =<< parse fp'
+            =<< readImportFile fp' a
+        Importstr fp' -> do
+          content <- readImportFile fp' a
+          pure $ Fix $ AnnF (EStr content) a
     readImportFile fp' a = do
       inp <- readFile' fp'
       liftEither $ left (ParserError . flip ImportError (Just a)) inp
@@ -368,6 +373,11 @@ importP = Fix <$> annotateLoc importDecl <?> "import"
   where
     importDecl = mkImportF <$> (keywordP "import" *> stringLiteral)
 
+importstrP :: Parser Expr'
+importstrP = Fix <$> annotateLoc importstrDecl <?> "importstr"
+  where
+    importstrDecl = mkImportstrF <$> (keywordP "importstr" *> stringLiteral)
+
 binary ::
   Text ->
   (Expr' -> Expr' -> Expr') ->
@@ -498,6 +508,7 @@ primP =
         objectP,
         arrayP,
         localP,
+        importstrP,
         importP,
         errorP,
         assertP,
