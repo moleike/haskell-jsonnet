@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
@@ -59,7 +56,7 @@ makeLenses ''EvalState
 newtype EvalM a b = EvalM
   { unEval :: ExceptT Error (ReaderT (EvalState a) IO) b
   }
-  deriving
+  deriving newtype
     ( Functor,
       Applicative,
       Monad,

@@ -1,6 +1,3 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances #-}
-
 -- |
 -- Module                  : Language.Jsonnet.Error
 -- Copyright               : (c) 2020-2021 Alexandre Moreno

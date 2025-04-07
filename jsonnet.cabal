@@ -1,4 +1,4 @@
-cabal-version:  2.2
+cabal-version:  3.0
 name:           jsonnet
 version:        0.3.1.1
 synopsis:       Jsonnet implementaton in pure Haskell
@@ -13,16 +13,31 @@ license:        BSD-3-Clause
 x-license:      BSD-3-Clause OR Apache-2.0
 license-file:   LICENSE
 build-type:     Simple
-extra-source-files:
+extra-doc-files:
     README.md
     CHANGELOG.md
+extra-source-files:
     stdlib/std.jsonnet
+    test/golden/*.jsonnet
+    test/golden/*.golden
+    test/golden/**/*.libsonnet
 
 source-repository head
   type: git
   location: https://github.com/moleike/haskell-jsonnet
 
+common common-extensions
+  default-language: GHC2021
+  default-extensions:
+      LambdaCase
+      DerivingStrategies
+      DeriveAnyClass
+      DerivingVia
+      RecordWildCards
+
 library
+  import:
+      common-extensions
   exposed-modules:
       Language.Jsonnet
     , Language.Jsonnet.Error
@@ -51,14 +66,13 @@ library
   hs-source-dirs:
       src
   build-depends:
-      aeson                         >= 1.5.6 && < 2.3,
-      base                          >= 4.14.1 && < 5,
-      bytestring                    >= 0.10.12 && < 0.12,
-      containers                    >= 0.6.2 && < 0.7,
+      aeson                         >= 2.2 && < 2.3,
+      base                          >= 4.20 && < 4.22,
+      bytestring                    >= 0.11 && < 0.13,
+      containers                    >= 0.6.2 && < 0.8,
       scientific                    >= 0.3.7 && < 0.4,
-      hashable                      >= 1.3.0.0 && < 1.5,
-      text                          >= 1.2.4 && < 2.1,
-      template-haskell              >= 2.16.0 && < 2.21,
+      text                          >= 2.0 && < 2.2,
+      template-haskell              >= 2.16.0 && < 2.23,
       data-fix                      >= 0.3.1 && < 0.4,
       transformers-compat           >= 0.6.6 && < 0.8,
       unordered-containers          >= 0.2.14 && < 0.3,
@@ -67,26 +81,20 @@ library
       prettyprinter                 >= 1.7.0 && < 1.8,
       deriving-compat               >= 0.5.10 && < 0.7,
       directory                     >= 1.3.6 && < 1.4,
-      filepath                      >= 1.4.2 && < 1.5,
+      filepath                      >= 1.4.2 && < 1.6,
       exceptions                    >= 0.10.4 && < 0.11,
-      lens                          >= 5.0.1 && < 5.3,
+      lens                          >= 5.0.1 && < 5.4,
       semigroupoids                 >= 5.3.5 && < 6.1,
-      megaparsec                    >= 9.0.1 && < 9.5,
+      megaparsec                    >= 9.5 && < 9.8,
       parser-combinators            >= 1.2.1 && < 1.4,
       unbound-generics              >= 0.4.3 && < 0.5,
-      th-utilities                  >= 0.2.4.2,
+      th-utilities                  >= 0.2.4.2 && < 0.3,
       binary                        >= 0.8.8 && < 0.9,
       th-lift-instances             >= 0.1.18 && < 0.2
 
-  default-language: Haskell2010
-  default-extensions:
-      MultiParamTypeClasses
-    , FlexibleContexts
-    , FlexibleInstances
-    , DeriveGeneric
-    , LambdaCase
-
 executable hs-jsonnet
+  import:
+      common-extensions
   main-is: Main.hs
   autogen-modules:
       Paths_jsonnet
@@ -106,9 +114,10 @@ executable hs-jsonnet
       mtl,
       prettyprinter,
       optparse-applicative >= 0.16.1 && < 0.19
-  default-language: Haskell2010
 
 test-suite jsonnet-test
+  import:
+      common-extensions
   type: exitcode-stdio-1.0
   main-is: Main.hs
   other-modules:
@@ -135,9 +144,10 @@ test-suite jsonnet-test
     , tasty-hunit
     , hedgehog
     , tasty-hedgehog
-  default-language: Haskell2010
 
 benchmark jsonnet-bench
+  import:
+      common-extensions
   main-is: Bench.hs
   type: exitcode-stdio-1.0
   hs-source-dirs:
@@ -149,8 +159,4 @@ benchmark jsonnet-bench
     , bytestring
     , text
     , prettyprinter
-  default-language: Haskell2010
-  if impl(ghc >= 8.10)
-    ghc-options: "-with-rtsopts=-A32m --nonmoving-gc"
-  else
-    ghc-options: "-with-rtsopts=-A32m"
+  ghc-options: "-with-rtsopts=-A32m --nonmoving-gc"

@@ -1,12 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveLift #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
 
 -- |
 -- Module                  : Language.Jsonnet.TH
@@ -38,59 +30,6 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
 import Prettyprinter (pretty)
-
-instance Data a => Lift (Arg a) where
-  lift = liftData
-
-instance Lift SrcSpan where
-  lift = liftData
-
-instance Lift Visibility where
-  lift = liftData
-
-instance Data a => Lift (Args a) where
-  lift = liftData
-
-instance Lift Strictness where
-  lift = liftData
-
-instance Lift Literal where
-  lift = liftData
-
-instance Lift Prim where
-  lift = liftData
-
-instance Lift BinOp where
-  lift = liftData
-
-instance Lift UnyOp where
-  lift = liftData
-
-instance Data a => Lift (EField a) where
-  lift = liftData
-
-instance Data a => Lift (Assert a) where
-  lift = liftData
-
-instance Data a => Lift (CompSpec a) where
-  lift = liftData
-
-instance Data a => Lift (ExprF a) where
-  lift = liftData
-
-instance
-  ( Typeable a,
-    Typeable f,
-    Typeable g,
-    Data (f a),
-    Data (g a)
-  ) =>
-  Lift (Product f g a)
-  where
-  lift = liftData
-
-instance Lift Expr where
-  lift = liftData
 
 liftText :: Text -> Q Exp
 liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
