@@ -122,6 +122,7 @@ data ExprF a
 data Import
   = Import FilePath
   | Importstr FilePath
+  | Importbin FilePath
   deriving stock (Show, Eq)
 
 type ExprF' = Sum ExprF (Const Import)
@@ -131,6 +132,9 @@ mkImportF = InR . Const . Import
 
 mkImportstrF :: FilePath -> ExprF' a
 mkImportstrF = InR . Const . Importstr
+
+mkImportbinF :: FilePath -> ExprF' a
+mkImportbinF = InR . Const . Importbin
 
 mkNullF :: ExprF' a
 mkNullF = InL ENull
