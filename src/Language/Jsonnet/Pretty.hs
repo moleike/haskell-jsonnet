@@ -42,7 +42,8 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 (<$$>) = \x y -> vcat [x, y]
 
 -- reserved keywords
-pnull, ptrue, pfalse, pif, pthen, pelse, pimport, perror, plocal, pfunction, passert, pfor, pin :: Doc ann
+pnull, ptrue, pfalse, pif, pthen, pelse, pimport, pimportstr, pimportbin,
+  perror, plocal, pfunction, passert, pfor, pin :: Doc ann
 pnull = pretty "null"
 ptrue = pretty "true"
 pfalse = pretty "false"
@@ -50,6 +51,8 @@ pif = pretty "if"
 pthen = pretty "then"
 pelse = pretty "else"
 pimport = pretty "import"
+pimportstr = pretty "importstr"
+pimportbin = pretty "importbin"
 perror = pretty "error"
 plocal = pretty "local"
 pfunction = pretty "function"
@@ -141,6 +144,9 @@ prettyEvalError = \case
       <+> pretty (T.unpack actual)
   InvalidKey k ->
     pretty "invalid key:"
+      <+> pretty k
+  DuplicateKey k ->
+    pretty "duplicate key:"
       <+> pretty k
   InvalidIndex k ->
     pretty "invalid index:"
@@ -257,6 +263,7 @@ prettyUnyOp = \case
   LNot -> pretty "!"
   Plus -> pretty "+"
   Minus -> pretty "-"
+  Err -> pretty "<prim:err>"
 
 prettyBinOp :: BinOp -> Doc ann
 prettyBinOp = \case
@@ -279,6 +286,7 @@ prettyBinOp = \case
   LAnd -> pretty "&&"
   LOr -> pretty "||"
   In -> pretty "in"
+  Lookup -> pretty "<prim:lookup>"
 
 ppFun :: [Param (Doc ann)] -> Doc ann -> Doc ann
 ppFun ps e = pfunction <> parens (commaSep ps') <+> e
@@ -292,12 +300,16 @@ ppMaybeDoc = fromMaybe mempty
 prettyExpr' :: Ann.Expr' -> Doc ann
 prettyExpr' = prettyFixExprF' . forget'
 
+prettyImport :: Import -> Doc ann
+prettyImport = \case
+  Import fp -> pimport <+> squotes (pretty fp)
+  Importstr fp -> pimportstr <+> squotes (pretty fp)
+  Importbin fp -> pimportbin <+> squotes (pretty fp)
+
 prettyFixExprF' :: Fix ExprF' -> Doc ann
-prettyFixExprF' = foldFix go
-  where
-    go = \case
-      InR (Const (Import fp)) -> pimport <+> squotes (pretty fp)
-      InL e -> ppExpr e
+prettyFixExprF' = foldFix $ \case
+  InR (Const import') -> prettyImport import'
+  InL e -> ppExpr e
 
 prettyFixExprF :: Fix ExprF -> Doc ann
 prettyFixExprF = foldFix ppExpr
