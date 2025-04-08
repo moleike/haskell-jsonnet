@@ -1,0 +1,2 @@
+Parse error: this file does not exist (No such file or directory)
+    ./test/golden/importstr-nonexistent.jsonnet:1:1-37

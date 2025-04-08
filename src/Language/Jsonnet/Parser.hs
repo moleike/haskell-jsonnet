@@ -47,6 +47,9 @@ import System.IO.Error (tryIOError)
 import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import Data.Word (Word8)
+import qualified Data.ByteString as BS
+import Data.Functor.Product (Product(..))
 
 type Parser = Parsec Void Text
 
@@ -63,7 +66,7 @@ parse fp inp =
     left (ParserError . ParseError) $
       runParser (sc *> exprP <* eof) fp inp
 
-resolveImports ::
+resolveImports :: forall m.
   (MonadError Error m, MonadIO m) =>
   -- | File path (modules are resolved relative to this path)
   FilePath ->
@@ -74,19 +77,41 @@ resolveImports ::
 resolveImports fp = foldFixM go
   where
     go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const (Import fp'))) a) =
-      resolveImports fp'
-        =<< parse fp'
-        =<< readImportFile fp' a
-    readImportFile fp' a = do
-      inp <- readFile' fp'
+    go (AnnF (InR (Const import')) a) =
+      case import' of
+        Import fp' -> do
+          resolveImports fp'
+            =<< parse fp'
+            =<< readImportFile fp' a
+        Importstr fp' -> do
+          content <- readImportFile fp' a
+          pure $ Fix $ AnnF (EStr content) a
+        Importbin fp' -> do
+          content <- readBinaryFile fp' a
+          pure $ mkBinaryLiteral content a
+
+    readImportFile :: FilePath -> SrcSpan -> m Text
+    readImportFile = readFileWith T.readFile
+
+    readBinaryFile :: FilePath -> SrcSpan -> m [Word8]
+    readBinaryFile = readFileWith (fmap BS.unpack . BS.readFile)
+
+    readFileWith :: (FilePath -> IO a) -> FilePath -> SrcSpan -> m a
+    readFileWith reader fp' a = do
+      inp <- (handleIO . reader) fp'
       liftEither $ left (ParserError . flip ImportError (Just a)) inp
       where
-        readFile' =
+        handleIO :: IO a -> m (Either IOError a)
+        handleIO =
           liftIO
-            . tryIOError
-            . withCurrentDirectory (takeDirectory fp)
-            . T.readFile
+          . tryIOError
+          . withCurrentDirectory (takeDirectory fp)
+
+    mkBinaryLiteral :: [Word8] -> SrcSpan -> Expr
+    mkBinaryLiteral ws a = Fix $ AnnF (EArr $ map wordExpr ws) a
+      where
+        wordExpr :: Word8 -> Expr
+        wordExpr w = Fix $ AnnF (ENum (fromIntegral w)) a
 
 sc :: Parser ()
 sc = L.space space1 lineComment blockComment
@@ -368,6 +393,16 @@ importP = Fix <$> annotateLoc importDecl <?> "import"
   where
     importDecl = mkImportF <$> (keywordP "import" *> stringLiteral)
 
+importstrP :: Parser Expr'
+importstrP = Fix <$> annotateLoc importstrDecl <?> "importstr"
+  where
+    importstrDecl = mkImportstrF <$> (keywordP "importstr" *> stringLiteral)
+
+importbinP :: Parser Expr'
+importbinP = Fix <$> annotateLoc importbinDecl <?> "importbin"
+  where
+    importbinDecl = mkImportbinF <$> (keywordP "importbin" *> stringLiteral)
+
 binary ::
   Text ->
   (Expr' -> Expr' -> Expr') ->
@@ -498,6 +533,8 @@ primP =
         objectP,
         arrayP,
         localP,
+        importstrP,
+        importbinP,
         importP,
         errorP,
         assertP,

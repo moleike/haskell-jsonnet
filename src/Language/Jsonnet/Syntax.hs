@@ -119,13 +119,22 @@ data ExprF a
     (Eq1, Show1)
     via FunctorClassesDefault ExprF
 
-newtype Import = Import FilePath
-  deriving (Show, Eq)
+data Import
+  = Import FilePath
+  | Importstr FilePath
+  | Importbin FilePath
+  deriving stock (Show, Eq)
 
 type ExprF' = Sum ExprF (Const Import)
 
-mkImportF :: String -> ExprF' a
+mkImportF :: FilePath -> ExprF' a
 mkImportF = InR . Const . Import
+
+mkImportstrF :: FilePath -> ExprF' a
+mkImportstrF = InR . Const . Importstr
+
+mkImportbinF :: FilePath -> ExprF' a
+mkImportbinF = InR . Const . Importbin
 
 mkNullF :: ExprF' a
 mkNullF = InL ENull
