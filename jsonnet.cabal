@@ -137,15 +137,12 @@ test-suite jsonnet-test
     , containers
     , prettyprinter
     , jsonnet
-    , mtl
     , text
     , filepath
     , data-fix
     , bytestring
     , tasty
     , tasty-golden
-    , tasty-expected-failure
-    , tasty-hunit
     , hedgehog
     , tasty-hedgehog
 

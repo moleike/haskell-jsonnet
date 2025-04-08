@@ -18,7 +18,6 @@ import Language.Jsonnet.Syntax
 import Prettyprinter
 import Prettyprinter.Render.Text
 import Test.Tasty
-import Test.Tasty.ExpectedFailure
 import Test.Tasty.Hedgehog
 
 genString :: Gen String
@@ -97,7 +96,7 @@ genLiteral =
   Gen.choice
     [ pure (Fix mkNullF),
       Fix . mkBoolF <$> Gen.bool,
-      Fix . mkIntF <$> Gen.integral (Range.linear 0 10),
+      Fix . mkIntF @Int <$> Gen.integral (Range.linear 0 10),
       genLitStr
     ]
 
@@ -181,7 +180,7 @@ printExpr :: Fix ExprF' -> Text
 printExpr =
   renderStrict
     . layoutPretty defaultLayoutOptions
-    . pretty
+    . prettyFixExprF'
 
 parseExpr :: Text -> Either Error (Fix ExprF')
 parseExpr = fmap forget' . Parser.parse ""
@@ -192,6 +191,7 @@ prop_roundtrip =
     x <- forAll genExpr
     tripping x printExpr parseExpr
 
+testRoundtripGroup :: TestTree
 testRoundtripGroup =
   testGroup
     "Property tests"
