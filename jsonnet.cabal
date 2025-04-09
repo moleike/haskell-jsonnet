@@ -1,6 +1,6 @@
 cabal-version:  3.0
 name:           jsonnet
-version:        0.3.1.1
+version:        0.4.0.0
 synopsis:       Jsonnet implementaton in pure Haskell
 description:    Please see the README on GitHub at <https://github.com/moleike/jsonnet-haskell#readme>
 homepage:       https://github.com/moleike/haskell-jsonnet#readme
@@ -124,6 +124,8 @@ test-suite jsonnet-test
     , common-warnings
   type: exitcode-stdio-1.0
   main-is: Main.hs
+  autogen-modules:
+      Paths_jsonnet
   other-modules:
       Paths_jsonnet
     , Language.Jsonnet.Test.Roundtrip
