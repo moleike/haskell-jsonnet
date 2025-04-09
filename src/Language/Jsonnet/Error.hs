@@ -15,7 +15,6 @@ import Data.Void (Void)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Parser.SrcSpan
-import Prettyprinter (Doc)
 import Text.Megaparsec (ParseErrorBundle)
 
 data Error
@@ -27,7 +26,11 @@ data Error
 instance Exception Error
 
 data EvalError
-  = TypeMismatch {expected :: Text, actual :: Text}
+  = TypeMismatch
+      Text
+      -- ^ expected
+      Text
+      -- ^ actual
   | InvalidKey Text
   | DuplicateKey Text
   | NoSuchKey Text

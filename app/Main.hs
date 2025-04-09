@@ -2,13 +2,11 @@
 
 module Main where
 
-import Control.Monad.Except
 import qualified Data.Aeson as JSON
-import Data.Bifunctor (bimap, first, second)
+import Data.Bifunctor (first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString.Lazy.Char8 as LC (putStrLn)
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -17,14 +15,10 @@ import qualified Data.Text.IO as TIO
 import Data.Version (showVersion)
 import Data.Void (Void)
 import Language.Jsonnet
-import Language.Jsonnet.Annotate
-import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
-import Language.Jsonnet.Eval
-import Language.Jsonnet.Value (ExtVars (..))
-import Options.Applicative
+import Language.Jsonnet.Pretty (ppJson, prettyError)
+import Options.Applicative hiding (str)
 import Paths_jsonnet (version)
-import Prettyprinter (Pretty, pretty)
 import System.Environment (lookupEnv)
 import System.Exit (die)
 import qualified Text.Megaparsec as MP
@@ -53,7 +47,7 @@ printResult outp outputMode Json val =
   writeOutput (encode val) outp
   where
     encode = case outputMode of
-      Pretty -> encodeToLazyByteString . T.pack . show . pretty
+      Pretty -> encodeToLazyByteString . T.pack . show . ppJson 4
       Compact -> JSON.encode
 printResult outp _ Plaintext (JSON.String s) =
   writeOutput (encodeToLazyByteString s) outp
@@ -66,7 +60,7 @@ writeOutput bs = \case
   Stdout -> LC.putStrLn bs
 
 printError :: Error -> IO ()
-printError = print . pretty
+printError = print . prettyError
 
 readSource :: Input -> IO Text
 readSource = \case
@@ -210,9 +204,9 @@ parsePair =
       (MP.someTill MPC.asciiChar MP.eof)
 
 mkInput :: Bool -> Maybe String -> Input
-mkInput exec = \case
+mkInput exec' = \case
   Nothing -> Stdin
-  Just e | exec -> ExecInput e
+  Just e | exec' -> ExecInput e
   Just p | otherwise -> FileInput p
 
 exec :: Parser Bool

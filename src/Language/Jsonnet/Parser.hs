@@ -28,13 +28,11 @@ import Data.Either
 import Data.Fix
 import Data.Functor
 import Data.Functor.Sum
-import Data.List (intercalate)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import Data.Void
-import GHC.IO.Exception hiding (IOError)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
@@ -49,7 +47,6 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import Data.Word (Word8)
 import qualified Data.ByteString as BS
-import Data.Functor.Product (Product(..))
 
 type Parser = Parsec Void Text
 
@@ -259,14 +256,14 @@ booleanP = Fix <$> annotateLoc boolean <?> "bool"
         <|> keywordP "false" $> mkBoolF False
 
 nullP :: Parser Expr'
-nullP = Fix <$> annotateLoc null
+nullP = Fix <$> annotateLoc null'
   where
-    null = keywordP "null" $> mkNullF
+    null' = keywordP "null" $> mkNullF
 
 errorP :: Parser Expr'
-errorP = Fix <$> annotateLoc error
+errorP = Fix <$> annotateLoc error'
   where
-    error = keywordP "error" *> (mkErrorF <$> exprP)
+    error' = keywordP "error" *> (mkErrorF <$> exprP)
 
 assertP :: Parser Expr'
 assertP = Fix <$> annotateLoc assert
@@ -354,7 +351,7 @@ objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
-      xs <- eitherP localP fieldP `sepEndBy` comma
+      xs <- eitherP localP' fieldP `sepEndBy` comma
       let (ls, fs) = (lefts xs, rights xs)
       pure $ mkObjectF fs ls
     fieldP = try methodP <|> pairP
@@ -378,13 +375,13 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
       try (symbol ":::" $> Forced)
         <|> try (symbol "::" $> Hidden)
         <|> symbol ":" $> Visible
-    localP = do
+    localP' = do
       _ <- keywordP "local"
       try binding <|> localFunc
     objectComp = do
-      locals1 <- localP `sepEndBy` comma
+      locals1 <- localP' `sepEndBy` comma
       expr <- pairP <* optional comma
-      locals2 <- localP `sepEndBy` comma
+      locals2 <- localP' `sepEndBy` comma
       comps <- NE.some forspecP
       return $ mkObjCompF expr (locals1 <> locals2) comps
 

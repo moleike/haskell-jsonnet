@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Eval
@@ -14,7 +15,6 @@ module Language.Jsonnet.Eval where
 import Control.Applicative
 import Control.Lens (locally, view)
 import Control.Monad ((>=>), join, forM, (<=<))
-import Control.Monad.Except
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -39,14 +39,12 @@ import Data.Text.Lazy (toStrict)
 import Data.Traversable (for)
 import Data.Vector (Vector, (!?))
 import qualified Data.Vector as V
-import Debug.Trace
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Value
-import Prettyprinter hiding (equals)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
@@ -103,8 +101,8 @@ whnfApp e es = withStackFrame e $ do
     VPrim op -> whnfPrim op vs
     v@(VFun _) -> foldlM f v vs
       where
-        f (VFun g) (Pos v) = g v
-        f v _ = throwTypeMismatch "function" v
+        f (VFun g) (Pos v') = g v'
+        f v' _ = throwTypeMismatch "function" v'
     v -> throwTypeMismatch "function" v
 
 withStackFrame :: Core -> Eval a -> Eval a
@@ -133,14 +131,15 @@ appDefaults rs e = mdo
   bnds <-
     M.fromList
       <$> mapM
-        ( \(n, e) -> do
-            th <- extendEnv bnds (mkValue e)
+        ( \(n, e') -> do
+            th <- extendEnv bnds (mkValue e')
             pure (n, th)
         )
         rs
   extendEnv bnds (whnf e)
 
 -- returns a triple with unapplied binders, positional and named
+splitArgs :: [Arg c] -> [(Name a, b)] -> EvalM s ([(Name a, b)], [(Name a, c)], [(Name a, c)])
 splitArgs args bnds = do
   named <- getNamed
   pos <- getPos
@@ -165,9 +164,9 @@ splitArgs args bnds = do
         g a = find ((a ==) . name2String) pNames
 
     getUnapp named =
-      pure $ filter ((`notElem` ns) . fst) bnds2
+      pure $ filter ((`notElem` ns') . fst) bnds2
       where
-        ns = map fst named
+        ns' = map fst named
 
     split [] = ([], [])
     split (Pos p : xs) =
@@ -207,7 +206,7 @@ whnfBinOp Or e1 e2 = liftF2 ((.|.) @Int64) e1 e2
 whnfBinOp Xor e1 e2 = liftF2 (Bits.xor @Int64) e1 e2
 whnfBinOp ShiftL e1 e2 = liftF2 (Bits.shiftL @Int64) e1 e2
 whnfBinOp ShiftR e1 e2 = liftF2 (Bits.shiftR @Int64) e1 e2
-whnfBinOp In s o = liftF2 (\o s -> objectHasEx o s True) o s
+whnfBinOp In s o = liftF2 (\o' s' -> objectHasEx o' s' True) o s
 
 whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
 whnfLogical f e1 e2 = do
@@ -372,13 +371,13 @@ mergeWith xs ys = mdo
     f a b
       | hidden a && visible b = a
       | otherwise = b
-    update name xs f@VField {..} = case fieldVal of
+    update name xs' f'@VField {..} = case fieldVal of
       VThunk c env -> do
-        let env' = M.insert name xs env
-        let fieldVal = VThunk c env'
-        fieldValWHNF <- mkIndirV fieldVal
-        pure VField {..}
-      _ -> pure f
+        let env' = M.insert name xs' env
+        let fieldVal' = VThunk c env'
+        fieldValWHNF' <- mkIndirV fieldVal'
+        pure VField {fieldVal = fieldVal', fieldValWHNF = fieldValWHNF', ..}
+      _ -> pure f'
 
 visibleKeys :: Object -> HashMap Text Value
 visibleKeys = H.mapMaybe f
@@ -412,18 +411,16 @@ objectFieldsEx o True = L.sort (H.keys o) -- all fields
 objectFieldsEx o False = L.sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
-objectHasEx o f all = f `elem` objectFieldsEx o all
+objectHasEx o f all' = f `elem` objectFieldsEx o all'
 
 primitiveEquals :: Value -> Value -> Eval Bool
 primitiveEquals VNull VNull = pure True
 primitiveEquals (VBool a) (VBool b) = pure (a == b)
 primitiveEquals (VStr a) (VStr b) = pure (a == b)
 primitiveEquals (VNum a) (VNum b) = pure (a == b)
-primitiveEquals a b =
+primitiveEquals _ _ =
   throwE
     ( StdError "primitiveEquals operates on primitive types "
-    --  <> showTy a
-    --  <> showTy b
     )
 
 equals :: Value -> Value -> Eval Bool

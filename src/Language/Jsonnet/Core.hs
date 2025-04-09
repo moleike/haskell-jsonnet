@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-orphans #-}
 -- |
 -- Module                  : Language.Jsonnet.Core
 -- Copyright               : (c) 2020-2021 Alexandre Moreno

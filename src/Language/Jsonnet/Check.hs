@@ -9,16 +9,13 @@ module Language.Jsonnet.Check where
 
 import Control.Monad.Except
 import Data.Fix
-import Data.Functor.Identity
-import Data.List
+import Data.List qualified as List
 import qualified Data.List.NonEmpty as NE
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common hiding (span)
-import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
-import Unbound.Generics.LocallyNameless
 
 type Check = ExceptT Error IO
 
@@ -31,18 +28,18 @@ check = foldFixM alg
       EApply _ (Args as _) -> checkApply as
       _ -> pure ()
     checkLocal names = case dups names of
-      [] -> pure ()
-      ((x:xs) : _) -> throwError $ DuplicateBinding x
+      ((x:_) : _) -> throwError $ DuplicateBinding x
+      _ -> pure ()
     checkFun names = case dups names of
-      [] -> pure ()
-      ((x:xs) : _) -> throwError $ DuplicateParam x
+      ((x:_) : _) -> throwError $ DuplicateParam x
+      _ -> pure ()
     checkApply args = case f args of
       [] -> pure ()
-      (x : _) -> throwError $ PosAfterNamedParam
+      _ -> throwError $ PosAfterNamedParam
       where
-        f args = filter isPos ns
+        f _ = filter isPos ns
         isPos = \case
           Pos _ -> True
           _ -> False
-        (ps, ns) = span isPos args
-    dups = filter ((> 1) . length) . group . sort
+        (_, ns) = span isPos args
+    dups = filter ((> 1) . length) . List.group . List.sort

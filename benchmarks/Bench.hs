@@ -4,21 +4,22 @@ import qualified Data.ByteString.Lazy as LBS
 import Data.Text.Lazy
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet
-import Language.Jsonnet.Core (Core)
+import Language.Jsonnet.Pretty (ppJson, prettyError)
 import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
-import Prettyprinter (Pretty, pretty)
+import Prettyprinter (Doc)
 import Test.Tasty.Bench
 
-render :: Pretty a => a -> LBS.ByteString
-render = encodeUtf8 . pack . show . pretty
+render :: (a -> Doc ann) -> a -> LBS.ByteString
+render printer = encodeUtf8 . pack . show . printer
 
+conf :: Config
 conf = Config "" mempty
 
 eval :: Expr -> IO LBS.ByteString
 eval expr = do
   outp <- runJsonnetM conf (desugar expr >>= evaluate)
-  pure (either render render outp)
+  pure (either (render prettyError) (render (ppJson 4)) outp)
 
 main :: IO ()
 main =
@@ -40,6 +41,7 @@ main =
         ]
     ]
 
+bench01 :: Expr
 bench01 =
   [jsonnet|
     local sum(x) =
@@ -50,6 +52,7 @@ bench01 =
     sum(300)
   |]
 
+bench02 :: Expr
 bench02 =
   [jsonnet|
     local Fib = {
@@ -63,6 +66,7 @@ bench02 =
     (Fib { n: 25 }).r
   |]
 
+bench03 :: Expr
 bench03 =
   [jsonnet|
     local fibonacci(n) =
@@ -73,11 +77,13 @@ bench03 =
     fibonacci(25)
   |]
 
+bench04 :: Expr
 bench04 =
   [jsonnet|
     std.foldl(function(e, res) e + res, std.makeArray(20000, function(i) 'aaaaa'), '')
   |]
 
+bench06 :: Expr
 bench06 =
   [jsonnet|
     // A benchmark for builtin sort
@@ -93,6 +99,7 @@ bench06 =
     && std.assertEqual(std.makeArray(2000, function(i) std.floor((i + 2) / 2)), sort(std.range(1, 1000) + reverse(std.range(1, 1000))))
   |]
 
+bench08 :: Expr
 bench08 =
   [jsonnet|
     local fib(n) =

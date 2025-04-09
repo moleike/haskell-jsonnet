@@ -9,8 +9,6 @@ module Language.Jsonnet.Syntax.Annotated where
 
 import Data.Fix
 import Data.Functor.Sum
-import Data.List.NonEmpty
-import Data.Semigroup.Foldable
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
