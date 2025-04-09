@@ -114,6 +114,8 @@ executable hs-jsonnet
       aeson,
       base,
       bytestring,
+      directory,
+      filepath,
       text,
       megaparsec,
       optparse-applicative >= 0.16.1 && < 0.19

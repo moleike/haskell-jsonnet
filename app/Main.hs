@@ -2,11 +2,15 @@
 
 module Main where
 
+import Control.Monad (when)
 import qualified Data.Aeson as JSON
+import qualified Data.Aeson.Key as JSON.Key
+import qualified Data.Aeson.KeyMap as JSON.KeyMap
 import Data.Bifunctor (first, second)
 import Data.ByteString.Builder (toLazyByteString)
 import qualified Data.ByteString.Lazy as L
-import Data.ByteString.Lazy.Char8 as LC (putStrLn)
+import qualified Data.ByteString.Lazy.Char8 as LC
+import Data.Functor (void)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -19,8 +23,10 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Pretty (ppJson, prettyError)
 import Options.Applicative hiding (str)
 import Paths_jsonnet (version)
+import qualified System.Directory as Dir
 import System.Environment (lookupEnv)
 import System.Exit (die)
+import System.FilePath ((</>))
 import qualified Text.Megaparsec as MP
 import qualified Text.Megaparsec.Char as MPC
 
@@ -39,25 +45,45 @@ runProgram opts@Options {..} = do
   outp <- interpret conf src
   either printError (printResult output outputMode format) outp
 
-encodeToLazyByteString :: Text -> L.ByteString
-encodeToLazyByteString = toLazyByteString . encodeUtf8Builder
+writeFileMulti :: FilePath -> L.ByteString -> IO ()
+writeFileMulti outFile content = do
+  -- We shouldn't touch the file if it exists and has the same content
+  fileExists <- Dir.doesFileExist outFile
+  if fileExists
+    then do
+      existingContent <- L.readFile outFile
+      when (existingContent /= content) $
+        L.writeFile outFile content
+    else 
+      L.writeFile outFile content
+  putStrLn outFile
 
 printResult :: Output -> OutputMode -> Format -> JSON.Value -> IO ()
-printResult outp outputMode Json val =
-  writeOutput (encode val) outp
+printResult outp outputMode format val =
+  case format of
+    Json -> case outp of
+      FileOutput path -> L.writeFile path (encode val)
+      FileOutputMulti outDir -> case val of
+        JSON.Object obj -> do
+          Dir.createDirectoryIfMissing True outDir
+          void $ flip JSON.KeyMap.traverseWithKey obj $ \fileName output ->
+            writeFileMulti (outDir </> JSON.Key.toString fileName) (encode output)
+        _ -> die "Runtime error: result must be a JSON object in multi mode"
+      Stdout -> LC.putStrLn (encode val)
+    Plaintext -> case val of
+      JSON.String s -> case outp of
+        FileOutput path -> L.writeFile path (encodeToLazyByteString s)
+        FileOutputMulti _ -> die "Runtime error: multi mode can only be used with JSON output"
+        Stdout -> LC.putStrLn (encodeToLazyByteString s)
+      _ -> die "Runtime error: result must be a string for plaintext output"
   where
+    encode :: JSON.Value -> L.ByteString
     encode = case outputMode of
       Pretty -> encodeToLazyByteString . T.pack . show . ppJson 4
       Compact -> JSON.encode
-printResult outp _ Plaintext (JSON.String s) =
-  writeOutput (encodeToLazyByteString s) outp
-printResult _ _ Plaintext _ =
-  print "Runtime error: expected string result"
 
-writeOutput :: L.ByteString -> Output -> IO ()
-writeOutput bs = \case
-  FileOutput path -> L.writeFile path bs
-  Stdout -> LC.putStrLn bs
+    encodeToLazyByteString :: Text -> L.ByteString
+    encodeToLazyByteString = toLazyByteString . encodeUtf8Builder
 
 printError :: Error -> IO ()
 printError = print . prettyError
@@ -87,16 +113,24 @@ mkConfig Options {..} = do
 
 fileOutput :: Parser Output
 fileOutput =
-  fromMaybe Stdout
-    <$> ( optional $
-            FileOutput
-              <$> strOption
-                ( long "output-file"
-                    <> short 'o'
-                    <> metavar "<filename>"
-                    <> help "Write to the output file rather than stdout"
-                )
-        )
+  fromMaybe Stdout <$> optional fileOpts 
+  where
+    fileOpts :: Parser Output
+    fileOpts =
+      FileOutput
+        <$> strOption
+          ( long "output-file"
+              <> short 'o'
+              <> metavar "<filename>"
+              <> help "Write to the output file rather than stdout"
+          )
+          <|> FileOutputMulti
+        <$> strOption
+          ( long "multi"
+              <> short 'm'
+              <> metavar "<dir>"
+              <> help "Write multiple files to the directory, list files on stdout"
+          )
 
 fileInput :: Parser (Maybe String)
 fileInput =
@@ -253,6 +287,7 @@ data Input
 
 data Output
   = FileOutput FilePath
+  | FileOutputMulti FilePath
   | Stdout
   deriving (Eq, Show)
 
