@@ -76,12 +76,13 @@ lookupExtVar :: ExtVars -> Text -> Eval Value
 lookupExtVar (ExtVars extVars) s = liftMaybe (ExtVarNotFound s) (M.lookup s extVars)
 
 intercalate :: Value -> [Value] -> Eval Value
-intercalate sep arr = go sep (filter isNull arr)
+intercalate sep arr = go sep (filter notNull arr)
   where
-    isNull VNull = False
-    isNull _ = True
+    notNull VNull = False
+    notNull _     = True
     go sep'@(VArr _) = app (L.intercalate @Value) sep'
     go sep'@(VStr _) = app T.intercalate sep'
+    go _             = const $ throwE ( StdError "join's separator must be a string or an array" )
     app f sep' arr' = inj <$> (f <$> proj sep' <*> traverse proj arr')
 
 length :: Value -> Eval Int
