@@ -58,6 +58,8 @@ std extVars = VObj $ H.fromList $ map f xs
         ("asin", inj (asin @Double)),
         ("acos", inj (acos @Double)),
         ("atan", inj (atan @Double)),
+        ("atan2", inj (atan2 @Double)),
+        ("hypot", inj hypot),
         ("modulo", inj (mod @Integer)),
         ("codepoint", inj (fromEnum . T.head)),
         ("char", inj (T.singleton . toEnum)),
@@ -100,3 +102,6 @@ length = \case
 
 makeArray :: Monad m => Int -> (Int -> m Value) -> m (Vector Value)
 makeArray n f = traverse f (V.fromList [0 .. n - 1])
+
+hypot :: Double -> Double -> Double
+hypot a b = sqrt (a * a + b * b)

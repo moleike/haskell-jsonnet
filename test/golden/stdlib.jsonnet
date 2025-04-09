@@ -168,6 +168,17 @@ std.assertEqual(std.objectValues({ x::: 1 } { x: 1 }), [1]) &&
 std.assertEqual(std.objectValues({ x::: 1 } { x:: 1 }), []) &&
 std.assertEqual(std.objectValues({ x::: 1 } { x::: 1 }), [1]) &&
 
+std.assertEqual(std.objectKeysValues({}), []) &&
+std.assertEqual(std.objectKeysValues({ x: 1, y: 2 }), [{ key: 'x', value: 1 }, { key: 'y', value: 2 }]) &&
+std.assertEqual(std.objectKeysValues({ x: 1 } { x: 1 }), [{ key: 'x', value: 1 }]) &&
+std.assertEqual(std.objectKeysValues({ x: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectKeysValues({ x: 1 } { x::: 1 }), [{ key: 'x', value: 1 }]) &&
+std.assertEqual(std.objectKeysValues({ x:: 1 } { x: 1 }), []) &&
+std.assertEqual(std.objectKeysValues({ x:: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectKeysValues({ x:: 1 } { x::: 1 }), [{ key: 'x', value: 1 }]) &&
+std.assertEqual(std.objectKeysValues({ x::: 1 } { x: 1 }), [{ key: 'x', value: 1 }]) &&
+std.assertEqual(std.objectKeysValues({ x::: 1 } { x:: 1 }), []) &&
+std.assertEqual(std.objectKeysValues({ x::: 1 } { x::: 1 }), [{ key: 'x', value: 1 }]) &&
 
 //std.assertEqual(std.toString({ a: 1, b: 2 }), '{"b":2,"a":1}') &&
 std.assertEqual(std.toString({}), '{}') &&
@@ -320,6 +331,11 @@ std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
 std.assertEqual(std.escapeStringJson('he"llo'), '"he\\"llo"') &&
 std.assertEqual(std.escapeStringBash("he\"l'lo"), "'he\"l'\"'\"'lo'") &&
 std.assertEqual(std.escapeStringDollars('The path is ${PATH}.'), 'The path is $${PATH}.') &&
+std.assertEqual(std.escapeStringXML('2 < 3'), '2 &lt; 3') &&
+std.assertEqual(std.escapeStringXML('3 > 2'), '3 &gt; 2') &&
+std.assertEqual(std.escapeStringXML('"foo"'), '&quot;foo&quot;') &&
+std.assertEqual(std.escapeStringXML("don't believe the hype"), 'don&apos;t believe the hype') &&
+std.assertEqual(std.escapeStringXML('PB&J'), 'PB&amp;J') &&
 std.assertEqual(std.escapeStringJson('!~'), '"!~"') &&
 
 std.assertEqual(std.manifestPython({
@@ -387,6 +403,60 @@ std.assertEqual(std.reverse([1, 2]), [2, 1]) &&
 std.assertEqual(std.reverse([1, 2, 3]), [3, 2, 1]) &&
 std.assertEqual(std.reverse([[1, 2, 3]]), [[1, 2, 3]]) &&
 
+std.assertEqual(std.sort([]), []) &&
+std.assertEqual(std.sort([1]), [1]) &&
+std.assertEqual(std.sort([1, 2]), [1, 2]) &&
+std.assertEqual(std.sort([2, 1]), [1, 2]) &&
+//std.assertEqual(std.sort(['1', '2']), ['1', '2']) &&
+//std.assertEqual(std.sort(['2', '1']), ['1', '2']) &&
+//std.assertEqual(
+//  std.sort(['The', 'rain', 'in', 'spain', 'falls', 'mainly', 'on', 'the', 'plain.']),
+//  ['The', 'falls', 'in', 'mainly', 'on', 'plain.', 'rain', 'spain', 'the']
+//) &&
+
+std.assertEqual(std.uniq([]), []) &&
+std.assertEqual(std.uniq([1]), [1]) &&
+std.assertEqual(std.uniq([1, 2]), [1, 2]) &&
+std.assertEqual(std.uniq(['1', '2']), ['1', '2']) &&
+std.assertEqual(
+  std.uniq(['The', 'falls', 'in', 'mainly', 'on', 'plain.', 'rain', 'spain', 'the']),
+  ['The', 'falls', 'in', 'mainly', 'on', 'plain.', 'rain', 'spain', 'the']
+) &&
+
+local animal_set = ['ant', 'bat', 'cat', 'dog', 'elephant', 'fish', 'giraffe'];
+
+std.assertEqual(
+  std.uniq(['ant', 'bat', 'cat', 'dog', 'dog', 'elephant', 'fish', 'fish', 'giraffe']),
+  animal_set
+) &&
+
+//std.assertEqual(
+//  std.set(['dog', 'ant', 'bat', 'cat', 'dog', 'elephant', 'fish', 'giraffe', 'fish']),
+//  animal_set
+//) &&
+
+std.assertEqual(std.setUnion(animal_set, animal_set), animal_set) &&
+std.assertEqual(std.setUnion(animal_set, []), animal_set) &&
+std.assertEqual(std.setUnion([], animal_set), animal_set) &&
+std.assertEqual(std.setUnion([], []), []) &&
+//std.assertEqual(std.setUnion(['a', 'b'], ['b', 'c']), ['a', 'b', 'c']) &&
+
+std.assertEqual(std.setInter(animal_set, animal_set), animal_set) &&
+std.assertEqual(std.setInter(animal_set, []), []) &&
+std.assertEqual(std.setInter([], animal_set), []) &&
+std.assertEqual(std.setInter([], []), []) &&
+//std.assertEqual(std.setInter(['a', 'b'], ['b', 'c']), ['b']) &&
+
+std.assertEqual(std.setDiff(animal_set, animal_set), []) &&
+std.assertEqual(std.setDiff(animal_set, []), animal_set) &&
+std.assertEqual(std.setDiff([], animal_set), []) &&
+std.assertEqual(std.setDiff([], []), []) &&
+//std.assertEqual(std.setDiff(['a', 'b'], ['b', 'c']), ['a']) &&
+
+//std.assertEqual(std.setMember('a', ['a', 'b', 'c']), true) &&
+//std.assertEqual(std.setMember('a', []), false) &&
+//std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
+
 //(
 //  if std.thisFile == '<stdin>' then
 //    // This happens when testing the unparser.
@@ -394,12 +464,33 @@ std.assertEqual(std.reverse([[1, 2, 3]]), [[1, 2, 3]]) &&
 //  else
 //    std.assertEqual(std.thisFile, 'stdlib.jsonnet')
 //) &&
+//
+//std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
+//std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
+
 
 std.assertEqual(std.extVar('var1'), 'test') &&
 
 std.assertEqual(std.extVar('var2'), { x: 1, y: 2 }) &&
-// std.assertEqual(std.toString(std.extVar('var2')), '{"x": 1, "y": 2}') &&
-// std.assertEqual(std.extVar('var2') { x+: 2 }.x, 3) &&
+//std.assertEqual(std.toString(std.extVar('var2')), '{"x": 1, "y": 2}') &&
+//std.assertEqual(std.extVar('var2') { x+: 2 }.x, 3) &&
+
+std.assertEqual(std.split('foo/bar', '/'), ['foo', 'bar']) &&
+std.assertEqual(std.split('/foo/', '/'), ['', 'foo', '']) &&
+std.assertEqual(std.split('foo/_bar', '/_'), ['foo', 'bar']) &&
+std.assertEqual(std.split('/_foo/_', '/_'), ['', 'foo', '']) &&
+
+std.assertEqual(std.splitLimit('foo/bar', '/', 1), ['foo', 'bar']) &&
+std.assertEqual(std.splitLimit('/foo/', '/', 1), ['', 'foo/']) &&
+std.assertEqual(std.splitLimit('foo/_bar', '/_', 1), ['foo', 'bar']) &&
+std.assertEqual(std.splitLimit('/_foo/_', '/_', 1), ['', 'foo/_']) &&
+
+std.assertEqual(std.splitLimitR('foo/bar', '/', 1), ['foo', 'bar']) &&
+std.assertEqual(std.splitLimitR('/foo/', '/', 1), ['/foo', '']) &&
+std.assertEqual(std.splitLimitR('/foo/', '/', -1), ['', 'foo', '']) &&
+std.assertEqual(std.splitLimitR('foo/_bar', '/_', 1), ['foo', 'bar']) &&
+std.assertEqual(std.splitLimitR('/_foo/_', '/_', 1), ['/_foo', '']) &&
+std.assertEqual(std.splitLimitR('/_foo/_', '/_', -1), ['', 'foo', '']) &&
 
 local some_toml = {
   key: 'value',
@@ -496,6 +587,73 @@ local some_json = {
   objectInArray: [{ f: 3 }],
   '"': null,
 };
+
+local bare_yaml_quoted = {
+  '685230': 'canonical',
+  '+685_230': 'decimal',
+  '02472256': 'octal',
+  '-1_0': 'negative integer',
+  '-0.1_0_0': 'negative float',
+  '0x_0A_74_AE': 'hexadecimal',
+  '-0x_0A_74_AE': 'negative hexadecimal',
+  '0b1010_0111_0100_1010_1110': 'binary',
+  '-0b1010_0111_0100_1010_1110': 'binary',
+  '190:20:30': 'sexagesimal',
+  '-190:20:30': 'negative sexagesimal',
+  '6.8523015e+5': 'canonical',
+  '6.8523015e-5': 'canonical',
+  '-6.8523015e+5': 'negative canonical',
+  '685.230_15e+03': 'exponential',
+  '-685.230_15e+03': 'negative exponential',
+  '-685.230_15e-03': 'negative w/ negative exponential',
+  '-685.230_15E-03': 'negative w/ negative exponential',
+  '685_230.15': 'fixed',
+  '-685_230.15': 'negative fixed',
+  '190:20:30.15': 'sexagesimal',
+  '-190:20:30.15': 'negative sexagesimal',
+  '-.inf': 'negative infinity',
+  '.inf': 'positive infinity',
+  '+.inf': 'positive infinity',
+  '.NaN': 'not a number',
+  y: 'boolean true',
+  yes: 'boolean true',
+  Yes: 'boolean true',
+  True: 'boolean true',
+  'true': 'boolean true',
+  on: 'boolean true',
+  On: 'boolean true',
+  NO: 'boolean false',
+  n: 'boolean false',
+  N: 'boolean false',
+  off: 'boolean false',
+  OFF: 'boolean false',
+  'null': 'null word',
+  NULL: 'null word capital',
+  Null: 'null word',
+  '~': 'null key',
+  '': 'empty key',
+  '-': 'invalid bare key',
+  '---': 'triple dash key',
+  '2001-12-15T02:59:43.1Z': 'canonical',
+  '2001-12-14t21:59:43.10-05:00': 'valid iso8601',
+  '2001-12-14 21:59:43.10 -5': 'space separated',
+  '2001-12-15 2:59:43.10': 'no time zone (Z)',
+  '2002-12-14': 'date',
+};
+local bare_yaml_unquoted = {
+  '0X_0a_74_ae': 'BARE_KEY',
+  '__-0X_0a_74_ae': 'BARE_KEY',
+  '-0B1010_0111_0100_1010_1110': 'BARE_KEY',
+  '__-0B1010_0111_0100_1010_1110': 'BARE_KEY',
+  x: 'BARE_KEY',
+  b: 'BARE_KEY',
+  just_letters_underscores: 'BARE_KEY',
+  'just-letters-dashes': 'BARE_KEY',
+  'jsonnet.org/k8s-label-like': 'BARE_KEY',
+  '192.168.0.1': 'BARE_KEY',
+  '1-234-567-8901': 'BARE_KEY',
+};
+local bare_yaml_test = bare_yaml_quoted + bare_yaml_unquoted;
 
 std.assertEqual(
   std.manifestJsonEx(some_json, '    ') + '\n',
@@ -1007,5 +1165,28 @@ std.assertEqual(std.decodeUTF8([(function(x) 65)(42)]), 'A') &&
 std.assertEqual(std.decodeUTF8([65 + 1 - 1]), 'A') &&
 std.assertEqual(std.decodeUTF8([90, 97, 197, 188, 195, 179, 197, 130, 196, 135, 32, 103, 196, 153, 197, 155, 108, 196, 133, 32, 106, 97, 197, 186, 197, 132]), 'Zażółć gęślą jaźń') &&
 std.assertEqual(std.decodeUTF8([240, 159, 152, 131]), '😃') &&
+
+
+std.assertEqual(std.any([true, false]), true) &&
+std.assertEqual(std.any([false, false]), false) &&
+std.assertEqual(std.any([]), false) &&
+
+std.assertEqual(std.all([true, false]), false) &&
+std.assertEqual(std.all([true, true]), true) &&
+std.assertEqual(std.all([]), true) &&
+
+std.assertEqual(std.sum([1, 2, 3]), 6) &&
+
+std.assertEqual(std.xor(true, false), true) &&
+std.assertEqual(std.xor(true, true), false) &&
+
+std.assertEqual(std.xnor(true, false), false) &&
+std.assertEqual(std.xnor(true, true), true) &&
+
+std.assertEqual(std.round(1.2), 1) &&
+std.assertEqual(std.round(1.5), 2) &&
+
+std.assertEqual(std.isEmpty(''), true) &&
+std.assertEqual(std.isEmpty('non-empty string'), false) &&
 
 true
