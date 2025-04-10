@@ -327,12 +327,12 @@ ppArg (Named n a) = surround equals (pretty n) a
 ppCompSpec :: NonEmpty (CompSpec (Doc ann)) -> Doc ann
 ppCompSpec cs = hsep $ f <$> NE.toList cs
   where
-    f (CompSpec v f' c) =
+    f (CompSpec v f' ifspecs) =
       pfor
         <+> pretty v
         <+> pin
         <+> parens f'
-        <+> ppMaybeDoc ((pif <+>) <$> c)
+        <+> hsep (map (pif <+>) ifspecs)
 
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case

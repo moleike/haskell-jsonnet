@@ -190,7 +190,7 @@ data CompSpec a = CompSpec
     -- |
     forspec :: a,
     -- |
-    ifspec :: Maybe a
+    ifspec :: [a]
   }
   deriving
     ( Eq,

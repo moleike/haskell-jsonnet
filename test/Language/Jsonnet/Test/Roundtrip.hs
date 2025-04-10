@@ -129,7 +129,7 @@ genBinOp :: Gen (Fix ExprF')
 genBinOp = Fix <$> (InL <$> (EBinOp <$> Gen.enum Add In <*> genExpr <*> genExpr))
 
 genCompSpec :: Gen a -> Gen (CompSpec a)
-genCompSpec a = CompSpec <$> genString <*> a <*> Gen.maybe a
+genCompSpec a = CompSpec <$> genString <*> a <*> Gen.list (Range.linear 0 10) a
 
 genArrComp :: Gen (Fix ExprF')
 genArrComp =

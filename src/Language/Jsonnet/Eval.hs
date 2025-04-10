@@ -14,7 +14,7 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Lens (locally, view)
-import Control.Monad ((>=>), join, forM, (<=<))
+import Control.Monad ((>=>), join, forM, (<=<), foldM)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as JSON
 import qualified Data.Aeson.KeyMap as KeyMap
@@ -311,6 +311,9 @@ whnfField self (CField k v h) = do
 flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
 
+whnfIfs :: [Core] -> EvalM Value Bool
+whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= proj')) True
+
 whnfComp ::
   Comp ->
   Core ->
@@ -324,14 +327,11 @@ whnfComp (ArrC bnd) cs = do
         VArr xs -> forM xs $ \x -> do
           (n, (e, cond)) <- unbind bnd
           extendEnv (M.fromList [(n, x)]) $ do
-            b <- f cond
+            b <- whnfIfs cond
             if b
               then Just <$> mkValue e
               else pure Nothing
         v -> throwTypeMismatch "" v
-      where
-        f Nothing = pure True
-        f (Just c) = proj' =<< whnf c
 whnfComp (ObjC bnd) cs = do
   xs <- comp
   pure $ VObj $ H.fromList $ catMaybes $ V.toList xs
@@ -341,7 +341,7 @@ whnfComp (ObjC bnd) cs = do
         VArr xs -> forM xs $ \x -> do
           (n, (CField k v h, cond)) <- unbind bnd
           extendEnv (M.fromList [(n, x)]) $ do
-            b <- f cond
+            b <- whnfIfs cond
             if b
               then do
                 fieldKey <- whnf k
@@ -351,8 +351,6 @@ whnfComp (ObjC bnd) cs = do
                 fmap (,VField {..}) <$> proj' fieldKey
               else pure Nothing
         v -> throwTypeMismatch "array" v
-    f Nothing = pure True
-    f (Just c) = proj' =<< whnf c
 
 -- | Right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
 --   with OO-like `self` and `super` support via value recursion (knot-tying)
