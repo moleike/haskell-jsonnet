@@ -27,7 +27,7 @@ Here is the implementation status of the main language features:
 - [X] outermost object reference `$`
 - [X] mixin inheritence and open recursion (operator `+` with `self` and `super`)
 - [X] field composition (operator `+:`)
-- [ ] multiple file output (https://github.com/moleike/haskell-jsonnet/issues/32)
+- [X] multiple file output (by Berk Özkütük)
 - [X] verbatim imports (by Berk Özkütük)
 
 ## Build
@@ -50,10 +50,11 @@ Using the [stack][stack] build tool:
 
 ```console
 % hs-jsonnet --help
-Usage: hs-jsonnet [-v|--version] [-e|--exec] [<filename>] 
-                  [-o|--output-file <filename>] [-S|--string] 
-                  [-V|--ext-str VAR=VALUE] [--ext-str-file FILE] 
-                  [--ext-code VAR=EXPR] [--ext-code-file FILE]
+Usage: hs-jsonnet [-v|--version] [-e|--exec] [<filename>]
+                  [(-o|--output-file <filename>) | (-m|--multi <dir>)]
+                  [--compact] [-S|--string] [-V|--ext-str VAR=VALUE]
+                  [--ext-str-file FILE] [--ext-code VAR=EXPR]
+                  [--ext-code-file FILE]
 
 Available options:
   -v,--version             Print version of the program
@@ -62,6 +63,9 @@ Available options:
   <filename>               Jsonnet source file or stdin
   -o,--output-file <filename>
                            Write to the output file rather than stdout
+  -m,--multi <dir>         Write multiple files to the directory, list files on
+                           stdout
+  --compact                Produce a compact JSON output
   -S,--string              Expect a string, manifest as plain text
   -V,--ext-str VAR=VALUE   External string variable
   --ext-str-file FILE      External string variable as file
