@@ -38,6 +38,7 @@ genObject =
     <$> ( mkObjectF
             <$> Gen.list (Range.linear 0 10) (genField genExpr)
             <*> Gen.list (Range.linear 0 10) ((,) <$> genString <*> genExpr)
+            <*> Gen.list (Range.linear 0 10) genAssert'
         )
 
 genArray :: Gen (Fix ExprF')

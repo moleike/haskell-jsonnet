@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Parser
@@ -356,9 +357,9 @@ objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
-      xs <- eitherP localP' fieldP `sepEndBy` comma
-      let (ls, fs) = (lefts xs, rights xs)
-      pure $ mkObjectF fs ls
+      (partitionEithers -> (partitionEithers -> (asserts, locals), fields))
+        <- eitherP (eitherP (try assertP') localP') fieldP `sepEndBy` comma
+      pure $ mkObjectF fields locals asserts
     fieldP = try methodP <|> pairP
     pairP = do
       (key, computed) <- keyP

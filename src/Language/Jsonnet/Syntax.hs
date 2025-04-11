@@ -65,11 +65,9 @@ data ExprF a
         expr :: a
       }
   | EObj
-      { -- |
-        locals :: [(Ident, a)],
-        -- |
-        fields :: [EField a]
-        --asserts :: [Assert a]
+      { locals :: [(Ident, a)],
+        fields :: [EField a],
+        asserts :: [Assert a]
       }
   | EArr [a]
   | EErr a
@@ -191,12 +189,11 @@ mkSliceF ::
 mkSliceF e f g = InL . ESlice e f g
 
 mkObjectF ::
-  -- |
   [EField a] ->
-  -- |
   [(Ident, a)] ->
+  [Assert a] ->
   ExprF' a
-mkObjectF fs ls = InL $ EObj ls fs
+mkObjectF fs ls = InL . EObj ls fs
 
 mkArrayF :: [a] -> ExprF' a
 mkArrayF = InL . EArr

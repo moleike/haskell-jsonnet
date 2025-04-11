@@ -22,6 +22,7 @@ import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
 import qualified Data.Bits as Bits
 import Data.Bits ((.&.), (.|.))
+import Data.Bitraversable (bitraverse)
 import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.HashMap.Lazy (HashMap)
@@ -301,12 +302,23 @@ whnfField ::
   CField ->
   -- |
   Eval (Maybe (Text, VField))
-whnfField self (CField k v h) = do
+whnfField self (CRegularField (RegularField k v h)) = do
   let fieldVis = h
   fieldKey <- whnf k -- keys are strictly evaluated
   fieldValWHNF <- extendEnv self (mkValue v)
   fieldVal <- extendEnv self (mkThunk v)
+  let assertField = False
   fmap (,VField {..}) <$> proj' fieldKey
+whnfField self (CAssertField assertion) = do
+  assertion' <- extendEnv self (mkThunk assertion)
+  fieldKey <- nameToText <$> fresh (s2n "$$assert")
+  -- The field is "Visible" since we want the evaluation to happen to uncover
+  -- the assertion errors, but they will be removed from the final output
+  -- since the "assertField" flag is True.
+  pure $ Just (fieldKey, VField (VStr fieldKey) assertion' assertion' Visible True)
+  where
+    nameToText :: Name a -> Text
+    nameToText n = (T.pack (name2String n)) <> "_" <> T.pack (show (name2Integer n))
 
 flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
@@ -339,7 +351,7 @@ whnfComp (ObjC bnd) cs = do
     comp =
       whnf cs >>= \case
         VArr xs -> forM xs $ \x -> do
-          (n, (CField k v h, cond)) <- unbind bnd
+          (n, (CRegularField (RegularField k v h), cond)) <- unbind bnd
           extendEnv (M.fromList [(n, x)]) $ do
             b <- whnfIfs cond
             if b
@@ -348,6 +360,7 @@ whnfComp (ObjC bnd) cs = do
                 fieldValWHNF <- mkValue v
                 fieldVal <- mkThunk v
                 let fieldVis = h
+                    assertField = False
                 fmap (,VField {..}) <$> proj' fieldKey
               else pure Nothing
         v -> throwTypeMismatch "array" v
@@ -377,8 +390,8 @@ mergeWith xs ys = mdo
         pure VField {fieldVal = fieldVal', fieldValWHNF = fieldValWHNF', ..}
       _ -> pure f'
 
-visibleKeys :: Object -> HashMap Text Value
-visibleKeys = H.mapMaybe f
+visibleKeys :: Object -> HashMap Text (Value, Bool)
+visibleKeys = H.mapMaybe (\field -> fmap (,assertField field) (f field))
   where
     f v@VField {..}
       | not (hidden v) = Just fieldValWHNF
@@ -396,13 +409,18 @@ manifest = \case
   VBool b -> pure (JSON.Bool b)
   VStr s -> pure (JSON.String s)
   VNum n -> pure (JSON.Number n)
-  VObj vs -> JSON.Object . KeyMap.fromHashMapText <$> mapM manifest (visibleKeys vs)
+  VObj vs -> do
+    fields <- traverse (bitraverse manifest pure) (visibleKeys vs)
+    pure . JSON.Object . KeyMap.fromHashMapText . filterNonAssertionFields $ fields
   VArr vs -> JSON.Array <$> mapM manifest vs
   VClos {} -> throwE (ManifestError "function")
   VFun _ -> throwE (ManifestError "function")
   v@VThunk {} -> whnfV v >>= manifest
   v@VIndir {} -> whnfV v >>= manifest
   _ -> throwE (ManifestError "impossible")
+  where
+    filterNonAssertionFields :: HashMap Text (JSON.Value, Bool) -> HashMap Text JSON.Value
+    filterNonAssertionFields = fmap fst . H.filter (not . snd)
 
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o True = L.sort (H.keys o) -- all fields
