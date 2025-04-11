@@ -69,7 +69,7 @@ alg outermost = \case
   ELookup e1 i -> desugarLookup e1 (CLit (String (T.pack i)))
   EIndex e1 e2 -> desugarLookup e1 e2
   EErr e -> desugarErr e
-  EAssert e -> desugarAssert e
+  EAssert a e -> desugarAssert a e
   ESlice {..} -> desugarSlice expr start end step
   EArrComp {expr, comp} -> desugarArrComp expr comp
   EObjComp {field, comp, locals} -> desugarObjComp field comp locals
@@ -123,8 +123,8 @@ desugarObj outermost locals fields = obj
     fields' =
       (\(EField key val comp v o) -> EField key (f val) comp v o) <$> fields
 
-desugarAssert :: Assert Core -> Core
-desugarAssert (Assert c m e) =
+desugarAssert :: Assert Core -> Core -> Core
+desugarAssert (Assert c m) e =
   desugarIfElse
     c
     e

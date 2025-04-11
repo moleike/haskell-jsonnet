@@ -75,7 +75,7 @@ data ExprF a
   | EErr a
   | ELookup a Ident
   | EIndex a a
-  | EAssert (Assert a)
+  | EAssert (Assert a) a
   | EIf a a
   | EIfElse a a a
   | ESlice
@@ -204,8 +204,8 @@ mkArrayF = InL . EArr
 mkErrorF :: a -> ExprF' a
 mkErrorF = InL . EErr
 
-mkAssertF :: a -> Maybe a -> a -> ExprF' a
-mkAssertF e m = InL . EAssert . Assert e m
+mkAssertF :: Assert a -> a -> ExprF' a
+mkAssertF a = InL . EAssert a
 
 mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
 mkArrCompF e = InL . EArrComp e

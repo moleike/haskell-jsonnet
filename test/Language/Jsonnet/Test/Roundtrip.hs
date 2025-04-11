@@ -72,13 +72,10 @@ genLookup :: Gen (Fix ExprF')
 genLookup = Fix <$> (mkLookupF <$> genIdent <*> genString)
 
 genAssert :: Gen (Fix ExprF')
-genAssert =
-  Fix
-    <$> ( mkAssertF
-            <$> genExpr
-            <*> Gen.maybe genExpr
-            <*> genExpr
-        )
+genAssert = Fix <$> ( mkAssertF <$> genAssert' <*> genExpr)
+
+genAssert' :: Gen (Assert (Fix ExprF'))
+genAssert' = Assert <$> genExpr <*> Gen.maybe genExpr
 
 genLocal :: Gen (Fix ExprF')
 genLocal =

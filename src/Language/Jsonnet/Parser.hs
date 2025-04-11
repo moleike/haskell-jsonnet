@@ -269,10 +269,15 @@ assertP :: Parser Expr'
 assertP = Fix <$> annotateLoc assert
   where
     assert = do
-      cond <- keywordP "assert" *> exprP
-      msg <- optional (colon *> exprP)
+      assert' <- assertP'
       _ <- symbol ";"
-      mkAssertF cond msg <$> exprP
+      mkAssertF assert' <$> exprP
+
+assertP' :: Parser (Assert Expr')
+assertP' = do
+  cond <- keywordP "assert" *> exprP
+  msg <- optional (colon *> exprP)
+  pure $ Assert cond msg
 
 ifElseP :: Parser Expr'
 ifElseP = Fix <$> annotateLoc ifElseExpr <?> "if"

@@ -334,6 +334,9 @@ ppCompSpec cs = hsep $ f <$> NE.toList cs
         <+> parens f'
         <+> hsep (map (pif <+>) ifspecs)
 
+prettyAssert :: Assert (Doc ann) -> Doc ann
+prettyAssert (Assert c m) = passert <+> c <> ppMaybeDoc ((colon <>) <$> m)
+
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case
   ENull -> pnull
@@ -350,7 +353,7 @@ ppExpr = \case
   EObj ls o -> ppObject ls (ppField <$> o)
   ELocal xs e -> ppLocal (NE.toList xs) (parens e)
   EErr a -> perror <+> parens a
-  EAssert (Assert c m e) -> passert <+> c <> ppMaybeDoc ((colon <>) <$> m) <> semi <+> e
+  EAssert assert e -> prettyAssert assert <> semi <+> e
   EIndex a b -> parens a <> brackets b
   ELookup a i -> enclose a (pretty i) dot
   EUnyOp o a -> parens (prettyUnyOp o <> a)
