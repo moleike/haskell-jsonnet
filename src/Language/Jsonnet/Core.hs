@@ -52,8 +52,8 @@ instance Binary a => Binary (Embed a)
 instance (Binary a, Binary b) => Binary (Bind a b)
 
 data Comp
-  = ArrC (Bind (Name Core) (Core, Maybe Core))
-  | ObjC (Bind (Name Core) (CField, Maybe Core))
+  = ArrC (Bind (Name Core) (Core, [Core]))
+  | ObjC (Bind (Name Core) (CField, [Core]))
   deriving
     ( Show,
       Typeable,

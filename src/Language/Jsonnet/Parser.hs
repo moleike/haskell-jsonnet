@@ -307,7 +307,7 @@ forspecP = do
   var <- identifier
   _ <- keywordP "in"
   forspec <- exprP
-  ifspec <- optional (keywordP "if" *> exprP)
+  ifspec <- many (keywordP "if" *> exprP)
   pure CompSpec {..}
 
 binding :: Parser (String, Expr')

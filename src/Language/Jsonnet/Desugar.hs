@@ -155,7 +155,7 @@ desugarField EField {..} = mkField key value' visibility
 
 desugarObjComp :: EField Core -> NonEmpty (CompSpec Core) -> [(String, Core)] -> Core
 desugarObjComp EField {..} comp locals =
-  CComp (ObjC (bind (s2n "arr") (kv', Nothing))) arrComp
+  CComp (ObjC (bind (s2n "arr") (kv', []))) arrComp
   where
     kv' =
       desugarField
