@@ -25,6 +25,8 @@ limitations under the License.
   local std = self,
   local id = function(x) x,
 
+  local go_only_function = error 'This function is only supported in go version of jsonnet. See https://github.com/google/go-jsonnet',
+
   isString(v):: std.type(v) == 'string',
   isNumber(v):: std.type(v) == 'number',
   isBoolean(v):: std.type(v) == 'boolean',
@@ -125,7 +127,7 @@ limitations under the License.
     local aux(idx, ret, val) =
       if idx >= strLen then
         ret + [val]
-      else if str[idx : idx + cLen : 1] == c &&
+      else if str[idx:idx + cLen:1] == c &&
               (maxsplits == -1 || std.length(ret) < maxsplits) then
         aux(idx + cLen, ret + [val], '')
       else
@@ -140,7 +142,7 @@ limitations under the License.
     if maxsplits == -1 then
       std.splitLimit(str, c, -1)
     else
-      local revStr(str) = std.join('', std.reverse(str));
+      local revStr(str) = std.join('', std.reverse(std.stringChars(str)));
       std.map(function(e) revStr(e), std.reverse(std.splitLimit(revStr(str), revStr(c), maxsplits))),
 
   strReplace(str, from, to)::
@@ -206,18 +208,27 @@ limitations under the License.
       {
         indexable: indexable,
         index:
-          if index == null then 0
-          else index,
+          if index == null
+          then 0
+          else
+            if index < 0
+            then std.max(0, std.length(indexable) + index)
+            else index,
         end:
-          if end == null then std.length(indexable)
-          else end,
+          if end == null
+          then std.length(indexable)
+          else
+            if end < 0
+            then std.length(indexable) + end
+            else end,
         step:
-          if step == null then 1
+          if step == null
+          then 1
           else step,
         length: std.length(indexable),
         type: std.type(indexable),
       };
-    assert invar.index >= 0 && invar.end >= 0 && invar.step >= 0 : 'got [%s:%s:%s] but negative index, end, and steps are not supported' % [invar.index, invar.end, invar.step];
+    assert invar.step >= 0 : 'got [%s:%s:%s] but negative steps are not supported' % [invar.index, invar.end, invar.step];
     assert step != 0 : 'got %s but step must be greater than 0' % step;
     assert std.isString(indexable) || std.isArray(indexable) : 'std.slice accepts a string or an array, but got: %s' % std.type(indexable);
     local build(slice, cur) =
@@ -249,6 +260,15 @@ limitations under the License.
       std.format(a, b)
     else
       error 'Operator % cannot be used on types ' + std.type(a) + ' and ' + std.type(b) + '.',
+
+  // this is the most precision that will fit in a f64
+  pi:: 3.14159265358979311600,
+
+  deg2rad(x):: x * std.pi / 180,
+  rad2deg(x):: x * 180 / std.pi,
+
+  log2(x):: std.log(x) / std.log(2),
+  log10(x):: std.log(x) / std.log(10),
 
   map(func, arr)::
     if !std.isFunction(func) then
@@ -657,7 +677,7 @@ limitations under the License.
           error 'Format required number at '
                 + i + ', got ' + std.type(val)
         else
-          local exponent = std.floor(std.log(std.abs(val)) / std.log(10));
+          local exponent = if val != 0 then std.floor(std.log(std.abs(val)) / std.log(10)) else 0;
           if exponent < -4 || exponent >= fpprec then
             render_float_sci(val,
                              zp,
@@ -865,6 +885,12 @@ limitations under the License.
   flattenArrays(arrs)::
     std.foldl(function(a, b) a + b, arrs, []),
 
+  flattenDeepArray(value)::
+    if std.isArray(value) then
+      [y for x in value for y in std.flattenDeepArray(x)]
+    else
+      [value],
+
   manifestIni(ini)::
     local body_lines(body) =
       std.join([], [
@@ -891,7 +917,7 @@ limitations under the License.
     local
       escapeStringToml = std.escapeStringJson,
       escapeKeyToml(key) =
-        local bare_allowed = std.set(std.stringChars("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"));
+        local bare_allowed = std.set(std.stringChars('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'));
         if std.setUnion(std.set(std.stringChars(key)), bare_allowed) == bare_allowed then key else escapeStringToml(key),
       isTableArray(v) = std.isArray(v) && std.length(v) > 0 && std.all(std.map(std.isObject, v)),
       isSection(v) = std.isObject(v) || isTableArray(v),
@@ -917,19 +943,19 @@ limitations under the License.
             local separator = if inline then ' ' else '\n';
             local lines = ['[' + separator]
                           + std.join([',' + separator],
-                                    [
-                                      [new_indent + renderValue(v[i], indexedPath + [i], true, '')]
-                                      for i in range
-                                    ])
+                                     [
+                                       [new_indent + renderValue(v[i], indexedPath + [i], true, '')]
+                                       for i in range
+                                     ])
                           + [separator + (if inline then '' else cindent) + ']'];
             std.join('', lines)
         else if std.isObject(v) then
           local lines = ['{ ']
                         + std.join([', '],
-                                  [
-                                    [escapeKeyToml(k) + ' = ' + renderValue(v[k], indexedPath + [k], true, '')]
-                                    for k in std.objectFields(v)
-                                  ])
+                                   [
+                                     [escapeKeyToml(k) + ' = ' + renderValue(v[k], indexedPath + [k], true, '')]
+                                     for k in std.objectFields(v)
+                                   ])
                         + [' }'];
           std.join('', lines),
       renderTableInternal(v, path, indexedPath, cindent) =
@@ -939,10 +965,11 @@ limitations under the License.
           if !isSection(v[k])
         ]);
         local sections = [std.join('\n', kvp)] + [
-          (if std.isObject(v[k]) then
-            renderTable(v[k], path + [k], indexedPath + [k], cindent)
-          else
-            renderTableArray(v[k], path + [k], indexedPath + [k], cindent)
+          (
+            if std.isObject(v[k]) then
+              renderTable(v[k], path + [k], indexedPath + [k], cindent)
+            else
+              renderTableArray(v[k], path + [k], indexedPath + [k], cindent)
           )
           for k in std.objectFields(v)
           if isSection(v[k])
@@ -956,8 +983,8 @@ limitations under the License.
         local range = std.range(0, std.length(v) - 1);
         local sections = [
           (cindent + '[[' + std.join('.', std.map(escapeKeyToml, path)) + ']]'
-          + (if v[i] == {} then '' else '\n')
-          + renderTableInternal(v[i], path, indexedPath + [i], cindent + indent))
+           + (if v[i] == {} then '' else '\n')
+           + renderTableInternal(v[i], path, indexedPath + [i], cindent + indent))
           for i in range
         ];
         std.join('\n\n', sections);
@@ -996,21 +1023,23 @@ limitations under the License.
 
   escapeStringBash(str_)::
     local str = std.toString(str_);
-    local trans(ch) =
-      if ch == "'" then
-        "'\"'\"'"
-      else
-        ch;
-    "'%s'" % std.join('', [trans(ch) for ch in std.stringChars(str)]),
+    "'%s'" % std.strReplace(str, "'", "'\"'\"'"),
 
   escapeStringDollars(str_)::
     local str = std.toString(str_);
-    local trans(ch) =
-      if ch == '$' then
-        '$$'
-      else
-        ch;
-    std.foldl(function(a, b) a + trans(b), std.stringChars(str), ''),
+    std.strReplace(str, '$', '$$'),
+
+  local xml_escapes = {
+    '<': '&lt;',
+    '>': '&gt;',
+    '&': '&amp;',
+    '"': '&quot;',
+    "'": '&apos;',
+  },
+
+  escapeStringXML(str_)::
+    local str = std.toString(str_);
+    std.join('', [std.get(xml_escapes, ch, ch) for ch in std.stringChars(str)]),
 
   manifestJson(value):: std.manifestJsonEx(value, '    '),
 
@@ -1064,11 +1093,24 @@ limitations under the License.
       // the risk of missing a permutation.
       local reserved = [
         // Boolean types taken from https://yaml.org/type/bool.html
-        'true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n',
+        'true',
+        'false',
+        'yes',
+        'no',
+        'on',
+        'off',
+        'y',
+        'n',
         // Numerical words taken from https://yaml.org/type/float.html
-        '.nan', '-.inf', '+.inf', '.inf', 'null', 
+        '.nan',
+        '-.inf',
+        '+.inf',
+        '.inf',
+        'null',
         // Invalid keys that contain no invalid characters
-        '-', '---', '',
+        '-',
+        '---',
+        '',
       ];
       local bad = [word for word in reserved if word == std.asciiLower(key)];
       if std.length(bad) > 0 then
@@ -1108,7 +1150,7 @@ limitations under the License.
       local keySet = std.set(keyChars);
       local keySetLc = std.set(std.stringChars(keyLc));
       // Check for unsafe characters
-      if ! onlyChars(safeChars, keySet) then
+      if !onlyChars(safeChars, keySet) then
         false
       // Check for reserved words
       else if isReserved(key) then
@@ -1120,8 +1162,8 @@ limitations under the License.
            - has exactly 2 dashes
          are considered dates.
       */
-      else if onlyChars(dateChars, keySet) 
-          && std.length(std.findSubstr('-', key)) == 2 then
+      else if onlyChars(dateChars, keySet)
+              && std.length(std.findSubstr('-', key)) == 2 then
         false
       /* Check for integers.  Keys that meet all of the following:
            - all characters match [0-9_\-]
@@ -1129,7 +1171,7 @@ limitations under the License.
          are considered integers.
       */
       else if onlyChars(intChars, keySetLc)
-          && std.length(std.findSubstr('-', key)) < 2 then
+              && std.length(std.findSubstr('-', key)) < 2 then
         false
       /* Check for binary integers.  Keys that meet all of the following:
            - all characters match [0-9b_\-]
@@ -1138,8 +1180,8 @@ limitations under the License.
          are considered binary integers.
       */
       else if onlyChars(binChars, keySetLc)
-          && std.length(key) > 2
-          && typeMatch(key, '0b') then
+              && std.length(key) > 2
+              && typeMatch(key, '0b') then
         false
       /* Check for floats. Keys that meet all of the following:
            - all characters match [0-9e._\-]
@@ -1149,9 +1191,9 @@ limitations under the License.
          are considered floats.
       */
       else if onlyChars(floatChars, keySetLc)
-          && std.length(std.findSubstr('.', key)) == 1
-          && std.length(std.findSubstr('-', key)) < 3 
-          && std.length(std.findSubstr('e', keyLc)) < 2 then
+              && std.length(std.findSubstr('.', key)) == 1
+              && std.length(std.findSubstr('-', key)) < 3
+              && std.length(std.findSubstr('e', keyLc)) < 2 then
         false
       /* Check for hexadecimals.  Keys that meet all of the following:
            - all characters match [0-9a-fx_\-]
@@ -1160,10 +1202,10 @@ limitations under the License.
            - starts with (-)0x
          are considered hexadecimals.
       */
-      else if onlyChars(hexChars, keySetLc) 
-          && std.length(std.findSubstr('-', key)) < 2
-          && std.length(keyChars) > 2
-          && typeMatch(key, '0x') then
+      else if onlyChars(hexChars, keySetLc)
+              && std.length(std.findSubstr('-', key)) < 2
+              && std.length(keyChars) > 2
+              && typeMatch(key, '0x') then
         false
       // All checks pass. Key is safe for emission without quotes.
       else true;
@@ -1506,7 +1548,7 @@ limitations under the License.
     else
       patch,
 
-  get(o, f, default = null, inc_hidden = true)::
+  get(o, f, default=null, inc_hidden=true)::
     if std.objectHasEx(o, f, inc_hidden) then o[f] else default,
 
   objectFields(o)::
@@ -1526,6 +1568,12 @@ limitations under the License.
 
   objectValuesAll(o)::
     [o[k] for k in std.objectFieldsAll(o)],
+
+  objectKeysValues(o)::
+    [{ key: k, value: o[k] } for k in std.objectFields(o)],
+
+  objectKeysValuesAll(o)::
+    [{ key: k, value: o[k] } for k in std.objectFieldsAll(o)],
 
   equals(a, b)::
     local ta = std.type(a);
@@ -1614,7 +1662,7 @@ limitations under the License.
         true
       else
         local e = arr[idx];
-        assert std.isBoolean(e) : std.format('element "%s" of type %s is not a boolean', e, std.type(e));
+        assert std.isBoolean(e) : 'element "%s" of type %s is not a boolean' % [e, std.type(e)];
         if !e then
           false
         else
@@ -1629,7 +1677,7 @@ limitations under the License.
         false
       else
         local e = arr[idx];
-        assert std.isBoolean(e) : std.format('element "%s" of type %s is not a boolean', e, std.type(e));
+        assert std.isBoolean(e) : 'element "%s" of type %s is not a boolean' % [e, std.type(e)];
         if e then
           true
         else
@@ -1669,4 +1717,80 @@ limitations under the License.
   __array_less_or_equal(arr1, arr2):: std.__compare_array(arr1, arr2) <= 0,
   __array_greater_or_equal(arr1, arr2):: std.__compare_array(arr1, arr2) >= 0,
 
+  sum(arr):: std.foldl(function(a, b) a + b, arr, 0),
+
+  avg(arr)::
+    if std.length(arr) == 0 then
+      error 'Cannot calculate average of an empty array.'
+    else
+      std.sum(arr)/std.length(arr),
+
+  minArray(arr, keyF=id, onEmpty=error 'Expected at least one element in array. Got none')::
+    if std.length(arr) == 0 then
+      onEmpty
+    else
+      local minVal = arr[0];
+      local minFn(a, b) =
+        if std.__compare(keyF(a), keyF(b)) > 0 then
+          b
+        else
+          a;
+      std.foldl(minFn, arr, minVal),
+
+  maxArray(arr, keyF=id, onEmpty=error 'Expected at least one element in array. Got none')::
+    if std.length(arr) == 0 then
+      onEmpty
+    else
+      local maxVal = arr[0];
+      local maxFn(a, b) =
+        if std.__compare(keyF(a), keyF(b)) < 0 then
+          b
+        else
+          a;
+      std.foldl(maxFn, arr, maxVal),
+
+  xor(x, y):: x != y,
+
+  xnor(x, y):: x == y,
+
+  round(x):: std.floor(x + 0.5),
+
+  isEmpty(str):: std.length(str) == 0,
+
+  contains(arr, elem):: std.any([e == elem for e in arr]),
+
+  equalsIgnoreCase(str1, str2):: std.asciiLower(str1) == std.asciiLower(str2),
+
+  isEven(x):: std.round(x) % 2 == 0,
+  isOdd(x):: std.round(x) % 2 != 0,
+  isInteger(x):: std.round(x) == x,
+  isDecimal(x):: std.round(x) != x,
+
+  removeAt(arr, at):: [
+    arr[i],
+    for i in std.range(0, std.length(arr) - 1)
+    if i != at
+  ],
+
+  remove(arr, elem)::
+    local indexes = std.find(elem, arr);
+    if std.length(indexes) == 0
+    then
+      arr
+    else
+      std.removeAt(arr, indexes[0])
+  ,
+
+  objectRemoveKey(obj, key):: {
+    [k]: obj[k],
+    for k in std.objectFields(obj)
+    if k != key
+  },
+
+  sha1(str):: go_only_function,
+  sha256(str):: go_only_function,
+  sha512(str):: go_only_function,
+  sha3(str):: go_only_function,
+
+  trim(str):: std.stripChars(str, ' \t\n\f\r\u0085\u00A0'),
 }
