@@ -17,7 +17,7 @@ Here is the implementation status of the main language features:
 - [X] text blocks
 - [X] verbatim strings
 - [X] object-level locals
-- [ ] object-level asserts (https://github.com/moleike/haskell-jsonnet/issues/39)
+- [X] object-level asserts (by Berk Özkütük)
 - [X] keyword parameters
 - [X] default arguments
 - [ ] top-level arguments (https://github.com/moleike/haskell-jsonnet/issues/24)
