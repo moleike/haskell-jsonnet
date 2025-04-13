@@ -38,6 +38,7 @@ genObject =
     <$> ( mkObjectF
             <$> Gen.list (Range.linear 0 10) (genField genExpr)
             <*> Gen.list (Range.linear 0 10) ((,) <$> genString <*> genExpr)
+            <*> Gen.list (Range.linear 0 10) genAssert'
         )
 
 genArray :: Gen (Fix ExprF')
@@ -72,13 +73,10 @@ genLookup :: Gen (Fix ExprF')
 genLookup = Fix <$> (mkLookupF <$> genIdent <*> genString)
 
 genAssert :: Gen (Fix ExprF')
-genAssert =
-  Fix
-    <$> ( mkAssertF
-            <$> genExpr
-            <*> Gen.maybe genExpr
-            <*> genExpr
-        )
+genAssert = Fix <$> ( mkAssertF <$> genAssert' <*> genExpr)
+
+genAssert' :: Gen (Assert (Fix ExprF'))
+genAssert' = Assert <$> genExpr <*> Gen.maybe genExpr
 
 genLocal :: Gen (Fix ExprF')
 genLocal =

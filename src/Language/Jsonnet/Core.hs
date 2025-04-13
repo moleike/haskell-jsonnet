@@ -25,23 +25,22 @@ import Unbound.Generics.LocallyNameless
 
 type Param a = (Name a, Embed a)
 
-data CField = CField
-  { -- |
-    fieldKey :: Core,
-    -- |
-    fieldVal :: Core,
-    -- |
-    fieldVis :: Visibility
+data RegularField = RegularField
+  { fieldKey :: Core
+  , fieldVal :: Core
+  , fieldVis :: Visibility
   }
-  deriving
-    ( Show,
-      Generic,
-      Alpha,
-      Binary
-    )
+  deriving stock (Show, Generic)
+  deriving anyclass (Alpha, Binary)
+
+data CField
+  = CRegularField RegularField
+  | CAssertField Core  -- ^ The desugared assertion expression
+  deriving stock (Show, Generic)
+  deriving anyclass (Alpha, Binary)
 
 mkField :: Core -> Core -> Visibility -> CField
-mkField = CField
+mkField k v h = CRegularField (RegularField k v h)
 
 instance Binary a => Binary (Name a)
 

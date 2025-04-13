@@ -65,11 +65,11 @@ alg outermost = \case
   EIfElse c t e -> desugarIfElse c t e
   EIf c t -> desugarIfElse c t (CLit Null)
   EArr e -> CArr e
-  EObj {..} -> desugarObj outermost locals fields
+  EObj {..} -> desugarObj outermost locals fields asserts
   ELookup e1 i -> desugarLookup e1 (CLit (String (T.pack i)))
   EIndex e1 e2 -> desugarLookup e1 e2
   EErr e -> desugarErr e
-  EAssert e -> desugarAssert e
+  EAssert a e -> desugarAssert a e
   ESlice {..} -> desugarSlice expr start end step
   EArrComp {expr, comp} -> desugarArrComp expr comp
   EObjComp {field, comp, locals} -> desugarObjComp field comp locals
@@ -104,10 +104,10 @@ desugarBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
 desugarUnyOp :: UnyOp -> Core -> Core
 desugarUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
 
-desugarObj :: Bool -> [(String, Core)] -> [EField Core] -> Core
-desugarObj outermost locals fields = obj
+desugarObj :: Bool -> [(String, Core)] -> [EField Core] -> [Assert Core] -> Core
+desugarObj outermost locals fields asserts = obj
   where
-    obj = CObj (desugarField <$> fields')
+    obj = CObj (map desugarField fields' <> map (CAssertField . flip desugarAssert (CLit (Bool True))) asserts)
 
     bnds =
       if outermost
@@ -123,8 +123,8 @@ desugarObj outermost locals fields = obj
     fields' =
       (\(EField key val comp v o) -> EField key (f val) comp v o) <$> fields
 
-desugarAssert :: Assert Core -> Core
-desugarAssert (Assert c m e) =
+desugarAssert :: Assert Core -> Core -> Core
+desugarAssert (Assert c m) e =
   desugarIfElse
     c
     e

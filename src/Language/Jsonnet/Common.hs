@@ -164,8 +164,7 @@ data Args a = Args
 
 data Assert a = Assert
   { cond :: a,
-    msg :: Maybe a,
-    expr :: a
+    msg :: Maybe a
   }
   deriving
     ( Eq,

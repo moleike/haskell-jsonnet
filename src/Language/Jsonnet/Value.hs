@@ -60,17 +60,14 @@ instance FromJSON Value where
           [ mkField k v
             | (k, v) <- H.toList o
           ]
-      mkField k v = (k, VField (VStr k) v v Visible)
+      mkField k v = (k, VField (VStr k) v v Visible False)
 
 data VField = VField
-  { -- |
-    fieldKey :: Value,
-    -- |
+  { fieldKey :: Value,
     fieldValWHNF :: Value,
-    -- |
     fieldVal :: Value,
-    -- |
-    fieldVis :: Visibility
+    fieldVis :: Visibility,
+    assertField :: Bool
   }
   deriving (Generic)
 

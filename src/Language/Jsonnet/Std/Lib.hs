@@ -38,7 +38,7 @@ import qualified Prelude as P (length)
 std :: ExtVars -> Value
 std extVars = VObj $ H.fromList $ map f xs
   where
-    f = \(k, v) -> (k, VField (VStr k) v v Hidden)
+    f = \(k, v) -> (k, VField (VStr k) v v Hidden False)
     xs =
       [ ("type", inj showTy),
         ("primitiveEquals", inj primitiveEquals),

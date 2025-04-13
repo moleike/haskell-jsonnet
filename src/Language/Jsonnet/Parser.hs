@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Parser
@@ -269,10 +270,15 @@ assertP :: Parser Expr'
 assertP = Fix <$> annotateLoc assert
   where
     assert = do
-      cond <- keywordP "assert" *> exprP
-      msg <- optional (colon *> exprP)
+      assert' <- assertP'
       _ <- symbol ";"
-      mkAssertF cond msg <$> exprP
+      mkAssertF assert' <$> exprP
+
+assertP' :: Parser (Assert Expr')
+assertP' = do
+  cond <- keywordP "assert" *> exprP
+  msg <- optional (colon *> exprP)
+  pure $ Assert cond msg
 
 ifElseP :: Parser Expr'
 ifElseP = Fix <$> annotateLoc ifElseExpr <?> "if"
@@ -351,9 +357,9 @@ objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
-      xs <- eitherP localP' fieldP `sepEndBy` comma
-      let (ls, fs) = (lefts xs, rights xs)
-      pure $ mkObjectF fs ls
+      (partitionEithers -> (partitionEithers -> (asserts, locals), fields))
+        <- eitherP (eitherP (try assertP') localP') fieldP `sepEndBy` comma
+      pure $ mkObjectF fields locals asserts
     fieldP = try methodP <|> pairP
     pairP = do
       (key, computed) <- keyP

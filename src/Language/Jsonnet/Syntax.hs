@@ -65,17 +65,15 @@ data ExprF a
         expr :: a
       }
   | EObj
-      { -- |
-        locals :: [(Ident, a)],
-        -- |
-        fields :: [EField a]
-        --asserts :: [Assert a]
+      { locals :: [(Ident, a)],
+        fields :: [EField a],
+        asserts :: [Assert a]
       }
   | EArr [a]
   | EErr a
   | ELookup a Ident
   | EIndex a a
-  | EAssert (Assert a)
+  | EAssert (Assert a) a
   | EIf a a
   | EIfElse a a a
   | ESlice
@@ -191,12 +189,11 @@ mkSliceF ::
 mkSliceF e f g = InL . ESlice e f g
 
 mkObjectF ::
-  -- |
   [EField a] ->
-  -- |
   [(Ident, a)] ->
+  [Assert a] ->
   ExprF' a
-mkObjectF fs ls = InL $ EObj ls fs
+mkObjectF fs ls = InL . EObj ls fs
 
 mkArrayF :: [a] -> ExprF' a
 mkArrayF = InL . EArr
@@ -204,8 +201,8 @@ mkArrayF = InL . EArr
 mkErrorF :: a -> ExprF' a
 mkErrorF = InL . EErr
 
-mkAssertF :: a -> Maybe a -> a -> ExprF' a
-mkAssertF e m = InL . EAssert . Assert e m
+mkAssertF :: Assert a -> a -> ExprF' a
+mkAssertF a = InL . EAssert a
 
 mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
 mkArrCompF e = InL . EArrComp e

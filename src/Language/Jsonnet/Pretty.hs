@@ -232,15 +232,20 @@ ppField EField {..} =
     ppOverride = pretty (bool "" "+" override)
     key' = bool key (brackets key) computed
 
-ppObject :: [(Ident, Doc ann)] -> [Doc ann] -> Doc ann
-ppObject l o =
+ppObject :: forall ann. [(Ident, Doc ann)] -> [Assert (Doc ann)] -> [Doc ann] -> Doc ann
+ppObject l asserts o =
   encloseSep
     lbrace
     rbrace
     comma
-    (mcons (ppLocal' l) o)
+    (mcons (ppLocal' l) (asserts' <> o))
   where
+    mcons :: Maybe a -> [a] -> [a]
     mcons ma as = maybe as (: as) ma
+
+    asserts' :: [Doc ann]
+    asserts' = map prettyAssert asserts
+
     ppLocal' :: [(Ident, Doc ann)] -> Maybe (Doc ann)
     ppLocal' [] = Nothing
     ppLocal' xs =
@@ -334,6 +339,9 @@ ppCompSpec cs = hsep $ f <$> NE.toList cs
         <+> parens f'
         <+> hsep (map (pif <+>) ifspecs)
 
+prettyAssert :: Assert (Doc ann) -> Doc ann
+prettyAssert (Assert c m) = passert <+> c <> ppMaybeDoc ((colon <>) <$> m)
+
 ppExpr :: ExprF (Doc ann) -> Doc ann
 ppExpr = \case
   ENull -> pnull
@@ -347,14 +355,14 @@ ppExpr = \case
   EIf c t -> pif <+> c <+> pthen <+> parens t
   EIfElse c t e -> pif <+> c <+> pthen <+> parens t <+> pelse <+> parens e
   EArr a -> bracketSep comma a
-  EObj ls o -> ppObject ls (ppField <$> o)
+  EObj ls o asserts -> ppObject ls asserts (ppField <$> o)
   ELocal xs e -> ppLocal (NE.toList xs) (parens e)
   EErr a -> perror <+> parens a
-  EAssert (Assert c m e) -> passert <+> c <> ppMaybeDoc ((colon <>) <$> m) <> semi <+> e
+  EAssert assert e -> prettyAssert assert <> semi <+> e
   EIndex a b -> parens a <> brackets b
   ELookup a i -> enclose a (pretty i) dot
   EUnyOp o a -> parens (prettyUnyOp o <> a)
   EBinOp o a b -> parens (parens a <+> prettyBinOp o <+> parens b)
   ESlice a b e s -> parens a <> bracketSep colon (ppMaybeDoc <$> [b, e, s])
   EArrComp e cs -> lbracket <> e <+> ppCompSpec cs <> rbracket
-  EObjComp f ls cs -> ppObject ls [ppField f <+> ppCompSpec cs]
+  EObjComp f ls cs -> ppObject ls [] [ppField f <+> ppCompSpec cs]
