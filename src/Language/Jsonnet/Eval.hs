@@ -422,9 +422,16 @@ manifest = \case
     filterNonAssertionFields :: HashMap Text (JSON.Value, Bool) -> HashMap Text JSON.Value
     filterNonAssertionFields = fmap fst . H.filter (not . snd)
 
+objectAssertionFields :: Object -> [VField]
+objectAssertionFields = H.elems . H.filter assertField
+
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o True = L.sort (H.keys o) -- all fields
-objectFieldsEx o False = L.sort $ H.keys $ H.filter (not . hidden) o -- only visible (incl. forced)
+objectFieldsEx o False = L.sort $ H.keys $ H.filter isVisible o
+  where
+    -- only visible (incl. forced), also excludes assertion fields
+    isVisible :: VField -> Bool
+    isVisible field = not (hidden field) && not (assertField field)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all' = f `elem` objectFieldsEx o all'
@@ -452,8 +459,13 @@ equals e1 e2 = liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry go
       let fields = objectFieldsEx a False
       if fields /= objectFieldsEx b False
         then pure False
-        else allM objectFieldEquals fields
+        else aAsserted <&&> bAsserted <&&> allM objectFieldEquals fields
       where
+        (<&&>) = liftA2 (&&)
+        aAsserted = allM proj' aAsserts
+        bAsserted = allM proj' bAsserts
+        aAsserts = map fieldValWHNF $ objectAssertionFields a
+        bAsserts = map fieldValWHNF $ objectAssertionFields b
         objectFieldEquals field =
           let a' = fieldValWHNF (a H.! field)
               b' = fieldValWHNF (b H.! field)
