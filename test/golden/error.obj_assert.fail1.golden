@@ -1,0 +1,2 @@
+Runtime error: Assertion failed
+  ./test/golden/error.obj_assert.fail1.jsonnet:20:1-50 

@@ -1,0 +1,2 @@
+Runtime error: foo was not equal to bar
+  ./test/golden/error.obj_assert.fail2.jsonnet:20:1-86 

@@ -91,7 +91,7 @@ length :: Value -> Eval Int
 length = \case
   VStr s -> pure $ T.length s
   VArr a -> pure $ P.length a
-  VObj o -> pure $ P.length (H.keys o)
+  VObj o -> pure $ P.length (objectFieldsEx o True)
   VClos f _ -> do
     (ps, _) <- unbind f
     pure $ P.length (unrec ps)

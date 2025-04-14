@@ -426,12 +426,12 @@ objectAssertionFields :: Object -> [VField]
 objectAssertionFields = H.elems . H.filter assertField
 
 objectFieldsEx :: Object -> Bool -> [Text]
-objectFieldsEx o True = L.sort (H.keys o) -- all fields
-objectFieldsEx o False = L.sort $ H.keys $ H.filter isVisible o
+objectFieldsEx o = \case
+  True  -> L.sort $ H.keys $ H.filter isRegular o
+  False -> L.sort $ H.keys $ H.filter isVisible o
   where
-    -- only visible (incl. forced), also excludes assertion fields
-    isVisible :: VField -> Bool
-    isVisible field = not (hidden field) && not (assertField field)
+    isRegular field = not (assertField field)
+    isVisible field = not (hidden field) && (isRegular field)
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all' = f `elem` objectFieldsEx o all'
