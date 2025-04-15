@@ -1,0 +1,2 @@
+Runtime error: {"a":1,"b":2,"c":3}
+  ./test/golden/error.08.jsonnet:18:1-19:1 

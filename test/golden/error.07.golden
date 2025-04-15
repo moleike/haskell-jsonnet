@@ -1,0 +1,3 @@
+Runtime error: sarcasm
+  ./test/golden/error.07.jsonnet:18:31-46 function <third>
+  ./test/golden/error.07.jsonnet:18:15-20 
