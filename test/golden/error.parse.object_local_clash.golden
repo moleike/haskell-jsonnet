@@ -1,0 +1,2 @@
+Static error: duplicate local var 'x'
+  ./test/golden/error.parse.object_local_clash.jsonnet:17:1-18:1

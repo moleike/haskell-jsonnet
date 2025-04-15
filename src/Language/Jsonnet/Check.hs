@@ -26,6 +26,7 @@ check = foldFixM alg
       ELocal bnds _ -> checkLocal (NE.toList $ fst <$> bnds)
       EFun ps _ -> checkFun (fst <$> ps)
       EApply _ (Args as _) -> checkApply as
+      EObj {..} -> checkLocal (fst <$> locals)
       _ -> pure ()
     checkLocal names = case dups names of
       ((x:_) : _) -> throwError $ DuplicateBinding x
