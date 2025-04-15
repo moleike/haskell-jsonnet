@@ -16,6 +16,7 @@ Here is the implementation status of the main language features:
 - [X] Python-style string formatting
 - [X] text blocks
 - [X] verbatim strings
+- [X] computed field names
 - [X] object-level locals
 - [X] object-level asserts (by Berk Özkütük)
 - [X] keyword parameters
