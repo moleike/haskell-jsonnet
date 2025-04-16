@@ -19,6 +19,7 @@ import Language.Jsonnet.Syntax
 
 type Check = ExceptT Error IO
 
+-- TODO add rules for remaining constructors
 check :: Ann ExprF SrcSpan -> Check ()
 check = foldFixM alg
   where
