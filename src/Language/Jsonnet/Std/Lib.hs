@@ -72,7 +72,7 @@ std extVars = VObj $ H.fromList $ map f xs
         ("objectFieldsEx", inj objectFieldsEx),
         ("parseJson", inj (JSON.decodeStrict @Value)),
         ("extVar", inj (lookupExtVar extVars)),
-        ("thisFile", inj thisFile)
+        ("thisFile", inj (getFilename @Value))
       ]
 
 lookupExtVar :: ExtVars -> Text -> Eval Value
@@ -106,6 +106,3 @@ makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 hypot :: Double -> Double -> Double
 hypot a b = sqrt (a * a + b * b)
-
-thisFile :: Eval Value
-thisFile = inj <$> getFilename
