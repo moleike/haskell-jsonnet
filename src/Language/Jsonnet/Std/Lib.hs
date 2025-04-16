@@ -28,7 +28,7 @@ import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval.Monad (getFilename, throwE)
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
@@ -71,7 +71,8 @@ std extVars = VObj $ H.fromList $ map f xs
         ("objectHasEx", inj objectHasEx),
         ("objectFieldsEx", inj objectFieldsEx),
         ("parseJson", inj (JSON.decodeStrict @Value)),
-        ("extVar", inj (lookupExtVar extVars))
+        ("extVar", inj (lookupExtVar extVars)),
+        ("thisFile", inj thisFile)
       ]
 
 lookupExtVar :: ExtVars -> Text -> Eval Value
@@ -105,3 +106,6 @@ makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 hypot :: Double -> Double -> Double
 hypot a b = sqrt (a * a + b * b)
+
+thisFile :: Eval Value
+thisFile = inj <$> getFilename

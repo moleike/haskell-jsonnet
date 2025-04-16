@@ -56,6 +56,7 @@ rnf = whnf >=> manifest
 whnfV :: Value -> Eval Value
 whnfV (VIndir loc) = whnfIndir loc >>= whnfV
 whnfV (VThunk c e) = withEnv e (whnf c)
+whnfV (VThunk' v) = v
 whnfV v = pure v
 
 whnf :: Core -> Eval Value
@@ -417,6 +418,7 @@ manifest = \case
   VFun _ -> throwE (ManifestError "function")
   v@VThunk {} -> whnfV v >>= manifest
   v@VIndir {} -> whnfV v >>= manifest
+  v@VThunk' {} -> whnfV v >>= manifest
   _ -> throwE (ManifestError "impossible")
   where
     filterNonAssertionFields :: HashMap Text (JSON.Value, Bool) -> HashMap Text JSON.Value
@@ -517,6 +519,7 @@ showTy = \case
   VPrim _ -> pure "function"
   VThunk {} -> pure "thunk"
   VIndir {} -> pure "pointer"
+  VThunk' _ -> pure "thunk"
 
 --v@VThunk {} -> whnfV v >>= showTy
 --v@VIndir {} -> whnfV v >>= showTy
@@ -596,6 +599,10 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
   inj f = inj $ \x -> inj (f x)
   {-# INLINE inj #-}
   proj = throwTypeMismatch "impossible"
+
+instance {-# OVERLAPS #-} HasValue a => HasValue (Eval a) where
+  inj a = VThunk' $ inj <$> a
+  proj = proj'
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
   inj f = VFun $ proj' >=> fmap inj . f

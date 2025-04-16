@@ -21,9 +21,10 @@ import qualified Data.Map.Lazy as M (union)
 import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Error (Error (EvalError), EvalError)
-import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
+import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Name
+import Text.Megaparsec.Pos
 
 type Ctx a = Map (Name Core) a
 
@@ -107,3 +108,6 @@ getBacktrace = do
       case sequence sp of
         Just sp' -> zipWith StackFrame sc sp'
         Nothing -> []
+
+getFilename :: EvalM a (Maybe FilePath)
+getFilename = (sourceName . spanBegin <$>) <$> view currentPos

@@ -44,6 +44,7 @@ data Value
   | VPrim !Prim
   | VClos !Lam !Env
   | VFun !Fun
+  | VThunk' !(Eval Value)
 
 instance FromJSON Value where
   parseJSON = \case
