@@ -1,0 +1,2 @@
+Runtime error: variable '"x"' is not defined
+  ./test/golden/error.computed_field_scope.jsonnet:17:21-22 
