@@ -53,12 +53,6 @@ import qualified Prelude as P (length)
 rnf :: Core -> Eval JSON.Value
 rnf = whnf >=> manifest
 
-whnfV :: Value -> Eval Value
-whnfV (VIndir loc) = whnfIndir loc >>= whnfV
-whnfV (VThunk c e) = withEnv e (whnf c)
-whnfV (VThunk' v) = v
-whnfV v = pure v
-
 whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
 whnf (CLoc sp c) = locally currentPos (const $ Just sp) (whnf c)
@@ -71,6 +65,13 @@ whnf (CApp e es) = whnfApp e es
 whnf (CLam f) = VClos f <$> view ctx
 whnf (CComp comp e) = whnfComp comp e
 
+force :: HasValue a => Value -> Eval a
+force (VIndir loc) = whnfIndir loc >>= force
+force (VThunk c e) = withEnv e (whnf c) >>= proj
+force (VThunk' v) = v >>= proj
+force v = proj v
+{-# INLINE force #-}
+
 mkValue :: Core -> Eval Value
 mkValue c@(CLit _) = whnf c
 mkValue c@(CLam _) = whnf c
@@ -81,7 +82,7 @@ lookupVar :: Name Core -> Eval Value
 lookupVar n = do
   rho <- view ctx
   v <- liftMaybe (VarNotFound (n2s n)) (M.lookup n rho)
-  whnfV v
+  force v
 
 whnfLiteral :: Literal -> Value
 whnfLiteral = \case
@@ -98,7 +99,7 @@ whnfArgs = \case
 whnfApp :: Core -> Args Core -> Eval Value
 whnfApp e es = withStackFrame e $ do
   vs <- whnfArgs es
-  whnf e >>= whnfV >>= \case
+  whnf e >>= force >>= \case
     VClos f env -> whnfClos env f vs
     VPrim op -> whnfPrim op vs
     v@(VFun _) -> foldlM f v vs
@@ -177,11 +178,11 @@ splitArgs args bnds = do
       let (ys, zs) = split xs in (ys, (n, v) : zs)
 
 whnfPrim :: Prim -> [Arg Value] -> Eval Value
-whnfPrim (UnyOp op) [Pos e] = whnfV e >>= whnfUnyOp op
+whnfPrim (UnyOp op) [Pos e] = force e >>= whnfUnyOp op
 whnfPrim (BinOp LAnd) [Pos e1, Pos e2] = whnfLogical id e1 e2
 whnfPrim (BinOp LOr) [Pos e1, Pos e2] = whnfLogical not e1 e2
 whnfPrim (BinOp op) [Pos e1, Pos e2] =
-  liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry (whnfBinOp op)
+  liftA2 (,) (force e1) (force e2) >>= uncurry (whnfBinOp op)
 whnfPrim Cond [Pos c, Pos t, Pos e] = whnfCond c t e
 
 whnfBinOp :: BinOp -> Value -> Value -> Eval Value
@@ -212,19 +213,19 @@ whnfBinOp In s o = liftF2 (\o' s' -> objectHasEx o' s' True) o s
 
 whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
 whnfLogical f e1 e2 = do
-  x <- whnfV e1 >>= proj'
+  x <- force e1 >>= force
   if f x
-    then inj <$> (whnfV e2 >>= proj' @Bool)
+    then inj <$> (force e2 >>= force @Bool)
     else pure (inj x)
 
 append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
 whnfUnyOp :: UnyOp -> Value -> Eval Value
-whnfUnyOp Compl x = inj <$> fmap (Bits.complement @Int64) (proj' x)
-whnfUnyOp LNot x = inj <$> fmap not (proj' x)
-whnfUnyOp Minus x = inj <$> fmap (negate @Double) (proj' x)
-whnfUnyOp Plus x = inj <$> fmap (id @Double) (proj' x)
+whnfUnyOp Compl x = inj <$> fmap (Bits.complement @Int64) (force x)
+whnfUnyOp LNot x = inj <$> fmap not (force x)
+whnfUnyOp Minus x = inj <$> fmap (negate @Double) (force x)
+whnfUnyOp Plus x = inj <$> fmap (id @Double) (force x)
 whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
 
 toString :: Value -> Eval Text
@@ -233,17 +234,17 @@ toString v = toStrict . encodeToLazyText <$> manifest v
 
 whnfCond :: Value -> Value -> Value -> Eval Value
 whnfCond c e1 e2 = do
-  c' <- proj' c
+  c' <- force c
   if c'
-    then whnfV e1
-    else whnfV e2
+    then force e1
+    else force e2
 
 whnfLookup :: Value -> Value -> Eval Value
 whnfLookup (VObj o) (VStr s) =
-  whnfV . fieldValWHNF =<< liftMaybe (NoSuchKey s) (H.lookup s o)
+  force . fieldValWHNF =<< liftMaybe (NoSuchKey s) (H.lookup s o)
 whnfLookup (VArr a) (VNum i)
   | isInteger i =
-    whnfV =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
+    force =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
 whnfLookup (VArr _) _ =
   throwE (InvalidIndex "array index was not integer")
 whnfLookup (VStr s) (VNum i)
@@ -267,7 +268,7 @@ whnfIndir ref = do
     Cell v True ->
       return v -- Already evaluated, just return it
     Cell v False -> do
-      v' <- whnfV v -- Needs to be reduced
+      v' <- force v -- Needs to be reduced
       liftIO $ writeIORef ref (Cell v' True)
       return v'
 
@@ -309,7 +310,7 @@ whnfField self (CRegularField (RegularField k v h)) = do
   fieldValWHNF <- extendEnv self (mkValue v)
   fieldVal <- extendEnv self (mkThunk v)
   let assertField = False
-  fmap (,VField {..}) <$> proj' fieldKey
+  fmap (,VField {..}) <$> force fieldKey
 whnfField self (CAssertField assertion) = do
   assertion' <- extendEnv self (mkThunk assertion)
   fieldKey <- nameToText <$> fresh (s2n "$$assert")
@@ -325,7 +326,7 @@ flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
 
 whnfIfs :: [Core] -> EvalM Value Bool
-whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= proj')) True
+whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
 whnfComp ::
   Comp ->
@@ -362,7 +363,7 @@ whnfComp (ObjC bnd) cs = do
                 fieldVal <- mkThunk v
                 let fieldVis = h
                     assertField = False
-                fmap (,VField {..}) <$> proj' fieldKey
+                fmap (,VField {..}) <$> force fieldKey
               else pure Nothing
         v -> throwTypeMismatch "array" v
 
@@ -416,9 +417,9 @@ manifest = \case
   VArr vs -> JSON.Array <$> mapM manifest vs
   VClos {} -> throwE (ManifestError "function")
   VFun _ -> throwE (ManifestError "function")
-  v@VThunk {} -> whnfV v >>= manifest
-  v@VIndir {} -> whnfV v >>= manifest
-  v@VThunk' {} -> whnfV v >>= manifest
+  v@VThunk {} -> force v >>= manifest
+  v@VIndir {} -> force v >>= manifest
+  v@VThunk' {} -> force v >>= manifest
   _ -> throwE (ManifestError "impossible")
   where
     filterNonAssertionFields :: HashMap Text (JSON.Value, Bool) -> HashMap Text JSON.Value
@@ -449,12 +450,12 @@ primitiveEquals _ _ =
     )
 
 equals :: Value -> Value -> Eval Bool
-equals e1 e2 = liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry go
+equals e1 e2 = liftA2 (,) (force e1) (force e2) >>= uncurry go
   where
     go as@(VArr a) bs@(VArr b)
       | P.length a == P.length b = do
-        as' <- proj' as
-        bs' <- proj' bs
+        as' <- force as
+        bs' <- force bs
         allM (uncurry equals) (zip as' bs')
       | P.length a /= P.length b = pure False
     go (VObj a) (VObj b) = do
@@ -464,8 +465,8 @@ equals e1 e2 = liftA2 (,) (whnfV e1) (whnfV e2) >>= uncurry go
         else aAsserted <&&> bAsserted <&&> allM objectFieldEquals fields
       where
         (<&&>) = liftA2 (&&)
-        aAsserted = allM proj' aAsserts
-        bAsserted = allM proj' bAsserts
+        aAsserted = allM force aAsserts
+        bAsserted = allM force bAsserts
         aAsserts = map fieldValWHNF $ objectAssertionFields a
         bAsserts = map fieldValWHNF $ objectAssertionFields b
         objectFieldEquals field =
@@ -487,7 +488,7 @@ liftF ::
   (HasValue a, HasValue b) =>
   (a -> b) ->
   (Value -> Eval Value)
-liftF f v = inj . f <$> proj' v
+liftF f v = inj . f <$> force v
 {-# INLINE liftF #-}
 
 liftF2 ::
@@ -496,12 +497,8 @@ liftF2 ::
   Value ->
   Value ->
   Eval Value
-liftF2 f v1 v2 = inj <$> liftA2 f (proj' v1) (proj' v2)
+liftF2 f v1 v2 = inj <$> liftA2 f (force v1) (force v2)
 {-# INLINE liftF2 #-}
-
-proj' :: HasValue a => Value -> Eval a
-proj' = whnfV >=> proj
-{-# INLINE proj' #-}
 
 throwTypeMismatch :: Text -> Value -> Eval a
 throwTypeMismatch e = throwE . TypeMismatch e <=< showTy
@@ -521,8 +518,8 @@ showTy = \case
   VIndir {} -> pure "pointer"
   VThunk' _ -> pure "thunk"
 
---v@VThunk {} -> whnfV v >>= showTy
---v@VIndir {} -> whnfV v >>= showTy
+--v@VThunk {} -> force v >>= showTy
+--v@VIndir {} -> force v >>= showTy
 
 instance HasValue Bool where
   proj (VBool n) = pure n
@@ -568,7 +565,7 @@ instance {-# OVERLAPS #-} Integral a => HasValue a where
 
 instance HasValue a => HasValue (Maybe a) where
   proj VNull = pure Nothing
-  proj a = Just <$> proj' a
+  proj a = Just <$> force a
   inj Nothing = VNull
   inj (Just a) = inj a
   {-# INLINE inj #-}
@@ -580,18 +577,18 @@ instance {-# OVERLAPS #-} HasValue Object where
   {-# INLINE inj #-}
 
 instance HasValue a => HasValue (Vector a) where
-  proj (VArr as) = mapM proj' as
+  proj (VArr as) = mapM force as
   proj v = throwTypeMismatch "array" v
   inj as = VArr (inj <$> as)
   {-# INLINE inj #-}
 
 instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
-  proj = fmap V.toList . proj'
+  proj = fmap V.toList . force
   inj = inj . V.fromList
   {-# INLINE inj #-}
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
-  inj f = VFun $ fmap (inj . f) . proj'
+  inj f = VFun $ fmap (inj . f) . force
   {-# INLINE inj #-}
   proj = throwTypeMismatch "impossible"
 
@@ -602,18 +599,18 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
 
 instance {-# OVERLAPS #-} HasValue a => HasValue (Eval a) where
   inj a = VThunk' $ inj <$> a
-  proj = proj'
+  proj = force
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
-  inj f = VFun $ proj' >=> fmap inj . f
+  inj f = VFun $ force >=> fmap inj . f
   {-# INLINE inj #-}
-  proj (VFun f) = pure $ \x -> f (inj x) >>= proj'
+  proj (VFun f) = pure $ \x -> f (inj x) >>= force
   proj (VClos f e) = pure $ \x -> proj =<< whnfClos e f [Pos (inj x)]
   proj v = throwTypeMismatch "function" v
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
   inj f = inj $ \x -> inj (f x)
   {-# INLINE inj #-}
-  proj (VFun f) = pure $ \x y -> f (inj x) >>= \(VFun g) -> g (inj y) >>= proj'
-  proj (VClos f env) = pure $ \x y -> proj' =<< whnfClos env f [Pos (inj x), Pos (inj y)]
+  proj (VFun f) = pure $ \x y -> f (inj x) >>= \(VFun g) -> g (inj y) >>= force
+  proj (VClos f env) = pure $ \x y -> force =<< whnfClos env f [Pos (inj x), Pos (inj y)]
   proj v = throwTypeMismatch "function" v
