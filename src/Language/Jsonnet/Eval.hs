@@ -213,9 +213,9 @@ whnfBinOp In s o = liftF2 (\o' s' -> objectHasEx o' s' True) o s
 
 whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
 whnfLogical f e1 e2 = do
-  x <- force e1 >>= force
+  x <- force e1
   if f x
-    then inj <$> (force e2 >>= force @Bool)
+    then inj <$> (force @Bool) e2
     else pure (inj x)
 
 append :: Value -> Value -> Eval Text
