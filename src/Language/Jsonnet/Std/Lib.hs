@@ -28,11 +28,17 @@ import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval.Monad (getFilename, throwE)
+import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import qualified Prelude as P (length)
+import System.IO
+import Data.Functor
+import Control.Monad.IO.Class (liftIO)
+import Data.Maybe (fromMaybe)
+import Control.Monad
+
 
 -- | Jsonnet standard library built-in methods
 std :: ExtVars -> Value
@@ -72,7 +78,8 @@ std extVars = VObj $ H.fromList $ map f xs
         ("objectFieldsEx", inj objectFieldsEx),
         ("parseJson", inj (JSON.decodeStrict @Value)),
         ("extVar", inj (lookupExtVar extVars)),
-        ("thisFile", inj (getFilename @Value))
+        ("thisFile", inj (getFilename @Value)),
+        ("trace", inj trace)
       ]
 
 lookupExtVar :: ExtVars -> Text -> Eval Value
@@ -106,3 +113,12 @@ makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 hypot :: Double -> Double -> Double
 hypot a b = sqrt (a * a + b * b)
+
+trace :: String -> Value -> Eval Value
+trace str = ($>) (msg >>= liftIO . hPutStrLn stderr)
+  where
+    msg = do
+      fn <- getFilename <&> mfilter (not . null) -- exec mode has no filename
+      ln <- getLineNum
+      fl <- pure $ fromMaybe mempty $ liftA2 (++) ((++ ":") <$> fn) (show <$> ln)
+      pure $ "TRACE: " ++ fl ++ " " ++ str

@@ -111,3 +111,6 @@ getBacktrace = do
 
 getFilename :: EvalM a (Maybe FilePath)
 getFilename = (sourceName . spanBegin <$>) <$> view currentPos
+
+getLineNum :: EvalM a (Maybe Int)
+getLineNum = (unPos . sourceLine . spanBegin <$>) <$> view currentPos
