@@ -119,6 +119,6 @@ trace str = ($>) (msg >>= liftIO . hPutStrLn stderr)
   where
     msg = do
       fn <- getFilename <&> mfilter (not . null) -- exec mode has no filename
-      ln <- getLineNum
-      fl <- pure $ fromMaybe mempty $ liftA2 (++) ((++ ":") <$> fn) (show <$> ln)
-      pure $ "TRACE: " ++ fl ++ " " ++ str
+      ln <- getLineNum <&> fmap show
+      fl <- pure $ fromMaybe mempty $ liftA2 (++) ((++ ":") <$> fn) ((++ " ") <$> ln)
+      pure $ "TRACE: " ++ fl ++ str
