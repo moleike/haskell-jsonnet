@@ -20,28 +20,26 @@
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
       treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
-      formatter = treefmtEval.config.build.wrapper;
       overlay = self: super: {
         unbound-generics = pkgs.haskell.lib.unmarkBroken super.unbound-generics;
+        jsonnet = self.callCabal2nix "jsonnet" ./. {};
       };
-      haskellPackages = pkgs.haskell.packages.ghc910;
-      haskellPackages' = haskellPackages.extend overlay;
-      packageName = "jsonnet";
-    in {
-      packages.${packageName} =
-        haskellPackages'.callCabal2nix packageName self {};
+      haskellPackages = pkgs.haskell.packages.ghc910.extend overlay;
+    in rec {
+      # nix build
+      packages.default = haskellPackages.jsonnet;
 
-      defaultPackage = self.packages.${system}.${packageName};
-
+      # nix develop
       devShell = pkgs.mkShell {
         inherit (self.checks.${system}.pre-commit-check) shellHook;
-        buildInputs = with haskellPackages'; [
+        buildInputs = with haskellPackages; [
           haskell-language-server
           ghcid
           cabal-install
         ];
       };
 
+      # nix flake check
       checks = {
         formatting = treefmtEval.config.build.check self;
         pre-commit-check = pre-commit-hooks.lib.${system}.run {
@@ -53,7 +51,7 @@
         };
       };
 
-      # for `nix fmt`
+      # nix fmt
       formatter = treefmtEval.config.build.wrapper;
     });
 }
