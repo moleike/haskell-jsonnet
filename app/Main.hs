@@ -3,19 +3,19 @@
 module Main where
 
 import Control.Monad (when)
-import qualified Data.Aeson as JSON
-import qualified Data.Aeson.Key as JSON.Key
-import qualified Data.Aeson.KeyMap as JSON.KeyMap
+import Data.Aeson qualified as JSON
+import Data.Aeson.Key qualified as JSON.Key
+import Data.Aeson.KeyMap qualified as JSON.KeyMap
 import Data.Bifunctor (first, second)
 import Data.ByteString.Builder (toLazyByteString)
-import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Lazy.Char8 as LC
+import Data.ByteString.Lazy qualified as L
+import Data.ByteString.Lazy.Char8 qualified as LC
 import Data.Functor (void)
 import Data.Maybe
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Text.Encoding (encodeUtf8Builder)
-import qualified Data.Text.IO as TIO
+import Data.Text.IO qualified as TIO
 import Data.Version (showVersion)
 import Data.Void (Void)
 import Language.Jsonnet
@@ -23,12 +23,12 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Pretty (ppJson, prettyError)
 import Options.Applicative hiding (str)
 import Paths_jsonnet (version)
-import qualified System.Directory as Dir
+import System.Directory qualified as Dir
 import System.Environment (lookupEnv)
 import System.Exit (die)
 import System.FilePath ((</>))
-import qualified Text.Megaparsec as MP
-import qualified Text.Megaparsec.Char as MPC
+import Text.Megaparsec qualified as MP
+import Text.Megaparsec.Char qualified as MPC
 
 main :: IO ()
 main = do
@@ -36,7 +36,6 @@ main = do
   return ()
 
 runProgram ::
-  -- |
   Options ->
   IO ()
 runProgram opts@Options {..} = do
@@ -54,8 +53,7 @@ writeFileMulti outFile content = do
       existingContent <- L.readFile outFile
       when (existingContent /= content) $
         L.writeFile outFile content
-    else 
-      L.writeFile outFile content
+    else L.writeFile outFile content
   putStrLn outFile
 
 printResult :: Output -> OutputMode -> Format -> JSON.Value -> IO ()
@@ -113,7 +111,7 @@ mkConfig Options {..} = do
 
 fileOutput :: Parser Output
 fileOutput =
-  fromMaybe Stdout <$> optional fileOpts 
+  fromMaybe Stdout <$> optional fileOpts
   where
     fileOpts :: Parser Output
     fileOpts =

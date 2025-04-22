@@ -1,12 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
--- |
 module Language.Jsonnet.Test.Golden where
 
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.Map.Strict as M
-import qualified Data.Text.IO as T (readFile)
+import Data.ByteString.Lazy qualified as LBS
+import Data.Map.Strict qualified as M
+import Data.Text.IO qualified as T (readFile)
 import Data.Text.Lazy
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet hiding (extVars)

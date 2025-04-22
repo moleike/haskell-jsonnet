@@ -27,10 +27,10 @@ instance Exception Error
 
 data EvalError
   = TypeMismatch
+      -- | expected
       Text
-      -- ^ expected
+      -- | actual
       Text
-      -- ^ actual
   | InvalidKey Text
   | DuplicateKey Text
   | NoSuchKey Text

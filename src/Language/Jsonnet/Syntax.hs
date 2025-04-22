@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-partial-fields #-}
+
 -- |
 -- Module                  : Language.Jsonnet.Syntax
 -- Copyright               : (c) 2020-2021 Alexandre Moreno
@@ -16,7 +17,7 @@ import Data.Functor.Sum
 import Data.List.NonEmpty
 import Data.Scientific (Scientific)
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Common
@@ -77,29 +78,20 @@ data ExprF a
   | EIf a a
   | EIfElse a a a
   | ESlice
-      { -- |
-        expr :: a,
-        -- |
+      { expr :: a,
         start :: Maybe a,
-        -- |
         end :: Maybe a,
-        -- |
         step :: Maybe a
       }
   | EBinOp BinOp a a
   | EUnyOp UnyOp a
   | EArrComp
-      { -- |
-        expr :: a,
-        -- |
+      { expr :: a,
         comp :: NonEmpty (CompSpec a)
       }
   | EObjComp
-      { -- |
-        field :: EField a,
-        -- |
+      { field :: EField a,
         locals :: [(Ident, a)],
-        -- |
         comp :: NonEmpty (CompSpec a)
       }
   deriving stock
@@ -137,7 +129,7 @@ mkImportbinF = InR . Const . Importbin
 mkNullF :: ExprF' a
 mkNullF = InL ENull
 
-mkIntF :: Integral b => b -> ExprF' a
+mkIntF :: (Integral b) => b -> ExprF' a
 mkIntF = InL . ENum . fromIntegral
 
 mkFloatF :: Scientific -> ExprF' a
@@ -177,13 +169,9 @@ mkIndexF :: a -> a -> ExprF' a
 mkIndexF e = InL . EIndex e
 
 mkSliceF ::
-  -- |
   a ->
-  -- |
   Maybe a ->
-  -- |
   Maybe a ->
-  -- |
   Maybe a ->
   ExprF' a
 mkSliceF e f g = InL . ESlice e f g
@@ -208,11 +196,8 @@ mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
 mkArrCompF e = InL . EArrComp e
 
 mkObjCompF ::
-  -- |
   EField a ->
-  -- |
   [(Ident, a)] ->
-  -- |
   NonEmpty (CompSpec a) ->
   ExprF' a
 mkObjCompF f ls = InL . EObjComp f ls

@@ -16,7 +16,7 @@ import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
 import Data.Text (Text)
-import qualified Data.Text as T (pack)
+import Data.Text qualified as T (pack)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
@@ -184,11 +184,8 @@ data Assert a = Assert
     via FunctorClassesDefault Assert
 
 data CompSpec a = CompSpec
-  { -- |
-    var :: String,
-    -- |
+  { var :: String,
     forspec :: a,
-    -- |
     ifspec :: [a]
   }
   deriving

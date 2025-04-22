@@ -14,32 +14,32 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Lens (locally, view)
-import Control.Monad ((>=>), join, forM, (<=<), foldM)
+import Control.Monad (foldM, forM, join, (<=<), (>=>))
 import Control.Monad.IO.Class (liftIO)
-import qualified Data.Aeson as JSON
-import qualified Data.Aeson.KeyMap as KeyMap
+import Data.Aeson qualified as JSON
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
-import qualified Data.Bits as Bits
-import Data.Bits ((.&.), (.|.))
 import Data.Bitraversable (bitraverse)
+import Data.Bits ((.&.), (.|.))
+import Data.Bits qualified as Bits
 import Data.ByteString (ByteString)
 import Data.Foldable
 import Data.HashMap.Lazy (HashMap)
-import qualified Data.HashMap.Lazy as H
+import Data.HashMap.Lazy qualified as H
 import Data.IORef
 import Data.Int (Int64)
-import qualified Data.List as L (sort)
-import qualified Data.Map.Lazy as M
+import Data.List qualified as L (sort)
+import Data.Map.Lazy qualified as M
 import Data.Maybe
 import Data.Scientific
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Lazy (toStrict)
 import Data.Traversable (for)
 import Data.Vector (Vector, (!?))
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
@@ -48,7 +48,7 @@ import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Value
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
-import qualified Prelude as P (length)
+import Prelude qualified as P (length)
 
 rnf :: Core -> Eval JSON.Value
 rnf = whnf >=> manifest
@@ -65,7 +65,7 @@ whnf (CApp e es) = whnfApp e es
 whnf (CLam f) = VClos f <$> view ctx
 whnf (CComp comp e) = whnfComp comp e
 
-force :: HasValue a => Value -> Eval a
+force :: (HasValue a) => Value -> Eval a
 force (VIndir loc) = whnfIndir loc >>= force
 force (VThunk c e) = withEnv e (whnf c) >>= proj
 force (VThunk' v) = v >>= proj
@@ -114,10 +114,10 @@ withStackFrame (CLoc sp (CVar n)) e =
 withStackFrame (CLoc sp _) e =
   pushStackFrame (s2n "anonymous", Just sp) e
 withStackFrame (CVar _) e = e
---pushStackFrame (n, Nothing) e
+-- pushStackFrame (n, Nothing) e
 withStackFrame _ e = e
 
---pushStackFrame (s2n "anonymous", Nothing) e
+-- pushStackFrame (s2n "anonymous", Nothing) e
 
 whnfClos :: Env -> Lam -> [Arg Value] -> Eval Value
 whnfClos rho f args = do
@@ -211,7 +211,7 @@ whnfBinOp ShiftL e1 e2 = liftF2 (Bits.shiftL @Int64) e1 e2
 whnfBinOp ShiftR e1 e2 = liftF2 (Bits.shiftR @Int64) e1 e2
 whnfBinOp In s o = liftF2 (\o' s' -> objectHasEx o' s' True) o s
 
-whnfLogical :: HasValue a => (a -> Bool) -> Value -> Value -> Eval Value
+whnfLogical :: (HasValue a) => (a -> Bool) -> Value -> Value -> Eval Value
 whnfLogical f e1 e2 = do
   x <- force e1
   if f x
@@ -244,12 +244,12 @@ whnfLookup (VObj o) (VStr s) =
   force . fieldValWHNF =<< liftMaybe (NoSuchKey s) (H.lookup s o)
 whnfLookup (VArr a) (VNum i)
   | isInteger i =
-    force =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
+      force =<< liftMaybe (IndexOutOfBounds i) ((a !?) =<< toBoundedInteger i)
 whnfLookup (VArr _) _ =
   throwE (InvalidIndex "array index was not integer")
 whnfLookup (VStr s) (VNum i)
   | isInteger i =
-    liftMaybe (IndexOutOfBounds i) (f =<< bounded)
+      liftMaybe (IndexOutOfBounds i) (f =<< bounded)
   where
     f = pure . VStr . T.singleton . T.index s
     bounded =
@@ -300,9 +300,7 @@ whnfObj xs = mdo
 whnfField ::
   -- | self object
   Env ->
-  -- |
   CField ->
-  -- |
   Eval (Maybe (Text, VField))
 whnfField self (CRegularField (RegularField k v h)) = do
   let fieldVis = h
@@ -430,7 +428,7 @@ objectAssertionFields = H.elems . H.filter assertField
 
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o = \case
-  True  -> L.sort $ H.keys $ H.filter isRegular o
+  True -> L.sort $ H.keys $ H.filter isRegular o
   False -> L.sort $ H.keys $ H.filter isVisible o
   where
     isRegular field = not (assertField field)
@@ -454,9 +452,9 @@ equals e1 e2 = liftA2 (,) (force e1) (force e2) >>= uncurry go
   where
     go as@(VArr a) bs@(VArr b)
       | P.length a == P.length b = do
-        as' <- force as
-        bs' <- force bs
-        allM (uncurry equals) (zip as' bs')
+          as' <- force as
+          bs' <- force bs
+          allM (uncurry equals) (zip as' bs')
       | P.length a /= P.length b = pure False
     go (VObj a) (VObj b) = do
       let fields = objectFieldsEx a False
@@ -480,7 +478,7 @@ equals e1 e2 = liftA2 (,) (force e1) (force e2) >>= uncurry go
         then primitiveEquals a b
         else pure False
 
-allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
+allM :: (Monad m) => (a -> m Bool) -> [a] -> m Bool
 allM p = foldrM (\a b -> (&& b) <$> p a) True
 
 -- better names?
@@ -518,8 +516,8 @@ showTy = \case
   VIndir {} -> pure "pointer"
   VThunk' _ -> pure "thunk"
 
---v@VThunk {} -> force v >>= showTy
---v@VIndir {} -> force v >>= showTy
+-- v@VThunk {} -> force v >>= showTy
+-- v@VIndir {} -> force v >>= showTy
 
 instance HasValue Bool where
   proj (VBool n) = pure n
@@ -557,13 +555,13 @@ instance HasValue Double where
   inj = VNum . fromFloatDigits
   {-# INLINE inj #-}
 
-instance {-# OVERLAPS #-} Integral a => HasValue a where
+instance {-# OVERLAPS #-} (Integral a) => HasValue a where
   proj (VNum n) = pure (round n)
   proj v = throwTypeMismatch "number" v
   inj = VNum . fromIntegral
   {-# INLINE inj #-}
 
-instance HasValue a => HasValue (Maybe a) where
+instance (HasValue a) => HasValue (Maybe a) where
   proj VNull = pure Nothing
   proj a = Just <$> force a
   inj Nothing = VNull
@@ -576,13 +574,13 @@ instance {-# OVERLAPS #-} HasValue Object where
   inj = VObj
   {-# INLINE inj #-}
 
-instance HasValue a => HasValue (Vector a) where
+instance (HasValue a) => HasValue (Vector a) where
   proj (VArr as) = mapM force as
   proj v = throwTypeMismatch "array" v
   inj as = VArr (inj <$> as)
   {-# INLINE inj #-}
 
-instance {-# OVERLAPPABLE #-} HasValue a => HasValue [a] where
+instance {-# OVERLAPPABLE #-} (HasValue a) => HasValue [a] where
   proj = fmap V.toList . force
   inj = inj . V.fromList
   {-# INLINE inj #-}
@@ -597,7 +595,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
   {-# INLINE inj #-}
   proj = throwTypeMismatch "impossible"
 
-instance {-# OVERLAPS #-} HasValue a => HasValue (Eval a) where
+instance {-# OVERLAPS #-} (HasValue a) => HasValue (Eval a) where
   inj a = VThunk' $ inj <$> a
   proj = force
 

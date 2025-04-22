@@ -17,14 +17,14 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..))
 import Data.IORef
 import Data.Map.Lazy (Map)
-import qualified Data.Map.Lazy as M (union)
+import Data.Map.Lazy qualified as M (union)
 import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Error (Error (EvalError), EvalError)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
+import Text.Megaparsec.Pos
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Name
-import Text.Megaparsec.Pos
 
 type Ctx a = Map (Name Core) a
 

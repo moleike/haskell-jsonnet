@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
+
 -- |
 -- Module                  : Language.Jsonnet.Core
 -- Copyright               : (c) 2020-2021 Alexandre Moreno
@@ -26,27 +27,28 @@ import Unbound.Generics.LocallyNameless
 type Param a = (Name a, Embed a)
 
 data RegularField = RegularField
-  { fieldKey :: Core
-  , fieldVal :: Core
-  , fieldVis :: Visibility
+  { fieldKey :: Core,
+    fieldVal :: Core,
+    fieldVis :: Visibility
   }
   deriving stock (Show, Generic)
   deriving anyclass (Alpha, Binary)
 
 data CField
   = CRegularField RegularField
-  | CAssertField Core  -- ^ The desugared assertion expression
+  | -- | The desugared assertion expression
+    CAssertField Core
   deriving stock (Show, Generic)
   deriving anyclass (Alpha, Binary)
 
 mkField :: Core -> Core -> Visibility -> CField
 mkField k v h = CRegularField (RegularField k v h)
 
-instance Binary a => Binary (Name a)
+instance (Binary a) => Binary (Name a)
 
-instance Binary a => Binary (Rec a)
+instance (Binary a) => Binary (Rec a)
 
-instance Binary a => Binary (Embed a)
+instance (Binary a) => Binary (Embed a)
 
 instance (Binary a, Binary b) => Binary (Bind a b)
 
@@ -84,11 +86,11 @@ data Core where
       Binary
     )
 
---data Params
+-- data Params
 --  = EmptyPs
 --  | ConsPs (Rebind (Name Core, Embed (Maybe Core)) Params)
 --  deriving (Show, Typeable, Generic)
---instance Alpha Params
+-- instance Alpha Params
 
 instance IsString (Name Core) where
   fromString = string2Name

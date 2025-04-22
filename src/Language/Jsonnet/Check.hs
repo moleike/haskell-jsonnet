@@ -10,7 +10,7 @@ module Language.Jsonnet.Check where
 import Control.Monad.Except
 import Data.Fix
 import Data.List qualified as List
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common hiding (span)
 import Language.Jsonnet.Error
@@ -30,10 +30,10 @@ check = foldFixM alg
       EObj {..} -> checkLocal (fst <$> locals)
       _ -> pure ()
     checkLocal names = case dups names of
-      ((x:_) : _) -> throwError $ DuplicateBinding x
+      ((x : _) : _) -> throwError $ DuplicateBinding x
       _ -> pure ()
     checkFun names = case dups names of
-      ((x:_) : _) -> throwError $ DuplicateParam x
+      ((x : _) : _) -> throwError $ DuplicateParam x
       _ -> pure ()
     checkApply args = case f args of
       [] -> pure ()

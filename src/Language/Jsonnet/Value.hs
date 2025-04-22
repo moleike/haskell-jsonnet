@@ -9,7 +9,11 @@ module Language.Jsonnet.Value where
 
 import Control.Lens (view)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Aeson (FromJSON (..))
+import Data.Aeson qualified as JSON
+import Data.Aeson.KeyMap qualified as KeyMap
 import Data.HashMap.Lazy (HashMap)
+import Data.HashMap.Lazy qualified as H
 import Data.IORef
 import Data.Map.Strict (Map)
 import Data.Scientific
@@ -20,10 +24,6 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Core hiding (mkField)
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
-import Data.Aeson (FromJSON (..))
-import qualified Data.Aeson as JSON
-import qualified Data.Aeson.KeyMap as KeyMap
-import qualified Data.HashMap.Lazy as H
 
 type Eval = EvalM Value
 
@@ -97,11 +97,11 @@ instance HasValue Value where
 mkCell :: Value -> Cell
 mkCell v = Cell v False
 
-mkIndirV :: MonadIO m => Value -> m Value
+mkIndirV :: (MonadIO m) => Value -> m Value
 mkIndirV v = VIndir <$> allocate v
 
 mkThunk :: Core -> Eval Value
 mkThunk c = VThunk c <$> view ctx
 
-allocate :: MonadIO m => Value -> m (IORef Cell)
+allocate :: (MonadIO m) => Value -> m (IORef Cell)
 allocate = liftIO . newIORef . mkCell

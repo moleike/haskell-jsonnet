@@ -25,27 +25,27 @@ module Language.Jsonnet
   )
 where
 
-import Control.Monad ((>=>), (<=<))
-import Control.Monad.Fix (MonadFix)
+import Control.Monad ((<=<), (>=>))
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import Control.Monad.Except
+import Control.Monad.Fix (MonadFix)
 import Control.Monad.Reader
-import qualified Data.Aeson as JSON
+import Data.Aeson qualified as JSON
 import Data.Binary (decode)
-import qualified Data.Map.Lazy as M
+import Data.Map.Lazy qualified as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
-import qualified Data.Text.IO as T
-import qualified Language.Jsonnet.Check as Check
+import Data.Text.IO qualified as T
+import Language.Jsonnet.Check qualified as Check
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
-import qualified Language.Jsonnet.Desugar as Desugar
+import Language.Jsonnet.Desugar qualified as Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
-import qualified Language.Jsonnet.Parser as Parser
+import Language.Jsonnet.Parser qualified as Parser
 import Language.Jsonnet.Pretty (prettyError)
-import qualified Language.Jsonnet.Std.Lib as Lib
+import Language.Jsonnet.Std.Lib qualified as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Syntax.Annotated
 import Language.Jsonnet.Value

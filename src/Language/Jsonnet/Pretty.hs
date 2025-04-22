@@ -8,31 +8,31 @@
 module Language.Jsonnet.Pretty where
 
 import Control.Applicative (Const (..))
-import qualified Data.Aeson as JSON
-import qualified Data.Aeson.Key as Key
-import qualified Data.Aeson.KeyMap as KeyMap
-import qualified Data.Aeson.Text as JSON (encodeToLazyText)
+import Data.Aeson qualified as JSON
+import Data.Aeson.Key qualified as Key
+import Data.Aeson.KeyMap qualified as KeyMap
+import Data.Aeson.Text qualified as JSON (encodeToLazyText)
 import Data.Bifunctor (bimap, first)
 import Data.Bool (bool)
 import Data.Fix
 import Data.Functor.Sum
-import Data.Maybe (fromMaybe)
 import Data.List (sortOn)
 import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
+import Data.Maybe (fromMaybe)
 import Data.Scientific (Scientific (..))
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
+import Data.Text qualified as T
+import Data.Text.Lazy qualified as LT
 import Data.Text.Lazy.Builder
 import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 import GHC.IO.Exception (IOException (..))
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
-import qualified Language.Jsonnet.Syntax.Annotated as Ann
+import Language.Jsonnet.Syntax.Annotated qualified as Ann
 import Prettyprinter
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
@@ -42,8 +42,22 @@ import Unbound.Generics.LocallyNameless (Name, name2String)
 (<$$>) = \x y -> vcat [x, y]
 
 -- reserved keywords
-pnull, ptrue, pfalse, pif, pthen, pelse, pimport, pimportstr, pimportbin,
-  perror, plocal, pfunction, passert, pfor, pin :: Doc ann
+pnull,
+  ptrue,
+  pfalse,
+  pif,
+  pthen,
+  pelse,
+  pimport,
+  pimportstr,
+  pimportbin,
+  perror,
+  plocal,
+  pfunction,
+  passert,
+  pfor,
+  pin ::
+    Doc ann
 pnull = pretty "null"
 ptrue = pretty "true"
 pfalse = pretty "false"
@@ -66,10 +80,10 @@ prettyName = pretty . name2String
 ppNumber :: Scientific -> Doc ann
 ppNumber s
   | e < 0 || e > 1024 =
-    pretty $
-      LT.unpack $
-        toLazyText $
-          scientificBuilder s
+      pretty $
+        LT.unpack $
+          toLazyText $
+            scientificBuilder s
   | otherwise = pretty (coefficient s * 10 ^ e)
   where
     e = base10Exponent s
@@ -104,15 +118,19 @@ prettySrcSpan SrcSpan {spanBegin, spanEnd} =
   where
     lc (SourcePos _ lb cb) (SourcePos _ le ce)
       | lb == le =
-        pretty (unPos lb) <> colon
-          <> pretty (unPos cb)
-          <> dash
-          <> pretty (unPos ce)
+          pretty (unPos lb)
+            <> colon
+            <> pretty (unPos cb)
+            <> dash
+            <> pretty (unPos ce)
       | otherwise =
-        pretty (unPos lb) <> colon <> pretty (unPos cb) <> dash
-          <> pretty (unPos le)
-          <> colon
-          <> pretty (unPos ce)
+          pretty (unPos lb)
+            <> colon
+            <> pretty (unPos cb)
+            <> dash
+            <> pretty (unPos le)
+            <> colon
+            <> pretty (unPos ce)
     dash = pretty '-'
 
 prettyParserError :: ParserError -> Doc ann
@@ -121,7 +139,7 @@ prettyParserError (ImportError (IOError _ _ _ desc _ f) sp) =
   pretty "Parse error:"
     <+> pretty f
     <+> parens (pretty desc)
-    <$$> indent 4 (maybe mempty prettySrcSpan sp)
+      <$$> indent 4 (maybe mempty prettySrcSpan sp)
 
 prettyCheckError :: CheckError -> Doc ann
 prettyCheckError = \case
@@ -200,12 +218,12 @@ prettyError = \case
   EvalError e bt ->
     pretty "Runtime error:"
       <+> prettyEvalError e
-      <$$> indent 2 (prettyBacktrace bt)
+        <$$> indent 2 (prettyBacktrace bt)
   ParserError e -> prettyParserError e
   CheckError e sp ->
     pretty "Static error:"
       <+> prettyCheckError e
-      <$$> indent 2 (maybe mempty prettySrcSpan sp)
+        <$$> indent 2 (maybe mempty prettySrcSpan sp)
 
 prettyVisibility :: Visibility -> Doc ann
 prettyVisibility = \case
@@ -257,7 +275,7 @@ ppLocal :: [(Ident, Doc ann)] -> Doc ann -> Doc ann
 ppLocal xs e =
   plocal
     <+> commaSep (uncurry (surround equals) <$> xs')
-      <> semi
+    <> semi
     <+> e
   where
     xs' = first pretty <$> xs

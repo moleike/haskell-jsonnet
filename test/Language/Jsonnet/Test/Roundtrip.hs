@@ -1,18 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- |
 module Language.Jsonnet.Test.Roundtrip where
 
 import Data.Fix
 import Data.Functor.Sum
 import Data.Text (Text)
 import Hedgehog
-import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
+import Hedgehog.Gen qualified as Gen
+import Hedgehog.Range qualified as Range
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error (Error)
-import qualified Language.Jsonnet.Parser as Parser
+import Language.Jsonnet.Parser qualified as Parser
 import Language.Jsonnet.Pretty
 import Language.Jsonnet.Syntax
 import Prettyprinter
@@ -73,7 +72,7 @@ genLookup :: Gen (Fix ExprF')
 genLookup = Fix <$> (mkLookupF <$> genIdent <*> genString)
 
 genAssert :: Gen (Fix ExprF')
-genAssert = Fix <$> ( mkAssertF <$> genAssert' <*> genExpr)
+genAssert = Fix <$> (mkAssertF <$> genAssert' <*> genExpr)
 
 genAssert' :: Gen (Assert (Fix ExprF'))
 genAssert' = Assert <$> genExpr <*> Gen.maybe genExpr
@@ -104,7 +103,8 @@ genArg a = Gen.choice [Pos <$> a, Named <$> genString <*> a]
 genArgs :: Gen a -> Gen (Args a)
 genArgs a =
   Args
-    <$> Gen.list (Range.linear 0 10) (genArg a) <*> pure Lazy
+    <$> Gen.list (Range.linear 0 10) (genArg a)
+    <*> pure Lazy
 
 genApply :: Gen (Fix ExprF')
 genApply = Fix <$> (mkApplyF <$> genExpr <*> genArgs genExpr)

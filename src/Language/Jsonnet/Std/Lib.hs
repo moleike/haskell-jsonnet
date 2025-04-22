@@ -1,5 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 -- |
 -- Module                  : Language.Jsonnet.Std.Lib
@@ -14,31 +14,30 @@ module Language.Jsonnet.Std.Lib
   )
 where
 
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString as B
-import qualified Data.HashMap.Lazy as H
-import qualified Data.List as L (intercalate)
-import qualified Data.Map.Strict as M
+import Control.Monad
+import Control.Monad.IO.Class (liftIO)
+import Data.Aeson qualified as JSON
+import Data.ByteString qualified as B
+import Data.Functor
+import Data.HashMap.Lazy qualified as H
+import Data.List qualified as L (intercalate)
+import Data.Map.Strict qualified as M
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import Data.Text qualified as T
+import Data.Text.Encoding qualified as T
 import Data.Vector (Vector)
-import qualified Data.Vector as V
+import Data.Vector qualified as V
 import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Value
+import System.IO
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
-import qualified Prelude as P (length)
-import System.IO
-import Data.Functor
-import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (fromMaybe)
-import Control.Monad
-
+import Prelude qualified as P (length)
 
 -- | Jsonnet standard library built-in methods
 std :: ExtVars -> Value
@@ -89,10 +88,10 @@ intercalate :: Value -> [Value] -> Eval Value
 intercalate sep arr = go sep (filter notNull arr)
   where
     notNull VNull = False
-    notNull _     = True
+    notNull _ = True
     go sep'@(VArr _) = app (L.intercalate @Value) sep'
     go sep'@(VStr _) = app T.intercalate sep'
-    go _             = const $ throwE ( StdError "join's separator must be a string or an array" )
+    go _ = const $ throwE (StdError "join's separator must be a string or an array")
     app f sep' arr' = inj <$> (f <$> proj sep' <*> traverse proj arr')
 
 length :: Value -> Eval Int
@@ -108,7 +107,7 @@ length = \case
       ( StdError "length operates on strings, objects, functions and arrays, got "
       )
 
-makeArray :: Monad m => Int -> (Int -> m Value) -> m (Vector Value)
+makeArray :: (Monad m) => Int -> (Int -> m Value) -> m (Vector Value)
 makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 hypot :: Double -> Double -> Double

@@ -1,6 +1,6 @@
 {-# LANGUAGE QuasiQuotes #-}
 
-import qualified Data.ByteString.Lazy as LBS
+import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Lazy
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet

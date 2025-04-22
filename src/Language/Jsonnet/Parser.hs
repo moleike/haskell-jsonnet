@@ -21,9 +21,10 @@ import Control.Applicative hiding (many, some)
 import Control.Arrow (left)
 import Control.Monad
 import Control.Monad.Combinators.Expr
-import qualified Control.Monad.Combinators.NonEmpty as NE
+import Control.Monad.Combinators.NonEmpty qualified as NE
 import Control.Monad.Except
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.ByteString qualified as BS
 import Data.Char
 import Data.Either
 import Data.Fix
@@ -31,9 +32,10 @@ import Data.Functor
 import Data.Functor.Sum
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
+import Data.Text qualified as T
+import Data.Text.IO qualified as T
 import Data.Void
+import Data.Word (Word8)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
@@ -45,14 +47,12 @@ import System.FilePath.Posix (takeDirectory)
 import System.IO.Error (tryIOError)
 import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
-import Data.Word (Word8)
-import qualified Data.ByteString as BS
+import Text.Megaparsec.Char.Lexer qualified as L
 
 type Parser = Parsec Void Text
 
 parse ::
-  MonadError Error m =>
+  (MonadError Error m) =>
   -- | File name (only for source location annotations)
   FilePath ->
   -- | Input for parser
@@ -64,7 +64,8 @@ parse fp inp =
     left (ParserError . ParseError) $
       runParser (sc *> exprP <* eof) fp inp
 
-resolveImports :: forall m.
+resolveImports ::
+  forall m.
   (MonadError Error m, MonadIO m) =>
   -- | File path (modules are resolved relative to this path)
   FilePath ->
@@ -102,8 +103,8 @@ resolveImports fp = foldFixM go
         handleIO :: IO a -> m (Either IOError a)
         handleIO =
           liftIO
-          . tryIOError
-          . withCurrentDirectory (takeDirectory fp)
+            . tryIOError
+            . withCurrentDirectory (takeDirectory fp)
 
     mkBinaryLiteral :: [Word8] -> SrcSpan -> Expr
     mkBinaryLiteral ws a = Fix $ AnnF (EArr $ map wordExpr ws) a
@@ -169,7 +170,8 @@ stringLiteral = quoted (char '\"') <|> quoted (char '\'')
     quoted c =
       c
         *> manyTill
-          ( try escapeUnicode <|> escapeAscii
+          ( try escapeUnicode
+              <|> escapeAscii
               <|> anySingle
           )
           c
@@ -357,15 +359,16 @@ objectP :: Parser Expr'
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
-      (partitionEithers -> (partitionEithers -> (asserts, locals), fields))
-        <- eitherP (eitherP (try assertP') localP') fieldP `sepEndBy` comma
+      (partitionEithers -> (partitionEithers -> (asserts, locals), fields)) <-
+        eitherP (eitherP (try assertP') localP') fieldP `sepEndBy` comma
       pure $ mkObjectF fields locals asserts
     fieldP = try methodP <|> pairP
     pairP = do
       (key, computed) <- keyP
       (override, visibility) <-
         (,)
-          <$> option False (symbol "+" $> True) <*> sepP
+          <$> option False (symbol "+" $> True)
+          <*> sepP
       value <- exprP
       pure $ EField {..}
     keyP = ((,True) <$> brackets exprP) <|> ((,False) <$> (identStringP <|> stringP))

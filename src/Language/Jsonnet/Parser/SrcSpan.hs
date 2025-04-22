@@ -41,7 +41,7 @@ instance Binary Pos
 
 instance Binary SrcSpan
 
-instance Subst b SourcePos => Subst b SrcSpan where
+instance (Subst b SourcePos) => Subst b SrcSpan where
   subst _ _ = id
   substs _ = id
 

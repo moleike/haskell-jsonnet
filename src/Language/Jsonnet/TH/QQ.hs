@@ -7,7 +7,7 @@
 -- Portability             : non-portable
 module Language.Jsonnet.TH.QQ where
 
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Language.Haskell.TH.Quote (QuasiQuoter (..))
 import Language.Jsonnet.TH
 

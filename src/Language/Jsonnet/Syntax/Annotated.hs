@@ -24,7 +24,7 @@ mkApply :: Expr' -> Args Expr' -> Expr'
 mkApply a@(Fix (AnnF _ ann)) args =
   Fix $ AnnF (InL $ EApply a args) ann
 
---mkApply a@(Fix (AnnF _ ann)) b =
+-- mkApply a@(Fix (AnnF _ ann)) b =
 --  Fix $ AnnF (InL $ EApply a b) (fold1 (ann <| fmap attrib (fromList b)))
 
 mkLookup :: Expr' -> (Ident, SrcSpan) -> Expr'

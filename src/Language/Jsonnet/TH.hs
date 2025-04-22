@@ -14,13 +14,13 @@ import Control.Monad.Except
 import Data.Binary (encode)
 import Data.Data
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
 import Instances.TH.Lift ()
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Jsonnet.Annotate (forget)
 import Language.Jsonnet.Desugar
-import qualified Language.Jsonnet.Parser as Parser
+import Language.Jsonnet.Parser qualified as Parser
 import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Syntax.Annotated
 
@@ -28,7 +28,7 @@ liftText :: Text -> Q Exp
 liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
 
 -- ouch: https://gitlab.haskell.org/ghc/ghc/-/issues/12596
-liftDataWithText :: Data a => a -> Q Exp
+liftDataWithText :: (Data a) => a -> Q Exp
 liftDataWithText = dataToExpQ (fmap liftText . cast)
 
 parse0 :: FilePath -> Text -> Q Expr

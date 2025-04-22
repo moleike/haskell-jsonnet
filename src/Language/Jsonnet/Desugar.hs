@@ -10,13 +10,13 @@
 -- Portability             : non-portable
 module Language.Jsonnet.Desugar (desugar) where
 
-import qualified Data.Bifunctor
+import Data.Bifunctor qualified
 import Data.Fix as F
 import Data.List.NonEmpty (NonEmpty (..), toList)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import qualified Data.Text as T (pack)
+import Data.Text qualified as T (pack)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core
@@ -204,7 +204,8 @@ desugarFun ps e =
           String
             ( T.pack $
                 show $
-                  prettyEvalError $ ParamNotBound n
+                  prettyEvalError $
+                    ParamNotBound n
             )
 
 desugarLet :: NonEmpty (String, Core) -> Core -> Core
