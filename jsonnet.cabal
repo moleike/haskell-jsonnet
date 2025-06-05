@@ -116,7 +116,7 @@ executable hs-jsonnet
     filepath,
     jsonnet,
     megaparsec,
-    optparse-applicative >=0.16.1 && <0.19,
+    optparse-applicative >=0.16.1 && <0.19 || ^>=0.19.0,
     text
 
 test-suite jsonnet-test
