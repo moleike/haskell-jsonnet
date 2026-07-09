@@ -74,8 +74,8 @@ library
   other-modules:   Paths_jsonnet
   hs-source-dirs:  src
   build-depends:
-    aeson >=2.2 && <2.3,
-    base >=4.20 && <4.22,
+    aeson >=2.2 && <2.3 || ^>=2.3.1,
+    base >=4.20 && <4.22 || ^>=4.22.0,
     binary >=0.8.8 && <0.9,
     bytestring >=0.11 && <0.13,
     containers >=0.6.2 && <0.8 || ^>=0.8,
@@ -84,16 +84,16 @@ library
     exceptions >=0.10.4 && <0.11,
     filepath >=1.4.2 && <1.6,
     lens >=5.0.1 && <5.4,
-    megaparsec >=9.5 && <9.8,
+    megaparsec >=9.5 && <9.8 || ^>=9.8.1,
     mtl >=2.2.2 && <2.4,
     parser-combinators >=1.2.1 && <1.4,
     prettyprinter >=1.7.0 && <1.8,
     scientific >=0.3.7 && <0.4,
-    template-haskell >=2.16.0 && <2.23 || ^>=2.23.0,
+    template-haskell >=2.16.0 && <2.23 || ^>=2.23.0 || ^>=2.24.0,
     text >=2.0 && <2.2,
     th-lift-instances >=0.1.18 && <0.2,
     th-utilities >=0.2.4.2 && <0.3,
-    transformers-compat >=0.6.6 && <0.8,
+    transformers-compat >=0.6.6 && <0.8 || ^>=0.8,
     unbound-generics >=0.4.3 && <0.5,
     unordered-containers >=0.2.14 && <0.3,
     vector >=0.12.3 && <0.14
