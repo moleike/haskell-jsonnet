@@ -8,33 +8,41 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
+
     - uses: haskell-actions/setup@v2
       with:
         ghc-version: '9.10.1'
         cabal-version: '3.12.1.0'
 
-    - name: Cache
-      uses: actions/cache@v4
-      env:
-        cache-name: cache-cabal
-      with:
-        path: ~/.cabal
-        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
-        restore-keys: |
-          ${{ runner.os }}-build-${{ env.cache-name }}-
-          ${{ runner.os }}-build-
-          ${{ runner.os }}-
+    - name: Enable tests and benchmarks globally
+      run: |
+        echo "tests: True" >> cabal.project.local
+        echo "benchmarks: True" >> cabal.project.local
 
-    - name: Install dependencies
+    - name: Configure and Freeze Dependencies
       run: |
         cabal update
-        cabal build --only-dependencies --enable-tests --enable-benchmarks
+        cabal freeze
+
+    - name: Cache Cabal Dependencies & Build Artifacts
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cabal/store
+          dist-newstyle
+        key: ${{ runner.os }}-ghc-9.10.1-cabal-${{ hashFiles('cabal.project.freeze') }}
+        restore-keys: |
+          ${{ runner.os }}-ghc-9.10.1-cabal-
+
+    - name: Install dependencies
+      run: cabal build --only-dependencies all
+
     - name: Build
-      run: cabal build --enable-tests --enable-benchmarks all
+      run: cabal build all
+
     - name: Run tests
-      run: cabal test all
+      run: cabal test all --test-show-details=direct
