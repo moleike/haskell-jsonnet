@@ -20,5 +20,4 @@ cabal.project.local
 cabal.project.local~
 .HTF/
 .ghc.environment.*
-.envrc
 .pre-commit-config.yaml
