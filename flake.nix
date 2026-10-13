@@ -1,57 +1,37 @@
 {
-  description = "Jsonnet implementation in pure Haskell";
+  description = "jsonnet implementation in pure haskell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
-    pre-commit-hooks.url = "github:cachix/git-hooks.nix";
-    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
-    treefmt-nix.url = "github:numtide/treefmt-nix";
-    treefmt-nix.inputs.nixpkgs.follows = "nixpkgs";
+    # ghc-wasm-meta.url = "gitlab:haskell-wasm/ghc-wasm-meta?host=gitlab.haskell.org";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-    treefmt-nix,
-    pre-commit-hooks,
-  }:
+  outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = nixpkgs.legacyPackages.${system};
-      treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
-      overlay = self: super: {
-        unbound-generics = pkgs.haskell.lib.unmarkBroken super.unbound-generics;
-        jsonnet = self.callCabal2nix "jsonnet" ./. {};
-      };
-      haskellPackages = pkgs.haskell.packages.ghc910.extend overlay;
-    in rec {
-      # nix build
-      packages.default = haskellPackages.jsonnet;
+      hspkgs = pkgs.haskellPackages;
+      jsonnet = hspkgs.callCabal2nix "jsonnet" ./. {};
+      ghc = hspkgs.ghcWithHoogle (p: jsonnet.buildInputs);
+      # wasmPkgs = ghc-wasm-meta.packages.${system};
+    in {
 
-      # nix develop
-      devShell = pkgs.mkShell {
-        inherit (self.checks.${system}.pre-commit-check) shellHook;
-        buildInputs = with haskellPackages; [
-          haskell-language-server
-          ghcid
-          cabal-install
+      packages.default = jsonnet;
+
+      devShells.default = pkgs.mkShell {
+        inputsFrom = [ self.packages.${system}.default ];
+
+        nativeBuildInputs = [
+          ghc
+          hspkgs.cabal-install
+          hspkgs.haskell-language-server
+          hspkgs.hasktags
+          # wasmPkgs.wasmtime
         ];
-      };
 
-      # nix flake check
-      checks = {
-        formatting = treefmtEval.config.build.check self;
-        pre-commit-check = pre-commit-hooks.lib.${system}.run {
-          src = ./.;
-          hooks = {
-            treefmt.package = formatter;
-            treefmt.enable = true;
-          };
-        };
+        shellHook = ''
+          export HOOGLE_DATABASE="${ghc}/share/doc/hoogle/default.hoo"
+        '';
       };
-
-      # nix fmt
-      formatter = treefmtEval.config.build.wrapper;
     });
 }
