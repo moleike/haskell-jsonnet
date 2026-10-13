@@ -9,11 +9,9 @@
 -- Portability             : non-portable
 module Language.Jsonnet.Syntax where
 
-import Control.Applicative (Const (..))
 import Data.Data (Data)
 import Data.Functor.Classes
 import Data.Functor.Classes.Generic
-import Data.Functor.Sum
 import Data.List.NonEmpty
 import Data.Scientific (Scientific)
 import Data.Text (Text)
@@ -94,6 +92,7 @@ data ExprF a
         locals :: [(Ident, a)],
         comp :: NonEmpty (CompSpec a)
       }
+  | EImport Import FilePath
   deriving stock
     ( Eq,
       Show,
@@ -109,95 +108,87 @@ data ExprF a
     (Eq1, Show1)
     via FunctorClassesDefault ExprF
 
-data Import
-  = Import FilePath
-  | Importstr FilePath
-  | Importbin FilePath
-  deriving stock (Show, Eq)
+mkImportF :: FilePath -> ExprF a
+mkImportF = EImport Code
 
-type ExprF' = Sum ExprF (Const Import)
+mkImportstrF :: FilePath -> ExprF a
+mkImportstrF = EImport Str
 
-mkImportF :: FilePath -> ExprF' a
-mkImportF = InR . Const . Import
+mkImportbinF :: FilePath -> ExprF a
+mkImportbinF = EImport Bin
 
-mkImportstrF :: FilePath -> ExprF' a
-mkImportstrF = InR . Const . Importstr
+mkNullF :: ExprF a
+mkNullF = ENull
 
-mkImportbinF :: FilePath -> ExprF' a
-mkImportbinF = InR . Const . Importbin
+mkIntF :: (Integral b) => b -> ExprF a
+mkIntF = ENum . fromIntegral
 
-mkNullF :: ExprF' a
-mkNullF = InL ENull
+mkFloatF :: Scientific -> ExprF a
+mkFloatF = ENum
 
-mkIntF :: (Integral b) => b -> ExprF' a
-mkIntF = InL . ENum . fromIntegral
+mkTextF :: Text -> ExprF a
+mkTextF = EStr
 
-mkFloatF :: Scientific -> ExprF' a
-mkFloatF = InL . ENum
-
-mkTextF :: Text -> ExprF' a
-mkTextF = InL . EStr
-
-mkStrF :: String -> ExprF' a
+mkStrF :: String -> ExprF a
 mkStrF s = mkTextF (T.pack s)
 
-mkBoolF :: Bool -> ExprF' a
-mkBoolF = InL . EBool
+mkBoolF :: Bool -> ExprF a
+mkBoolF = EBool
 
-mkIdentF :: Ident -> ExprF' a
-mkIdentF = InL . EIdent
+mkIdentF :: Ident -> ExprF a
+mkIdentF = EIdent
 
-mkFunF :: [Param a] -> a -> ExprF' a
-mkFunF a = InL . EFun a
+mkFunF :: [Param a] -> a -> ExprF a
+mkFunF a = EFun a
 
-mkApplyF :: a -> Args a -> ExprF' a
-mkApplyF a = InL . EApply a
+mkApplyF :: a -> Args a -> ExprF a
+mkApplyF a = EApply a
 
-mkIfF :: a -> a -> ExprF' a
-mkIfF c = InL . EIf c
+mkIfF :: a -> a -> ExprF a
+mkIfF c = EIf c
 
-mkIfElseF :: a -> a -> a -> ExprF' a
-mkIfElseF c a = InL . EIfElse c a
+mkIfElseF :: a -> a -> a -> ExprF a
+mkIfElseF c a = EIfElse c a
 
-mkLocalF :: NonEmpty (Ident, a) -> a -> ExprF' a
-mkLocalF n = InL . ELocal n
+mkLocalF :: NonEmpty (Ident, a) -> a -> ExprF a
+mkLocalF n = ELocal n
 
-mkLookupF :: a -> Ident -> ExprF' a
-mkLookupF e = InL . ELookup e
+mkLookupF :: a -> Ident -> ExprF a
+mkLookupF e = ELookup e
 
-mkIndexF :: a -> a -> ExprF' a
-mkIndexF e = InL . EIndex e
+mkIndexF :: a -> a -> ExprF a
+mkIndexF e = EIndex e
 
 mkSliceF ::
   a ->
   Maybe a ->
   Maybe a ->
   Maybe a ->
-  ExprF' a
-mkSliceF e f g = InL . ESlice e f g
+  ExprF a
+mkSliceF e f g = ESlice e f g
 
 mkObjectF ::
   [EField a] ->
   [(Ident, a)] ->
   [Assert a] ->
-  ExprF' a
-mkObjectF fs ls = InL . EObj ls fs
+  ExprF a
+mkObjectF fs ls = EObj ls fs
 
-mkArrayF :: [a] -> ExprF' a
-mkArrayF = InL . EArr
+mkArrayF :: [a] -> ExprF a
+mkArrayF = EArr
 
-mkErrorF :: a -> ExprF' a
-mkErrorF = InL . EErr
+mkErrorF :: a -> ExprF a
+mkErrorF = EErr
 
-mkAssertF :: Assert a -> a -> ExprF' a
-mkAssertF a = InL . EAssert a
+mkAssertF :: Assert a -> a -> ExprF a
+mkAssertF a = EAssert a
 
-mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF' a
-mkArrCompF e = InL . EArrComp e
+mkArrCompF :: a -> NonEmpty (CompSpec a) -> ExprF a
+mkArrCompF e = EArrComp e
 
 mkObjCompF ::
   EField a ->
   [(Ident, a)] ->
   NonEmpty (CompSpec a) ->
-  ExprF' a
-mkObjCompF f ls = InL . EObjComp f ls
+  ExprF a
+mkObjCompF f ls = EObjComp f ls

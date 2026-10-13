@@ -54,6 +54,7 @@ library
     Language.Jsonnet.Annotate
     Language.Jsonnet.Check
     Language.Jsonnet.Common
+    Language.Jsonnet.Compiler
     Language.Jsonnet.Core
     Language.Jsonnet.Desugar
     Language.Jsonnet.Error

@@ -13,7 +13,7 @@ import Data.Binary (Binary)
 import Data.String (IsString (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import Language.Jsonnet.Common (Args, Literal, Prim, Visibility)
+import Language.Jsonnet.Common (Args, Literal, Prim, Visibility, Import)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 import Unbound.Generics.LocallyNameless
   ( Alpha,
@@ -78,6 +78,7 @@ data Core where
   CObj :: [CField] -> Core
   CArr :: [Core] -> Core
   CComp :: Comp -> Core -> Core
+  CImp :: Import -> FilePath -> Core
   deriving
     ( Show,
       Typeable,

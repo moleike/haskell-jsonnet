@@ -12,7 +12,6 @@
 -- Parser for Jsonnet source code.
 module Language.Jsonnet.Parser
   ( parse,
-    resolveImports,
     reservedKeywords,
   )
 where
@@ -23,28 +22,20 @@ import Control.Monad
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty qualified as NE
 import Control.Monad.Except
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.ByteString qualified as BS
 import Data.Char
 import Data.Either
 import Data.Fix
 import Data.Functor
-import Data.Functor.Sum
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Data.Text qualified as T
-import Data.Text.IO qualified as T
 import Data.Void
-import Data.Word (Word8)
 import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
 import Language.Jsonnet.Syntax.Annotated
-import System.Directory
-import System.FilePath.Posix (takeDirectory)
-import System.IO.Error (tryIOError)
 import Text.Megaparsec hiding (ParseError, parse)
 import Text.Megaparsec.Char
 import Text.Megaparsec.Char.Lexer qualified as L
@@ -58,59 +49,11 @@ parse ::
   -- | Input for parser
   Text ->
   -- | AST with unresolved imports
-  m Expr'
+  m Expr
 parse fp inp =
   liftEither $
     left (ParserError . ParseError) $
       runParser (sc *> exprP <* eof) fp inp
-
-resolveImports ::
-  forall m.
-  (MonadError Error m, MonadIO m) =>
-  -- | File path (modules are resolved relative to this path)
-  FilePath ->
-  -- | AST with unresolved imports
-  Expr' ->
-  -- | AST with imports resolved
-  m Expr
-resolveImports fp = foldFixM go
-  where
-    go (AnnF (InL e) a) = pure $ Fix $ AnnF e a
-    go (AnnF (InR (Const import')) a) =
-      case import' of
-        Import fp' -> do
-          resolveImports fp'
-            =<< parse fp'
-            =<< readImportFile fp' a
-        Importstr fp' -> do
-          content <- readImportFile fp' a
-          pure $ Fix $ AnnF (EStr content) a
-        Importbin fp' -> do
-          content <- readBinaryFile fp' a
-          pure $ mkBinaryLiteral content a
-
-    readImportFile :: FilePath -> SrcSpan -> m Text
-    readImportFile = readFileWith T.readFile
-
-    readBinaryFile :: FilePath -> SrcSpan -> m [Word8]
-    readBinaryFile = readFileWith (fmap BS.unpack . BS.readFile)
-
-    readFileWith :: (FilePath -> IO a) -> FilePath -> SrcSpan -> m a
-    readFileWith reader fp' a = do
-      inp <- (handleIO . reader) fp'
-      liftEither $ left (ParserError . flip ImportError (Just a)) inp
-      where
-        handleIO :: IO a -> m (Either IOError a)
-        handleIO =
-          liftIO
-            . tryIOError
-            . withCurrentDirectory (takeDirectory fp)
-
-    mkBinaryLiteral :: [Word8] -> SrcSpan -> Expr
-    mkBinaryLiteral ws a = Fix $ AnnF (EArr $ map wordExpr ws) a
-      where
-        wordExpr :: Word8 -> Expr
-        wordExpr w = Fix $ AnnF (ENum (fromIntegral w)) a
 
 sc :: Parser ()
 sc = L.space space1 lineComment blockComment
@@ -224,10 +167,10 @@ textBlock = do
     sc'' :: Pos -> Parser ()
     sc'' x = void $ count' 0 (unPos x - 1) (oneOf [' ', '\t'])
 
-identStringP :: Parser Expr'
+identStringP :: Parser Expr
 identStringP = Fix <$> annotateLoc (mkStrF <$> identifier)
 
-stringP :: Parser Expr'
+stringP :: Parser Expr
 stringP =
   Fix
     <$> annotateLoc
@@ -239,36 +182,36 @@ stringP =
       )
     <?> "string"
 
-numberP :: Parser Expr'
+numberP :: Parser Expr
 numberP = Fix <$> annotateLoc number <?> "number"
   where
     number = mkFloatF <$> lexeme L.scientific
 
-identP :: Parser Expr'
+identP :: Parser Expr
 identP =
   Fix
     <$> annotateLoc
       (mkIdentF <$> (try (T.unpack <$> symbol "$") <|> identifier))
     <?> "identifier"
 
-booleanP :: Parser Expr'
+booleanP :: Parser Expr
 booleanP = Fix <$> annotateLoc boolean <?> "bool"
   where
     boolean =
       keywordP "true" $> mkBoolF True
         <|> keywordP "false" $> mkBoolF False
 
-nullP :: Parser Expr'
+nullP :: Parser Expr
 nullP = Fix <$> annotateLoc null'
   where
     null' = keywordP "null" $> mkNullF
 
-errorP :: Parser Expr'
+errorP :: Parser Expr
 errorP = Fix <$> annotateLoc error'
   where
     error' = keywordP "error" *> (mkErrorF <$> exprP)
 
-assertP :: Parser Expr'
+assertP :: Parser Expr
 assertP = Fix <$> annotateLoc assert
   where
     assert = do
@@ -276,13 +219,13 @@ assertP = Fix <$> annotateLoc assert
       _ <- symbol ";"
       mkAssertF assert' <$> exprP
 
-assertP' :: Parser (Assert Expr')
+assertP' :: Parser (Assert Expr)
 assertP' = do
   cond <- keywordP "assert" *> exprP
   msg <- optional (colon *> exprP)
   pure $ Assert cond msg
 
-ifElseP :: Parser Expr'
+ifElseP :: Parser Expr
 ifElseP = Fix <$> annotateLoc ifElseExpr <?> "if"
   where
     ifElseExpr = do
@@ -292,24 +235,24 @@ ifElseP = Fix <$> annotateLoc ifElseExpr <?> "if"
         (mkIfF cond expr)
         (keywordP "else" *> (mkIfElseF cond expr <$> exprP))
 
-paramsP :: Parser [Param Expr']
+paramsP :: Parser [Param Expr]
 paramsP = parens (param `sepEndBy` comma)
   where
     param = (,) <$> identifier <*> optional (symbol "=" *> exprP)
 
 function ::
-  Parser [Param Expr'] ->
-  Parser Expr' ->
-  Parser Expr'
+  Parser [Param Expr] ->
+  Parser Expr ->
+  Parser Expr
 function ps expr =
   Fix
     <$> annotateLoc (mkFunF <$> ps <*> expr)
     <?> "function"
 
-functionP :: Parser Expr'
+functionP :: Parser Expr
 functionP = keywordP "function" *> function paramsP exprP
 
-forspecP :: Parser (CompSpec Expr')
+forspecP :: Parser (CompSpec Expr)
 forspecP = do
   _ <- keywordP "for"
   var <- identifier
@@ -318,14 +261,14 @@ forspecP = do
   ifspec <- many (keywordP "if" *> exprP)
   pure CompSpec {..}
 
-binding :: Parser (String, Expr')
+binding :: Parser (String, Expr)
 binding = do
   name <- identifier
   _ <- symbol "="
   expr <- exprP
   pure (name, expr)
 
-localFunc :: Parser (String, Expr')
+localFunc :: Parser (String, Expr)
 localFunc = do
   name <- identifier
   ps <- paramsP
@@ -333,12 +276,12 @@ localFunc = do
   expr <- function (pure ps) exprP
   pure (name, expr)
 
-localBndsP :: Parser (NonEmpty (String, Expr'))
+localBndsP :: Parser (NonEmpty (String, Expr))
 localBndsP = do
   _ <- keywordP "local"
   (try binding <|> localFunc) `NE.sepBy1` comma
 
-localP :: Parser Expr'
+localP :: Parser Expr
 localP = Fix <$> annotateLoc localExpr <?> "local"
   where
     localExpr = do
@@ -346,7 +289,7 @@ localP = Fix <$> annotateLoc localExpr <?> "local"
       _ <- symbol ";"
       mkLocalF bnds <$> exprP
 
-arrayP :: Parser Expr'
+arrayP :: Parser Expr
 arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array)) <?> "array"
   where
     array = mkArrayF <$> (exprP `sepEndBy` comma)
@@ -355,7 +298,7 @@ arrayP = Fix <$> annotateLoc (brackets (try arrayComp <|> array)) <?> "array"
       comps <- NE.some forspecP
       return $ mkArrCompF expr comps
 
-objectP :: Parser Expr'
+objectP :: Parser Expr
 objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
   where
     object = do
@@ -394,25 +337,25 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
       comps <- NE.some forspecP
       return $ mkObjCompF expr (locals1 <> locals2) comps
 
-importP :: Parser Expr'
+importP :: Parser Expr
 importP = Fix <$> annotateLoc importDecl <?> "import"
   where
     importDecl = mkImportF <$> (keywordP "import" *> stringLiteral)
 
-importstrP :: Parser Expr'
+importstrP :: Parser Expr
 importstrP = Fix <$> annotateLoc importstrDecl <?> "importstr"
   where
     importstrDecl = mkImportstrF <$> (keywordP "importstr" *> stringLiteral)
 
-importbinP :: Parser Expr'
+importbinP :: Parser Expr
 importbinP = Fix <$> annotateLoc importbinDecl <?> "importbin"
   where
     importbinDecl = mkImportbinF <$> (keywordP "importbin" *> stringLiteral)
 
 binary ::
   Text ->
-  (Expr' -> Expr' -> Expr') ->
-  Operator Parser Expr'
+  (Expr -> Expr -> Expr) ->
+  Operator Parser Expr
 binary name f = InfixL (f <$ operator name)
   where
     operator sym = try $ symbol sym <* notFollowedBy opChar
@@ -420,8 +363,8 @@ binary name f = InfixL (f <$ operator name)
 
 prefix ::
   Text ->
-  (Expr' -> Expr') ->
-  Operator Parser Expr'
+  (Expr -> Expr) ->
+  Operator Parser Expr
 prefix name f = Prefix (f <$ symbol name)
 
 -- | associativity and operator precedence
@@ -438,7 +381,7 @@ prefix name f = Prefix (f <$ symbol name)
 -- 11. @&&@
 -- 12. @||@
 -- default is associate to the left
-opTable :: [[Operator Parser Expr']]
+opTable :: [[Operator Parser Expr]]
 opTable =
   [ [Postfix postfixOperators],
     [ prefix "+" (mkUnyOp Plus),
@@ -476,12 +419,12 @@ opTable =
 -- | shorthand syntax for object composition:
 -- when the right-hand side is an object literal the '+'
 -- operator can be elided.
-postfixObjectMerge :: Parser (Expr' -> Expr')
+postfixObjectMerge :: Parser (Expr -> Expr)
 postfixObjectMerge = flip (mkBinOp Add) <$> objectP
 
 -- | application, indexing and lookup: e(...) e[...] e.f
 -- all have the same precedence (the highest)
-postfixOperators :: Parser (Expr' -> Expr')
+postfixOperators :: Parser (Expr -> Expr)
 postfixOperators =
   foldr1 (flip (.))
     <$> some
@@ -491,10 +434,10 @@ postfixOperators =
           <|> lookupP
       )
 
-indexP :: Parser (Expr' -> Expr')
+indexP :: Parser (Expr -> Expr)
 indexP = flip mkIndex <$> brackets exprP
 
-lookupP :: Parser (Expr' -> Expr')
+lookupP :: Parser (Expr -> Expr)
 lookupP = flip mkLookup <$> (symbol "." *> annotatedIdent) <?> "."
   where
     annotatedIdent :: Parser (Ident, SrcSpan)
@@ -507,10 +450,10 @@ lookupP = flip mkLookup <$> (symbol "." *> annotatedIdent) <?> "."
 
 -- arguments are many postional followed by many named
 -- just like Python
-applyP :: Parser (Expr' -> Expr')
+applyP :: Parser (Expr -> Expr)
 applyP = flip mkApply <$> argsP
   where
-    argsP :: Parser (Args Expr')
+    argsP :: Parser (Args Expr)
     argsP = Args <$> parens (args `sepEndBy` comma) <*> tailstrict
       where
         args = try named <|> posal
@@ -518,14 +461,14 @@ applyP = flip mkApply <$> argsP
         named = Named <$> identifier <*> (symbol "=" *> exprP)
         tailstrict = option Lazy (keywordP "tailstrict" $> Strict)
 
-sliceP :: Parser (Expr' -> Expr')
+sliceP :: Parser (Expr -> Expr)
 sliceP = brackets $ do
   start <- optional exprP <* colon
   end <- optional exprP
   step <- optional (colon *> optional exprP)
   pure $ mkSlice start end (join step)
 
-primP :: Parser Expr'
+primP :: Parser Expr
 primP =
   lexeme $
     choice
@@ -547,7 +490,7 @@ primP =
         parens exprP
       ]
 
-exprP :: Parser Expr'
+exprP :: Parser Expr
 exprP = makeExprParser primP opTable
 
 reservedKeywords :: [String]

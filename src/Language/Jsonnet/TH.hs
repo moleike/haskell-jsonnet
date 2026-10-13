@@ -9,7 +9,6 @@
 -- Portability             : non-portable
 module Language.Jsonnet.TH where
 
-import Control.Monad ((>=>))
 import Control.Monad.Except
 import Data.Binary (encode)
 import Data.Data
@@ -37,11 +36,7 @@ parse0 path str = do
     Left err -> fail (show $ prettyError err)
     Right res -> pure res
   where
-    parse' =
-      runExceptT
-        . ( Parser.parse path
-              >=> Parser.resolveImports path
-          )
+    parse' = runExceptT . Parser.parse path
 
 parse :: FilePath -> Text -> Q Exp
 parse path str =

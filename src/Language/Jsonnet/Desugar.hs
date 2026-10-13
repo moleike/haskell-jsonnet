@@ -73,6 +73,7 @@ alg outermost = \case
   ESlice {..} -> desugarSlice expr start end step
   EArrComp {expr, comp} -> desugarArrComp expr comp
   EObjComp {field, comp, locals} -> desugarObjComp field comp locals
+  EImport it fp -> CImp it fp
 
 desugarSlice :: Core -> Maybe Core -> Maybe Core -> Maybe Core -> Core
 desugarSlice expr start end step =

@@ -6,7 +6,7 @@ module Language.Jsonnet.Test.Golden where
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as M
 import Data.Text.IO qualified as T (readFile)
-import Data.Text.Lazy
+import Data.Text.Lazy hiding (show)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet hiding (extVars)
 import Language.Jsonnet.Pretty (ppJson, prettyError)

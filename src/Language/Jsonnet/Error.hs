@@ -46,13 +46,13 @@ data EvalError
   | StdError Text
   | RuntimeError Text
   | ManifestError Text
+  | ImportError FilePath IOError
   deriving (Eq, Show, Typeable)
 
 instance Exception EvalError
 
 data ParserError
   = ParseError (ParseErrorBundle Text Void)
-  | ImportError IOError (Maybe SrcSpan)
   deriving (Eq, Show)
 
 data CheckError

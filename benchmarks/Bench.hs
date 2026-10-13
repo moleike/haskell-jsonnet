@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 import Data.ByteString.Lazy qualified as LBS
-import Data.Text.Lazy
+import Data.Text.Lazy hiding (show)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet
 import Language.Jsonnet.Pretty (ppJson, prettyError)
@@ -9,6 +9,7 @@ import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
 import Prettyprinter (Doc)
 import Test.Tasty.Bench
+import Language.Jsonnet.Desugar (desugar)
 
 render :: (a -> Doc ann) -> a -> LBS.ByteString
 render printer = encodeUtf8 . pack . show . printer
@@ -18,7 +19,7 @@ conf = Config "" mempty
 
 eval :: Expr -> IO LBS.ByteString
 eval expr = do
-  outp <- runJsonnetM conf (desugar expr >>= evaluate)
+  outp <- runJsonnetM conf (evaluate $ desugar expr)
   pure (either (render prettyError) (render (ppJson 4)) outp)
 
 main :: IO ()
