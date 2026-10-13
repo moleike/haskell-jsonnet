@@ -1,0 +1,16 @@
+cradle:
+  cabal:
+    - path: "src"
+      component: "lib:jsonnet"
+
+    - path: "app/Main.hs"
+      component: "jsonnet:exe:hs-jsonnet"
+
+    - path: "test"
+      component: "jsonnet:test:jsonnet-test"
+
+    - path: "test/golden"
+      component: "jsonnet:test:jsonnet-test"
+
+    - path: "benchmarks/Bench.hs"
+      component: "jsonnet:bench:jsonnet-bench"
