@@ -15,7 +15,6 @@ import Data.Aeson.KeyMap qualified as KeyMap
 import Data.HashMap.Lazy (HashMap)
 import Data.HashMap.Lazy qualified as H
 import Data.IORef
-import Data.Map.Strict (Map)
 import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
@@ -28,9 +27,6 @@ import Language.Jsonnet.Pretty ()
 type Eval = EvalM Value
 
 type Env = Ctx Value
-
-newtype ExtVars = ExtVars (Map Text Value)
-  deriving newtype (Semigroup, Monoid)
 
 data Value
   = VNull

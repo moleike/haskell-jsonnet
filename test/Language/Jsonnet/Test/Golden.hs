@@ -5,12 +5,14 @@ module Language.Jsonnet.Test.Golden where
 
 import Data.ByteString.Lazy qualified as LBS
 import Data.Map.Strict qualified as M
+import Data.Text (Text)
 import Data.Text.IO qualified as T (readFile)
-import Data.Text.Lazy hiding (show)
+import Data.Text.Lazy hiding (Text, show)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet hiding (extVars)
 import Language.Jsonnet.Pretty (ppJson, prettyError)
-import Language.Jsonnet.Value
+import Language.Jsonnet.Std.Lib
+import Language.Jsonnet.Value (inj)
 import Prettyprinter (Doc)
 import System.FilePath (replaceExtension, takeBaseName)
 import System.IO.Unsafe (unsafePerformIO)
@@ -22,29 +24,37 @@ render printer = encodeUtf8 . pack . show . printer
 
 run :: Config -> IO LBS.ByteString
 run conf = do
-  prog <- T.readFile (fname conf)
-  outp <- interpret conf prog
-  pure (either (render prettyError) (render (ppJson 4)) outp)
+    prog <- T.readFile (fname conf)
+    outp <- interpret conf prog
+    pure (either (render prettyError) (render (ppJson 4)) outp)
 
 -- Adapted from the C++ test suite
 extVars :: ExtVars
 extVars =
-  ExtVars $
-    M.fromList
-      [ ("var1", VStr "test"),
-        ("var2", unsafePerformIO $ interpretExtVar (ExtVar ExtCode (Inline "{x:1,y:2}")))
-      ]
+    ExtVars $
+        M.fromList
+            [ ("var1", VStr "test")
+            , ("var2", unsafePerformIO $ interpretExtVar (ExtVar ExtCode (Inline "{x:1,y:2}")))
+            ]
+
+testUserFuncs :: UserFuncs
+testUserFuncs =
+    UserFuncs $
+        M.fromList
+            [ ("concat", inj ((<>) @Text))
+            , ("add", inj ((+) @Int))
+            ]
 
 goldenTests :: IO TestTree
 goldenTests = do
-  jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
-  return $
-    testGroup
-      "Jsonnet golden tests"
-      [ goldenVsString
-          (takeBaseName jsonnetFile) -- test name
-          goldenFile -- golden file path
-          (run $ Config jsonnetFile extVars)
-        | jsonnetFile <- jsonnetFiles,
-          let goldenFile = replaceExtension jsonnetFile ".golden"
-      ]
+    jsonnetFiles <- findByExtension [".jsonnet"] "./test/golden"
+    return $
+        testGroup
+            "Jsonnet golden tests"
+            [ goldenVsString
+                (takeBaseName jsonnetFile) -- test name
+                goldenFile -- golden file path
+                (run $ Config jsonnetFile extVars testUserFuncs)
+            | jsonnetFile <- jsonnetFiles
+            , let goldenFile = replaceExtension jsonnetFile ".golden"
+            ]

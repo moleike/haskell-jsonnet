@@ -1,0 +1,10 @@
+{
+    "curried_test": [
+        11,
+        12,
+        13
+    ],
+    "missing_func_is_null": true,
+    "number_test": 42,
+    "string_test": "hello world"
+}

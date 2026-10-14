@@ -12,6 +12,8 @@ Portability             : non-portable
 module Language.Jsonnet.Std.Lib (
     std,
     objectHasEx,
+    ExtVars (..),
+    UserFuncs (..),
 )
 where
 
@@ -23,6 +25,8 @@ import Data.ByteString qualified as B
 import Data.Functor
 import Data.HashMap.Lazy qualified as H
 import Data.List qualified as L (intercalate)
+import Data.Map (Map)
+import Data.Map qualified as Map
 import Data.Map.Strict qualified as M
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -40,9 +44,15 @@ import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
 
+newtype ExtVars = ExtVars (Map Text Value)
+    deriving newtype (Semigroup, Monoid)
+
+newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
+    deriving newtype (Semigroup, Monoid)
+
 -- | Jsonnet standard library built-in methods
-std :: ExtVars -> Value
-std extVars = VObj $ H.fromList $ map f xs
+std :: ExtVars -> UserFuncs -> Value
+std extVars userFuncs = VObj $ H.fromList $ map f xs
   where
     f = \(k, v) -> (k, VField (VStr k) v v Hidden False)
     xs =
@@ -80,6 +90,7 @@ std extVars = VObj $ H.fromList $ map f xs
         , ("extVar", inj (lookupExtVar extVars))
         , ("thisFile", inj (getFileName @Value))
         , ("trace", inj trace)
+        , ("native", inj (native userFuncs))
         ]
 
 lookupExtVar :: ExtVars -> Data.Text.Text -> Eval Value
@@ -124,3 +135,8 @@ trace str =
                     Nothing -> fn
             liftIO $ hPutStrLn stderr ("TRACE: " ++ loc ++ " " ++ str)
         )
+
+native :: UserFuncs -> Value -> Eval Value
+native (UserFuncs reg) n = do
+    funcName <- proj n
+    return $ inj (Map.lookup funcName reg)
