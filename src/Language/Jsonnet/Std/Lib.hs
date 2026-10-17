@@ -27,13 +27,11 @@ import Data.HashMap.Lazy qualified as H
 import Data.List qualified as L (intercalate)
 import Data.Map (Map)
 import Data.Map qualified as Map
-import Data.Map.Strict qualified as M
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Vector (Vector)
 import Data.Vector qualified as V
-import Data.Word
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
@@ -52,7 +50,7 @@ newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
 
 -- | Jsonnet standard library built-in methods
 std :: ExtVars -> UserFuncs -> Value
-std extVars userFuncs = VObj $ H.fromList $ map f xs
+std (ExtVars extVars) (UserFuncs userFuncs) = VObj $ H.fromList $ map f xs
   where
     f = \(k, v) -> (k, VField (VStr k) v v Hidden False)
     xs =
@@ -75,26 +73,23 @@ std extVars userFuncs = VObj $ H.fromList $ map f xs
         , ("acos", inj (acos @Double))
         , ("atan", inj (atan @Double))
         , ("atan2", inj (atan2 @Double))
-        , ("hypot", inj hypot)
+        , ("hypot", inj (\a b -> (sqrt @Double) (a * a + b * b)))
         , ("modulo", inj (mod @Integer))
         , ("codepoint", inj (fromEnum . T.head))
         , ("char", inj (T.singleton . toEnum))
-        , ("encodeUTF8", inj (B.unpack . T.encodeUtf8 :: Data.Text.Text -> [Word8]))
-        , ("decodeUTF8", inj (T.decodeUtf8 . B.pack :: [Word8] -> Data.Text.Text))
+        , ("encodeUTF8", inj (B.unpack . T.encodeUtf8))
+        , ("decodeUTF8", inj (T.decodeUtf8 . B.pack))
         , ("makeArray", inj (makeArray @Eval))
         , ("filter", inj (V.filterM @Eval @Value))
         , ("join", inj intercalate)
         , ("objectHasEx", inj objectHasEx)
         , ("objectFieldsEx", inj objectFieldsEx)
         , ("parseJson", inj (JSON.decodeStrict @Value))
-        , ("extVar", inj (lookupExtVar extVars))
+        , ("extVar", inj ((liftMaybe . ExtVarNotFound) <*> (`Map.lookup` extVars)))
         , ("thisFile", inj (getFileName @Value))
         , ("trace", inj trace)
-        , ("native", inj (native userFuncs))
+        , ("native", inj (`Map.lookup` userFuncs))
         ]
-
-lookupExtVar :: ExtVars -> Data.Text.Text -> Eval Value
-lookupExtVar (ExtVars extVars) s = liftMaybe (ExtVarNotFound s) (M.lookup s extVars)
 
 intercalate :: Value -> [Value] -> Eval Value
 intercalate sep arr = go sep (filter notNull arr)
@@ -121,9 +116,6 @@ length = \case
 makeArray :: (Monad m) => Int -> (Int -> m Value) -> m (Vector Value)
 makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
-hypot :: Double -> Double -> Double
-hypot a b = sqrt (a * a + b * b)
-
 trace :: String -> Value -> Eval Value
 trace str =
     ($>)
@@ -135,8 +127,3 @@ trace str =
                     Nothing -> fn
             liftIO $ hPutStrLn stderr ("TRACE: " ++ loc ++ " " ++ str)
         )
-
-native :: UserFuncs -> Value -> Eval Value
-native (UserFuncs reg) n = do
-    funcName <- proj n
-    return $ inj (Map.lookup funcName reg)

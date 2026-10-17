@@ -107,7 +107,7 @@ mkConfig Options{..} = do
             FileInput path -> path
             ExecInput _ -> ""
     extVars' <- constructExtVars =<< traverse mkExtVar extVars
-    pure defaultConfig{fname = fname, extVars = extVars'}
+    pure defaultConfig{fname = fname, extVars = extVars', jpaths = reverse jpaths}
 
 fileOutput :: Parser Output
 fileOutput =
@@ -161,6 +161,7 @@ parseOpts = do
     extStrFiles <- parseExtStrFile
     extCodes <- parseExtCode
     extCodeFiles <- parseExtCodeFile
+    jpaths <- parseModSearchPath
     pure Options{extVars = extStrs <> extStrFiles <> extCodes <> extCodeFiles, ..}
 
 parseExtStr :: Parser [(Text, Either ExtVarType ExtVar)]
@@ -204,6 +205,16 @@ parseExtCodeFile =
                 <> help "External code variable as file"
                 <> metavar "FILE"
                 <> action "file"
+            )
+            
+parseModSearchPath :: Parser [FilePath]
+parseModSearchPath =
+    many $
+        strOption
+            ( long "jpath"
+                <> short 'J'
+                <> metavar "<dir>"
+                <> help "Specify an additional library search directory"
             )
 
 interpretAs :: ExtVarType -> Maybe ExtVarContent -> Either ExtVarType ExtVar
@@ -275,6 +286,7 @@ data Options = Options
     , input :: Input
     , extVars :: [(Text, Either ExtVarType ExtVar)]
     -- ^ ExtVarType determines the interpretation of the environment variable
+    , jpaths :: [FilePath]
     }
 
 data Input

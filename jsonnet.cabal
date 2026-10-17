@@ -131,6 +131,7 @@ test-suite jsonnet-test
   other-modules:
     Language.Jsonnet.Test.Golden
     Language.Jsonnet.Test.Roundtrip
+    Language.Jsonnet.Test.JPath
     Paths_jsonnet
 
   hs-source-dirs:  test test/golden
@@ -147,6 +148,9 @@ test-suite jsonnet-test
     tasty,
     tasty-golden,
     tasty-hedgehog,
+    tasty-hunit,
+    directory,
+    temporary,
     text
 
 benchmark jsonnet-bench

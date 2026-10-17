@@ -43,7 +43,7 @@ import Language.Jsonnet.Compiler
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval.Monad hiding (jpaths)
 import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Std.Lib
     ( std, ExtVars(ExtVars), UserFuncs(unUserFuncs, UserFuncs) )
@@ -51,6 +51,7 @@ import Language.Jsonnet.Std.Lib qualified as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
 import System.Exit (die)
+import Control.Applicative (empty)
 
 newtype JsonnetM a = JsonnetM
     { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
@@ -73,14 +74,16 @@ data Config = Config
     { fname :: FilePath
     , extVars :: Lib.ExtVars
     , userFuncs :: Lib.UserFuncs
+    , jpaths :: [FilePath]
     }
 
 defaultConfig :: Config
 defaultConfig =
     Config
-        { fname = ""
+        { fname = empty
         , extVars = ExtVars M.empty
         , userFuncs = UserFuncs M.empty -- Empty by default
+        , jpaths = empty
         }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
@@ -98,8 +101,9 @@ compile inp = do
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
     fp <- asks fname
+    paths <- asks jpaths
     env <- singleton "std" <$> stdlib
-    JsonnetM $ lift $ ExceptT $ runEvalM fp env (rnf expr)
+    JsonnetM $ lift $ ExceptT $ runEvalM fp paths env (rnf expr)
 
 {- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
   the native (a small subset) with the interpreted (the splice mkStdlib)
@@ -109,8 +113,9 @@ stdlib = do
     extVars <- asks extVars
     userFuncs <- asks userFuncs
     fp <- asks fname
+    paths <- asks jpaths
     let lib = whnf core >>= flip mergeObjects (std extVars userFuncs)
-    JsonnetM $ lift $ ExceptT $ runEvalM fp M.empty lib
+    JsonnetM $ lift $ ExceptT $ runEvalM fp paths M.empty lib
   where
     core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
@@ -140,14 +145,15 @@ interpretExtVar = \case
 
     interpretToValue :: Text -> IO (Either Error Value)
     interpretToValue =
-        runJsonnetM (Config "External variable" mempty mempty)
+        runJsonnetM (Config "External variable" mempty mempty [])
             . (compile >=> evaluateToValue)
 
     evaluateToValue :: Core -> JsonnetM Value
     evaluateToValue expr = do
         env <- singleton "std" <$> stdlib
         fp <- asks fname
-        JsonnetM $ lift $ ExceptT $ runEvalM fp env (whnf expr)
+        paths <- asks jpaths
+        JsonnetM $ lift $ ExceptT $ runEvalM fp paths env (whnf expr)
 
     dieError :: Error -> IO a
     dieError = die . show . prettyError

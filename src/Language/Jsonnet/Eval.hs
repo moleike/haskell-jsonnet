@@ -15,8 +15,9 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Lens (locally, view)
-import Control.Monad (foldM, forM, join, (<=<), (>=>))
+import Control.Monad (filterM, foldM, forM, join, (<=<), (>=>))
 import Control.Monad.Except
+import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -52,9 +53,11 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Value
-import System.Directory (withCurrentDirectory)
+import System.Directory (doesFileExist, withCurrentDirectory)
 import System.FilePath (normalise, takeDirectory, (</>))
+import System.FilePath.Posix (isAbsolute)
 import System.IO.Error
+import System.IO.Error (userError)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
@@ -240,7 +243,7 @@ whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
 
 whnfImport :: Import -> FilePath -> Eval Value
 whnfImport it fp = do
-    absPath <- resolvePath fp
+    absPath <- resolveImportPath fp
     let key = ImpKey it absPath
     ref <- view loadedModules
     mods <- liftIO $ readIORef ref
@@ -258,10 +261,21 @@ whnfImport it fp = do
             liftIO $ writeIORef ref (M.insert key ptr mods)
             return ptr
   where
-    resolvePath :: FilePath -> Eval FilePath
-    resolvePath target = do
-        currFile <- view currentFile
-        pure $ normalise (takeDirectory currFile </> target)
+    resolveImportPath :: FilePath -> Eval FilePath
+    resolveImportPath importPath = do
+        candidates <-
+            if isAbsolute importPath
+                then pure [importPath]
+                else do
+                    baseFile <- view currentFile
+                    paths <- view jpaths
+                    pure $ (takeDirectory baseFile </> importPath) : map (</> importPath) paths
+
+        matches <- liftIO $ filterM doesFileExist candidates
+
+        case matches of
+            (firstMatch : _) -> pure (normalise firstMatch)
+            [] -> throwE $ ImportError importPath (userError "File not found")
 
     readImportFile :: FilePath -> Eval Text
     readImportFile = readFileWith TIO.readFile

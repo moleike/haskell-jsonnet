@@ -54,7 +54,7 @@ goldenTests = do
             [ goldenVsString
                 (takeBaseName jsonnetFile) -- test name
                 goldenFile -- golden file path
-                (run $ Config jsonnetFile extVars testUserFuncs)
+                (run $ Config jsonnetFile extVars testUserFuncs [])
             | jsonnetFile <- jsonnetFiles
             , let goldenFile = replaceExtension jsonnetFile ".golden"
             ]

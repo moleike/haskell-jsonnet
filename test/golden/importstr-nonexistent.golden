@@ -1,2 +1,2 @@
-Runtime error: this file does not exist (No such file or directory)
+Runtime error: this file does not exist (File not found)
   ./test/golden/importstr-nonexistent.jsonnet:1:1-37 

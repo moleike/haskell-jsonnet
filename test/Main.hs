@@ -2,6 +2,7 @@ module Main where
 
 import Language.Jsonnet.Test.Golden
 import Language.Jsonnet.Test.Roundtrip
+import Language.Jsonnet.Test.JPath
 import Test.Tasty
 
 main :: IO ()
@@ -11,5 +12,6 @@ main = do
     testGroup
       "tests"
       [ testRoundtripGroup,
-        goldenTests'
+        goldenTests',
+        jpathTests
       ]

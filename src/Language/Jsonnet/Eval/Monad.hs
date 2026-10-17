@@ -57,6 +57,8 @@ data EvalState a = EvalState
     -- ^ current file being evaluated
     , _loadedModules :: IORef (Map ImpKey a)
     -- ^ memoization of imports
+    , _jpaths :: [FilePath]
+    -- ^ additional search paths for modules
     }
 
 makeLenses ''EvalState
@@ -86,11 +88,20 @@ instance Fresh (EvalM a) where
         return $ (Fn s n)
     fresh nm@(Bn{}) = return nm
 
-runEvalM :: FilePath -> Ctx a -> EvalM a b -> IO (Either Error b)
-runEvalM fp ctx' e = do
+runEvalM :: FilePath -> [FilePath] -> Ctx a -> EvalM a b -> IO (Either Error b)
+runEvalM fp ps ctx' e = do
     gen' <- newIORef 0
     mods <- newIORef empty
-    let st = EvalState ctx' emptyStack Nothing gen' fp mods
+    let st =
+            EvalState
+                { _ctx = ctx'
+                , _callStack = emptyStack
+                , _currentPos = Nothing
+                , _gen = gen'
+                , _currentFile = fp
+                , _loadedModules = mods
+                , _jpaths = ps
+                }
     (`runReaderT` st) (runExceptT (unEval e))
 
 throwE :: EvalError -> EvalM a b

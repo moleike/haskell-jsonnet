@@ -14,12 +14,9 @@ import Language.Jsonnet.Desugar (desugar)
 render :: (a -> Doc ann) -> a -> LBS.ByteString
 render printer = encodeUtf8 . pack . show . printer
 
-conf :: Config
-conf = Config "" mempty
-
 eval :: Expr -> IO LBS.ByteString
 eval expr = do
-  outp <- runJsonnetM conf (evaluate $ desugar expr)
+  outp <- runJsonnetM defaultConfig (evaluate $ desugar expr)
   pure (either (render prettyError) (render (ppJson 4)) outp)
 
 main :: IO ()
