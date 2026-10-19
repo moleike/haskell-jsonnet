@@ -9,7 +9,7 @@ module Language.Jsonnet.Compiler (
     compileModule,
 ) where
 
-import Control.Monad.Except (ExceptT)
+import Control.Monad.Except (MonadError)
 import Data.Text (Text)
 
 import Language.Jsonnet.Check (check)
@@ -18,7 +18,7 @@ import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser (parse)
 
-compileModule :: FilePath -> Text -> ExceptT Error IO Core
+compileModule :: MonadError Error m => FilePath -> Text -> m Core
 compileModule path content = do
     expr <- parse path content
     check expr

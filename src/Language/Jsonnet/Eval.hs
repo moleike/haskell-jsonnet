@@ -16,8 +16,6 @@ module Language.Jsonnet.Eval where
 import Control.Applicative
 import Control.Lens (locally, view)
 import Control.Monad (filterM, foldM, forM, join, (<=<), (>=>))
-import Control.Monad.Except
-import Control.Monad.Except (throwError)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -53,14 +51,14 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Value
-import System.Directory (doesFileExist, withCurrentDirectory)
+import System.Directory (doesFileExist)
 import System.FilePath (normalise, takeDirectory, (</>))
 import System.FilePath.Posix (isAbsolute)
 import System.IO.Error
-import System.IO.Error (userError)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
+import Control.Monad.Catch (throwM)
 
 rnf :: Core -> Eval JSON.Value
 rnf = whnf >=> manifest
@@ -253,7 +251,7 @@ whnfImport it fp = do
             val <- case it of
                 Code -> do
                     content <- readImportFile absPath
-                    core <- liftIO (runExceptT (compileModule absPath content)) >>= liftEither
+                    core <- either throwM pure (compileModule absPath content)
                     mkThunk core
                 Bin -> inj <$> readBinaryFile absPath
                 Str -> inj <$> readImportFile absPath

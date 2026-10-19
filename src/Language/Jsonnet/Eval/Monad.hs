@@ -11,8 +11,7 @@ Portability             : non-portable
 module Language.Jsonnet.Eval.Monad where
 
 import Control.Lens (locally, makeLenses, view)
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
-import Control.Monad.Except
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, throwM)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..))
@@ -64,7 +63,7 @@ data EvalState a = EvalState
 makeLenses ''EvalState
 
 newtype EvalM a b = EvalM
-    { unEval :: ExceptT Error (ReaderT (EvalState a) IO) b
+    { unEval :: ReaderT (EvalState a) IO b
     }
     deriving newtype
         ( Functor
@@ -72,7 +71,6 @@ newtype EvalM a b = EvalM
         , Monad
         , MonadIO
         , MonadReader (EvalState a)
-        , MonadError Error
         , MonadThrow
         , MonadCatch
         , MonadMask
@@ -88,7 +86,7 @@ instance Fresh (EvalM a) where
         return $ (Fn s n)
     fresh nm@(Bn{}) = return nm
 
-runEvalM :: FilePath -> [FilePath] -> Ctx a -> EvalM a b -> IO (Either Error b)
+runEvalM :: FilePath -> [FilePath] -> Ctx a -> EvalM a b -> IO b
 runEvalM fp ps ctx' e = do
     gen' <- newIORef 0
     mods <- newIORef empty
@@ -102,10 +100,10 @@ runEvalM fp ps ctx' e = do
                 , _loadedModules = mods
                 , _jpaths = ps
                 }
-    (`runReaderT` st) (runExceptT (unEval e))
+    runReaderT (unEval e) st
 
 throwE :: EvalError -> EvalM a b
-throwE e = throwError . EvalError e =<< getBacktrace
+throwE e = throwM . EvalError e =<< getBacktrace
 
 extendEnv :: Ctx a -> EvalM a b -> EvalM a b
 extendEnv = locally ctx . M.union

@@ -60,3 +60,6 @@ data CheckError
   | PosAfterNamedParam
   | DuplicateBinding String
   deriving (Eq, Show)
+
+
+instance Exception CheckError

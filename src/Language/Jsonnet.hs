@@ -28,8 +28,7 @@ module Language.Jsonnet (
 where
 
 import Control.Monad ((<=<), (>=>))
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
-import Control.Monad.Except
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, throwM, try)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Reader
 import Data.Aeson qualified as JSON
@@ -46,15 +45,13 @@ import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad hiding (jpaths)
 import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Std.Lib
-    ( std, ExtVars(ExtVars), UserFuncs(unUserFuncs, UserFuncs) )
 import Language.Jsonnet.Std.Lib qualified as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
 import System.Exit (die)
-import Control.Applicative (empty)
 
 newtype JsonnetM a = JsonnetM
-    { unJsonnetM :: ReaderT Config (ExceptT Error IO) a
+    { unJsonnetM :: ReaderT Config IO a
     }
     deriving newtype
         ( Functor
@@ -63,7 +60,6 @@ newtype JsonnetM a = JsonnetM
         , MonadIO
         , MonadFix
         , MonadReader Config
-        , MonadError Error
         , MonadThrow
         , MonadCatch
         , MonadMask
@@ -80,14 +76,14 @@ data Config = Config
 defaultConfig :: Config
 defaultConfig =
     Config
-        { fname = empty
-        , extVars = ExtVars M.empty
-        , userFuncs = UserFuncs M.empty -- Empty by default
-        , jpaths = empty
+        { fname = mempty
+        , extVars = mempty
+        , userFuncs = mempty
+        , jpaths = mempty
         }
 
 runJsonnetM :: Config -> JsonnetM a -> IO (Either Error a)
-runJsonnetM conf = runExceptT . (`runReaderT` conf) . unJsonnetM
+runJsonnetM conf = try . (`runReaderT` conf) . unJsonnetM
 
 interpret :: Config -> Text -> IO (Either Error JSON.Value)
 interpret conf = runJsonnetM conf . (compile >=> evaluate)
@@ -95,7 +91,7 @@ interpret conf = runJsonnetM conf . (compile >=> evaluate)
 compile :: Text -> JsonnetM Core
 compile inp = do
     fp <- asks fname
-    JsonnetM $ lift $ compileModule fp inp
+    either throwM pure (compileModule fp inp)
 
 -- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
@@ -103,7 +99,7 @@ evaluate expr = do
     fp <- asks fname
     paths <- asks jpaths
     env <- singleton "std" <$> stdlib
-    JsonnetM $ lift $ ExceptT $ runEvalM fp paths env (rnf expr)
+    JsonnetM $ liftIO $ runEvalM fp paths env (rnf expr)
 
 {- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
   the native (a small subset) with the interpreted (the splice mkStdlib)
@@ -114,8 +110,8 @@ stdlib = do
     userFuncs <- asks userFuncs
     fp <- asks fname
     paths <- asks jpaths
-    let lib = whnf core >>= flip mergeObjects (std extVars userFuncs)
-    JsonnetM $ lift $ ExceptT $ runEvalM fp paths M.empty lib
+    let lib = whnf core >>= flip mergeObjects (Lib.std extVars userFuncs)
+    JsonnetM $ liftIO $ runEvalM fp paths M.empty lib
   where
     core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
@@ -145,7 +141,7 @@ interpretExtVar = \case
 
     interpretToValue :: Text -> IO (Either Error Value)
     interpretToValue =
-        runJsonnetM (Config "External variable" mempty mempty [])
+        runJsonnetM (defaultConfig{fname = "External variable"})
             . (compile >=> evaluateToValue)
 
     evaluateToValue :: Core -> JsonnetM Value
@@ -153,7 +149,7 @@ interpretExtVar = \case
         env <- singleton "std" <$> stdlib
         fp <- asks fname
         paths <- asks jpaths
-        JsonnetM $ lift $ ExceptT $ runEvalM fp paths env (whnf expr)
+        JsonnetM $ liftIO $ runEvalM fp paths env (whnf expr)
 
     dieError :: Error -> IO a
     dieError = die . show . prettyError
@@ -164,5 +160,5 @@ constructExtVars = fmap (ExtVars . M.fromList) . traverse interpretExtVarPair
     interpretExtVarPair :: (Text, ExtVar) -> IO (Text, Value)
     interpretExtVarPair (s, extVar) = (s,) <$> interpretExtVar extVar
 
-registerFun :: HasValue a => Text -> a -> (Text, Value)
+registerFun :: (HasValue a) => Text -> a -> (Text, Value)
 registerFun name fn = (name, inj fn)
