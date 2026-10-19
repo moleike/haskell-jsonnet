@@ -14,7 +14,7 @@ Portability             : non-portable
 module Language.Jsonnet.Eval where
 
 import Control.Applicative
-import Control.Lens (locally, view)
+import Control.Lens (view)
 import Control.Monad (filterM, foldM, forM, join, (<=<), (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
@@ -65,7 +65,7 @@ rnf = whnf >=> manifest
 
 whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
-whnf (CLoc sp c) = locally currentPos (const $ Just sp) (whnf c)
+whnf (CLoc sp c) = withCurrentPos sp (whnf c)
 whnf (CLit l) = pure (whnfLiteral l)
 whnf (CObj bnd) = whnfObj bnd
 whnf (CArr cs) = VArr . V.fromList <$> mapM mkValue cs

@@ -114,6 +114,9 @@ withEnv = locally ctx . const
 withCurrentFile :: FilePath -> EvalM a b -> EvalM a b
 withCurrentFile = locally currentFile . const
 
+withCurrentPos :: SrcSpan -> EvalM a b -> EvalM a b
+withCurrentPos = locally currentPos . const . Just
+
 pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a b -> EvalM a b
 pushStackFrame (name, span') =
     locally (callStack . scopes) (name :)
