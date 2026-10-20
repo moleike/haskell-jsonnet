@@ -48,12 +48,10 @@ newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
 
 -- | Jsonnet standard library built-in methods
 std :: ExtVars -> UserFuncs -> Value
-std (ExtVars extVars) (UserFuncs userFuncs) = VObj $ H.fromList $ map f xs
+std (ExtVars extVars) (UserFuncs userFuncs) = VObj (H.fromList xs)
   where
-    f (k, v) = (k, VField (VStr k) v v Hidden False)
     infixr 8 ~>
-    k ~> v = (k, inj v)
-
+    k ~> v = (k, VField (VStr k) (inj v) (inj v) Hidden False)
     xs =
         [ "type" ~> showTy
         , "primitiveEquals" ~> primitiveEquals
