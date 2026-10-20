@@ -18,7 +18,6 @@ module Language.Jsonnet.Std.Lib (
 where
 
 import Control.Lens (view)
-import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.ByteString qualified as B
@@ -30,7 +29,6 @@ import Data.Map qualified as Map
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
-import Data.Vector (Vector)
 import Data.Vector qualified as V
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
@@ -52,43 +50,46 @@ newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
 std :: ExtVars -> UserFuncs -> Value
 std (ExtVars extVars) (UserFuncs userFuncs) = VObj $ H.fromList $ map f xs
   where
-    f = \(k, v) -> (k, VField (VStr k) v v Hidden False)
+    f (k, v) = (k, VField (VStr k) v v Hidden False)
+    infixr 8 ~>
+    k ~> v = (k, inj v)
+
     xs =
-        [ ("type", inj showTy)
-        , ("primitiveEquals", inj primitiveEquals)
-        , ("equals", inj equals)
-        , ("length", inj length)
-        , ("pow", inj ((^^) @Double @Int))
-        , ("exp", inj (exp @Double))
-        , ("log", inj (log @Double))
-        , ("exponent", inj (exponent @Double))
-        , ("mantissa", inj (significand @Double))
-        , ("floor", inj (floor @Double @Integer))
-        , ("ceil", inj (ceiling @Double @Integer))
-        , ("sqrt", inj (sqrt @Double))
-        , ("sin", inj (sin @Double))
-        , ("cos", inj (cos @Double))
-        , ("tan", inj (tan @Double))
-        , ("asin", inj (asin @Double))
-        , ("acos", inj (acos @Double))
-        , ("atan", inj (atan @Double))
-        , ("atan2", inj (atan2 @Double))
-        , ("hypot", inj (\a b -> (sqrt @Double) (a * a + b * b)))
-        , ("modulo", inj (mod @Integer))
-        , ("codepoint", inj (fromEnum . T.head))
-        , ("char", inj (T.singleton . toEnum))
-        , ("encodeUTF8", inj (B.unpack . T.encodeUtf8))
-        , ("decodeUTF8", inj (T.decodeUtf8 . B.pack))
-        , ("makeArray", inj (makeArray @Eval))
-        , ("filter", inj (V.filterM @Eval @Value))
-        , ("join", inj intercalate)
-        , ("objectHasEx", inj objectHasEx)
-        , ("objectFieldsEx", inj objectFieldsEx)
-        , ("parseJson", inj (JSON.decodeStrict @Value))
-        , ("extVar", inj ((liftMaybe . ExtVarNotFound) <*> (`Map.lookup` extVars)))
-        , ("thisFile", inj (getFileName @Value))
-        , ("trace", inj trace)
-        , ("native", inj (`Map.lookup` userFuncs))
+        [ "type" ~> showTy
+        , "primitiveEquals" ~> primitiveEquals
+        , "equals" ~> equals
+        , "length" ~> length
+        , "pow" ~> (^^) @Double @Int
+        , "exp" ~> exp @Double
+        , "log" ~> log @Double
+        , "exponent" ~> exponent @Double
+        , "mantissa" ~> significand @Double
+        , "floor" ~> floor @Double @Integer
+        , "ceil" ~> ceiling @Double @Integer
+        , "sqrt" ~> sqrt @Double
+        , "sin" ~> sin @Double
+        , "cos" ~> cos @Double
+        , "tan" ~> tan @Double
+        , "asin" ~> asin @Double
+        , "acos" ~> acos @Double
+        , "atan" ~> atan @Double
+        , "atan2" ~> atan2 @Double
+        , "hypot" ~> \a b -> (sqrt @Double) (a * a + b * b)
+        , "modulo" ~> mod @Integer
+        , "codepoint" ~> fromEnum . T.head
+        , "char" ~> T.singleton . toEnum
+        , "encodeUTF8" ~> B.unpack . T.encodeUtf8
+        , "decodeUTF8" ~> T.decodeUtf8 . B.pack
+        , "makeArray" ~> V.generateM @Eval @Value
+        , "filter" ~> V.filterM @Eval @Value
+        , "join" ~> intercalate
+        , "objectHasEx" ~> objectHasEx
+        , "objectFieldsEx" ~> objectFieldsEx
+        , "parseJson" ~> JSON.decodeStrict @Value
+        , "extVar" ~> (liftMaybe . ExtVarNotFound <*> (`Map.lookup` extVars))
+        , "thisFile" ~> getFileName @Value
+        , "trace" ~> trace
+        , "native" ~> (`Map.lookup` userFuncs)
         ]
 
 intercalate :: Value -> [Value] -> Eval Value
@@ -112,9 +113,6 @@ length = \case
     _ ->
         throwE
             (StdError "length operates on strings, objects, functions and arrays, got ")
-
-makeArray :: (Monad m) => Int -> (Int -> m Value) -> m (Vector Value)
-makeArray n f = traverse f (V.fromList [0 .. n - 1])
 
 trace :: String -> Value -> Eval Value
 trace str =
