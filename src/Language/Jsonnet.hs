@@ -99,7 +99,7 @@ evaluate expr = do
     fp <- asks fname
     paths <- asks jpaths
     env <- singleton "std" <$> stdlib
-    JsonnetM $ liftIO $ runEvalM fp paths env (rnf expr)
+    JsonnetM $ liftIO $ runEvalM fp paths env (manifest expr)
 
 {- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
   the native (a small subset) with the interpreted (the splice mkStdlib)

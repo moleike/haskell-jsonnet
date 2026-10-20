@@ -59,7 +59,10 @@ import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
 
-rnf :: Core -> Eval JSON.Value
+manifest :: Core -> Eval JSON.Value
+manifest = rnf >=> proj
+
+rnf :: Core -> Eval Value
 rnf = whnf >=> force
 
 whnf :: Core -> Eval Value
