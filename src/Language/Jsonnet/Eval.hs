@@ -249,12 +249,13 @@ whnfImport it fp = do
     mods <- liftIO $ readIORef ref
     case M.lookup key mods of
         Just val -> pure val
-        Nothing -> withCurrentFile absPath $ do
+        Nothing -> do
             val <- case it of
                 Code -> do
                     content <- readImportFile absPath
                     core <- either throwM pure (compileModule absPath content)
-                    mkThunk core
+                    env <- view ctx
+                    pure $ VThunk' (withCurrentFile fp $ withEnv env $ whnf core)
                 Bin -> inj <$> readBinaryFile absPath
                 Str -> inj <$> readImportFile absPath
             ptr <- mkIndirV val

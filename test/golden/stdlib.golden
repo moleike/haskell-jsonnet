@@ -1,1 +1,5 @@
-true
+Runtime error: lib/capture_std_func.libsonnet (File not found)
+  stdlib.jsonnet:20:18-57 function <anonymous>
+  stdlib.jsonnet:20:18-57 function <anonymous>
+  stdlib.jsonnet:20:18-65 function <anonymous>
+  stdlib.jsonnet:20:1-16 

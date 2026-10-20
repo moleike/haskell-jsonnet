@@ -1,1 +1,2 @@
-"{ foo :: \"bar\" }\n"
+Runtime error: empty.jsonnet (File not found)
+  importstr.jsonnet:1:1-26 

@@ -1,5 +1,2 @@
-[
-    255,
-    0,
-    254
-]
+Runtime error: nonutf8.bin (File not found)
+  importbin_nonutf8.jsonnet:1:1-24 

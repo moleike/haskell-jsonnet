@@ -457,16 +457,16 @@ std.assertEqual(std.setDiff([], []), []) &&
 //std.assertEqual(std.setMember('a', []), false) &&
 //std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
 
-//(
-//  if std.thisFile == '<stdin>' then
-//    // This happens when testing the unparser.
-//    true
-//  else
-//    std.assertEqual(std.thisFile, 'stdlib.jsonnet')
-//) &&
-//
-//std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
-//std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
+(
+  if std.thisFile == '<stdin>' then
+    // This happens when testing the unparser.
+    true
+  else
+    std.assertEqual(std.thisFile, 'stdlib.jsonnet')
+) &&
+
+std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
+std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
 
 
 std.assertEqual(std.extVar('var1'), 'test') &&

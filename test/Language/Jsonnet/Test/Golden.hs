@@ -14,7 +14,7 @@ import Language.Jsonnet.Pretty (ppJson, prettyError)
 import Language.Jsonnet.Std.Lib
 import Language.Jsonnet.Value (inj)
 import Prettyprinter (Doc)
-import System.FilePath (replaceExtension, takeBaseName)
+import System.FilePath (replaceExtension, takeFileName)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
@@ -22,9 +22,9 @@ import Test.Tasty.Golden (findByExtension, goldenVsString)
 render :: (a -> Doc ann) -> a -> LBS.ByteString
 render printer = encodeUtf8 . pack . show . printer
 
-run :: Config -> IO LBS.ByteString
-run conf = do
-    prog <- T.readFile (fname conf)
+run :: FilePath -> Config -> IO LBS.ByteString
+run fp conf = do
+    prog <- T.readFile fp
     outp <- interpret conf prog
     pure (either (render prettyError) (render (ppJson 4)) outp)
 
@@ -52,9 +52,10 @@ goldenTests = do
         testGroup
             "Jsonnet golden tests"
             [ goldenVsString
-                (takeBaseName jsonnetFile) -- test name
+                fileName
                 goldenFile -- golden file path
-                (run $ Config jsonnetFile extVars testUserFuncs [])
+                (run jsonnetFile $ Config fileName extVars testUserFuncs [])
             | jsonnetFile <- jsonnetFiles
             , let goldenFile = replaceExtension jsonnetFile ".golden"
+                  fileName = takeFileName jsonnetFile
             ]

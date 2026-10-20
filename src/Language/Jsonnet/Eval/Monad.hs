@@ -25,6 +25,7 @@ import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Text.Megaparsec.Pos
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Name
+import System.FilePath (takeFileName)
 
 type Ctx a = Map (Name Core) a
 

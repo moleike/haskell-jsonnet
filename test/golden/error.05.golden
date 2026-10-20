@@ -1,2 +1,2 @@
 Runtime error: foo
-  ./test/golden/error.05.jsonnet:17:21-33 
+  error.05.jsonnet:17:21-33 
