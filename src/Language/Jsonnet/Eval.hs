@@ -16,12 +16,12 @@ module Language.Jsonnet.Eval where
 import Control.Applicative
 import Control.Lens (view)
 import Control.Monad (filterM, foldM, forM, join, (<=<), (>=>))
+import Control.Monad.Catch (throwM)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.Aeson.KeyMap qualified as KeyMap
 import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
-import Data.Bitraversable (bitraverse)
 import Data.Bits ((.&.), (.|.))
 import Data.Bits qualified as Bits
 import Data.ByteString (ByteString)
@@ -58,10 +58,9 @@ import System.IO.Error
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
-import Control.Monad.Catch (throwM)
 
 rnf :: Core -> Eval JSON.Value
-rnf = whnf >=> manifest
+rnf = whnf >=> force
 
 whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
@@ -288,7 +287,7 @@ whnfImport it fp = do
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
-toString v = toStrict . encodeToLazyText <$> manifest v
+toString v = toStrict . encodeToLazyText <$> force @JSON.Value v
 
 whnfCond :: Value -> Value -> Value -> Eval Value
 whnfCond c e1 e2 = do
@@ -449,38 +448,16 @@ mergeWith xs ys = mdo
             pure VField{fieldVal = fieldVal', fieldValWHNF = fieldValWHNF', ..}
         _ -> pure f'
 
-visibleKeys :: Object -> HashMap Text (Value, Bool)
-visibleKeys = H.mapMaybe (\field -> fmap (,assertField field) (f field))
-  where
-    f v@VField{..}
-        | not (hidden v) = Just fieldValWHNF
-        | otherwise = Nothing
-
 liftMaybe :: EvalError -> Maybe a -> Eval a
 liftMaybe e =
     \case
         Nothing -> throwE e
         Just a -> pure a
 
-manifest :: Value -> Eval JSON.Value
-manifest = \case
-    VNull -> pure JSON.Null
-    VBool b -> pure (JSON.Bool b)
-    VStr s -> pure (JSON.String s)
-    VNum n -> pure (JSON.Number n)
-    VObj vs -> do
-        fields <- traverse (bitraverse manifest pure) (visibleKeys vs)
-        pure . JSON.Object . KeyMap.fromHashMapText . filterNonAssertionFields $ fields
-    VArr vs -> JSON.Array <$> mapM manifest vs
-    VClos{} -> throwE (ManifestError "function")
-    VFun _ -> throwE (ManifestError "function")
-    v@VThunk{} -> force v >>= manifest
-    v@VIndir{} -> force v >>= manifest
-    v@VThunk'{} -> force v >>= manifest
-    _ -> throwE (ManifestError "impossible")
-  where
-    filterNonAssertionFields :: HashMap Text (JSON.Value, Bool) -> HashMap Text JSON.Value
-    filterNonAssertionFields = fmap fst . H.filter (not . snd)
+visibleKeys :: Object -> HashMap Text Value
+visibleKeys =
+    fmap fieldValWHNF
+        . H.filter ((&&) <$> (not . hidden) <*> (not . assertField))
 
 objectAssertionFields :: Object -> [VField]
 objectAssertionFields = H.elems . H.filter assertField
@@ -670,3 +647,34 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
     proj (VFun f) = pure $ \x y -> f (inj x) >>= \(VFun g) -> g (inj y) >>= force
     proj (VClos f env) = pure $ \x y -> force =<< whnfClos env f [Pos (inj x), Pos (inj y)]
     proj v = throwTypeMismatch "function" v
+
+instance HasValue JSON.Value where
+    inj = \case
+        JSON.Null -> VNull
+        JSON.Bool b -> VBool b
+        JSON.String s -> VStr s
+        JSON.Number n -> VNum n
+        JSON.Array vs -> VArr (fmap inj vs)
+        JSON.Object obj ->
+            let
+                aesonMap = KeyMap.toHashMapText obj
+                makeField key val =
+                    VField
+                        { fieldKey = VStr key
+                        , fieldValWHNF = inj val
+                        , fieldVal = inj val
+                        , fieldVis = Visible
+                        , assertField = False
+                        }
+             in
+                VObj (H.mapWithKey makeField aesonMap)
+    proj = \case
+        VNull -> pure JSON.Null
+        VBool b -> pure (JSON.Bool b)
+        VStr s -> pure (JSON.String s)
+        VNum n -> pure (JSON.Number n)
+        VArr vs -> JSON.Array <$> traverse force vs
+        VObj vs -> JSON.Object . KeyMap.fromHashMapText <$> traverse force (visibleKeys vs)
+        VClos{} -> throwE (ManifestError "function")
+        VFun{} -> throwE (ManifestError "function")
+        _ -> throwE (ManifestError "impossible")
