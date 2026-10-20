@@ -42,23 +42,6 @@ data Value
   | VFun !Fun
   | VThunk' !(Eval Value)
 
-instance FromJSON Value where
-  parseJSON = \case
-    JSON.Null -> pure VNull
-    JSON.Bool b -> pure $ VBool b
-    JSON.Number n -> pure $ VNum n
-    JSON.String s -> pure $ VStr s
-    JSON.Array a -> VArr <$> traverse parseJSON a
-    JSON.Object o -> VObj . f <$> traverse parseJSON (KeyMap.toHashMapText o)
-    where
-      f :: HashMap Text Value -> Object
-      f o =
-        H.fromList
-          [ mkField k v
-            | (k, v) <- H.toList o
-          ]
-      mkField k v = (k, VField (VStr k) v v Visible False)
-
 data VField = VField
   { fieldKey :: Value,
     fieldValWHNF :: Value,

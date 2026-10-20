@@ -85,7 +85,7 @@ std (ExtVars extVars) (UserFuncs userFuncs) = VObj $ H.fromList $ map f xs
         , "join" ~> intercalate
         , "objectHasEx" ~> objectHasEx
         , "objectFieldsEx" ~> objectFieldsEx
-        , "parseJson" ~> JSON.decodeStrict @Value
+        , "parseJson" ~> JSON.decodeStrict @JSON.Value
         , "extVar" ~> (liftMaybe . ExtVarNotFound <*> (`Map.lookup` extVars))
         , "thisFile" ~> getFileName @Value
         , "trace" ~> trace

@@ -623,6 +623,11 @@ instance {-# OVERLAPPABLE #-} (HasValue a) => HasValue [a] where
     inj = inj . V.fromList
     {-# INLINE inj #-}
 
+instance (HasValue a) => HasValue (HashMap Text a) where
+    inj = VObj . H.mapWithKey (\k v -> VField (VStr k) (inj v) (inj v) Visible False)
+    proj (VObj vs) = traverse force (visibleKeys vs)
+    proj v = throwTypeMismatch "object" v
+
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> b) where
     inj f = VFun $ fmap (inj . f) . force
     {-# INLINE inj #-}
@@ -654,30 +659,19 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
 instance HasValue JSON.Value where
     inj = \case
         JSON.Null -> VNull
-        JSON.Bool b -> VBool b
-        JSON.String s -> VStr s
-        JSON.Number n -> VNum n
-        JSON.Array vs -> VArr (fmap inj vs)
-        JSON.Object obj ->
-            let
-                aesonMap = KeyMap.toHashMapText obj
-                makeField key val =
-                    VField
-                        { fieldKey = VStr key
-                        , fieldValWHNF = inj val
-                        , fieldVal = inj val
-                        , fieldVis = Visible
-                        , assertField = False
-                        }
-             in
-                VObj (H.mapWithKey makeField aesonMap)
+        JSON.Bool b -> inj b
+        JSON.Number n -> inj n
+        JSON.String s -> inj s
+        JSON.Array a -> inj a
+        JSON.Object o -> inj (KeyMap.toHashMapText o)
+
     proj = \case
         VNull -> pure JSON.Null
         VBool b -> pure (JSON.Bool b)
         VStr s -> pure (JSON.String s)
         VNum n -> pure (JSON.Number n)
-        VArr vs -> JSON.Array <$> traverse force vs
-        VObj vs -> JSON.Object . KeyMap.fromHashMapText <$> traverse force (visibleKeys vs)
+        VArr vs -> JSON.Array <$> proj (VArr vs)
+        VObj vs -> JSON.Object . KeyMap.fromHashMapText <$> proj (VObj vs)
         VClos{} -> throwE (ManifestError "function")
         VFun{} -> throwE (ManifestError "function")
         _ -> throwE (ManifestError "impossible")
