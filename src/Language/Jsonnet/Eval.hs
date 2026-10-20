@@ -455,9 +455,10 @@ liftMaybe e =
         Just a -> pure a
 
 visibleKeys :: Object -> HashMap Text Value
-visibleKeys =
-    fmap fieldValWHNF
-        . H.filter ((&&) <$> (not . hidden) <*> (not . assertField))
+visibleKeys = fmap fieldValWHNF . H.filter isFieldVisible
+
+isFieldVisible :: VField -> Bool
+isFieldVisible = (&&) <$> (not . hidden) <*> (not . assertField)
 
 objectAssertionFields :: Object -> [VField]
 objectAssertionFields = H.elems . H.filter assertField
@@ -465,10 +466,9 @@ objectAssertionFields = H.elems . H.filter assertField
 objectFieldsEx :: Object -> Bool -> [Text]
 objectFieldsEx o = \case
     True -> L.sort $ H.keys $ H.filter isRegular o
-    False -> L.sort $ H.keys $ H.filter isVisible o
+    False -> L.sort $ H.keys $ H.filter isFieldVisible o
   where
-    isRegular field = not (assertField field)
-    isVisible field = not (hidden field) && (isRegular field)
+    isRegular = not . assertField
 
 objectHasEx :: Object -> Text -> Bool -> Bool
 objectHasEx o f all' = f `elem` objectFieldsEx o all'
