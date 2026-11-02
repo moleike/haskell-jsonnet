@@ -92,7 +92,7 @@ library
     prettyprinter >=1.7.0 && <1.8,
     scientific >=0.3.7 && <0.4,
     template-haskell >=2.16.0 && <2.23 || ^>=2.23.0 || ^>=2.24.0,
-    text >=2.0 && <2.2,
+    text >=2.1.2 && <2.2,
     th-lift-instances >=0.1.18 && <0.2,
     th-utilities >=0.2.4.2 && <0.3,
     transformers-compat >=0.6.6 && <0.8 || ^>=0.8,
