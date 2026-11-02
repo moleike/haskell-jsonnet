@@ -45,6 +45,8 @@ zipWithOutermost = annZip . inherit go False
   where
     go (Fix (AnnF EObj {} _)) False = (True, True)
     go (Fix (AnnF EObj {} _)) True = (False, True)
+    go (Fix (AnnF EObjComp {} _)) False = (True, True)
+    go (Fix (AnnF EObjComp {} _)) True = (False, True)
     go _ x = (False, x)
 
 alg :: Bool -> ExprF Core -> Core
@@ -72,7 +74,7 @@ alg outermost = \case
   EAssert a e -> desugarAssert a e
   ESlice {..} -> desugarSlice expr start end step
   EArrComp {expr, comp} -> desugarArrComp expr comp
-  EObjComp {field, comp, locals} -> desugarObjComp field comp locals
+  EObjComp {field, comp, locals} -> desugarObjComp outermost field comp locals
   EImport it fp -> CImp it fp
 
 desugarSlice :: Core -> Maybe Core -> Maybe Core -> Maybe Core -> Core
@@ -144,20 +146,26 @@ desugarArrComp expr = foldr f (CArr [expr])
 desugarField :: EField Core -> CField
 desugarField EField {..} = mkField key value' visibility
   where
+    -- If the key is computed, use $$key inside value' so it isn't re-evaluated in valueEnv
+    k = if computed then CVar (s2n "$$key") else key
+
     value' =
       if override
         then
           desugarIfElse
-            (desugarBinOp In key super)
-            (desugarBinOp Add (desugarLookup super key) value)
+            (desugarBinOp In k super)
+            (desugarBinOp Add (desugarLookup super k) value)
             value
         else value
-    super = CVar $ s2n "super"
+    super = CVar (s2n "super")
 
-desugarObjComp :: EField Core -> NonEmpty (CompSpec Core) -> [(String, Core)] -> Core
-desugarObjComp EField {..} comp locals =
+desugarObjComp :: Bool -> EField Core -> NonEmpty (CompSpec Core) -> [(String, Core)] -> Core
+desugarObjComp outermost EField {..} comp locals =
   CComp (ObjC (bind (s2n "arr") (kv', []))) arrComp
   where
+    -- Inject '$' if this is the outermost object
+    locals' = if outermost then ("$", CVar "self") : locals else locals
+
     kv' =
       desugarField
         ( EField
@@ -170,10 +178,12 @@ desugarObjComp EField {..} comp locals =
         )
     bnds = NE.zip (fmap var comp) xs
     key' = desugarLet bnds key
-    value' = case locals of
+    
+    value' = case locals' of
       [] -> desugarLet bnds value
       -- we need to nest the let bindings due to the impl.
       xs' -> desugarLet bnds $ desugarLet (NE.fromList xs') value
+      
     xs = desugarLookup (CVar $ s2n "arr") . CLit . Number . fromIntegral @Integer <$> [0 ..]
     arrComp = desugarArrComp arr comp
     arr = CArr $ NE.toList $ CVar . s2n . var <$> comp

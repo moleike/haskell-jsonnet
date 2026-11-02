@@ -60,6 +60,7 @@ library
     Language.Jsonnet.Error
     Language.Jsonnet.Eval
     Language.Jsonnet.Eval.Monad
+    Language.Jsonnet.Eval.Types
     Language.Jsonnet.Parser
     Language.Jsonnet.Parser.SrcSpan
     Language.Jsonnet.Pretty
@@ -97,7 +98,10 @@ library
     transformers-compat >=0.6.6 && <0.8 || ^>=0.8,
     unbound-generics >=0.4.3 && <0.5,
     unordered-containers >=0.2.14 && <0.3,
-    vector >=0.12.3 && <0.14
+    vector >=0.12.3 && <0.14,
+    cryptohash-md5,
+    base16-bytestring,
+    yaml
 
 executable hs-jsonnet
   import:

@@ -10,11 +10,11 @@ import Data.Text.IO qualified as T (readFile)
 import Data.Text.Lazy hiding (Text, show)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet hiding (extVars)
-import Language.Jsonnet.Pretty (ppJson, prettyError)
+import Language.Jsonnet.Pretty (ppJsonIndent, prettyError)
 import Language.Jsonnet.Std.Lib
 import Language.Jsonnet.Value (inj)
 import Prettyprinter (Doc)
-import System.FilePath (replaceExtension, takeFileName)
+import System.FilePath (replaceExtension, takeDirectory, takeFileName)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.Golden (findByExtension, goldenVsString)
@@ -22,11 +22,12 @@ import Test.Tasty.Golden (findByExtension, goldenVsString)
 render :: (a -> Doc ann) -> a -> LBS.ByteString
 render printer = encodeUtf8 . pack . show . printer
 
+
 run :: FilePath -> Config -> IO LBS.ByteString
 run fp conf = do
     prog <- T.readFile fp
     outp <- interpret conf prog
-    pure (either (render prettyError) (render (ppJson 4)) outp)
+    pure (either (render prettyError) (render (ppJsonIndent 4)) outp)
 
 -- Adapted from the C++ test suite
 extVars :: ExtVars
@@ -54,7 +55,7 @@ goldenTests = do
             [ goldenVsString
                 fileName
                 goldenFile -- golden file path
-                (run jsonnetFile $ Config fileName extVars testUserFuncs [])
+                (run jsonnetFile $ Config fileName extVars testUserFuncs [takeDirectory jsonnetFile])
             | jsonnetFile <- jsonnetFiles
             , let goldenFile = replaceExtension jsonnetFile ".golden"
                   fileName = takeFileName jsonnetFile

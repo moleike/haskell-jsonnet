@@ -1,19 +1,17 @@
--- |
--- Module                  : Language.Jsonnet.Value
--- Copyright               : (c) 2020-2021 Alexandre Moreno
--- SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
--- Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
--- Stability               : experimental
--- Portability             : non-portable
+{- |
+Module                  : Language.Jsonnet.Value
+Copyright               : (c) 2020-2021 Alexandre Moreno
+SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
+Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
+Stability               : experimental
+Portability             : non-portable
+-}
 module Language.Jsonnet.Value where
 
-import Control.Lens (view)
+import Control.Lens
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Aeson (FromJSON (..))
-import Data.Aeson qualified as JSON
-import Data.Aeson.KeyMap qualified as KeyMap
+import Control.Monad.Reader (MonadReader)
 import Data.HashMap.Lazy (HashMap)
-import Data.HashMap.Lazy qualified as H
 import Data.IORef
 import Data.Scientific
 import Data.Text (Text)
@@ -22,56 +20,55 @@ import GHC.Generics
 import Language.Jsonnet.Common
 import Language.Jsonnet.Core hiding (mkField)
 import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Pretty ()
 
-type Eval = EvalM Value
-
-type Env = Ctx Value
+type Eval = EvalM
 
 data Value
-  = VNull
-  | VBool !Bool
-  | VStr !Text
-  | VNum !Scientific
-  | VObj !Object -- !Object
-  | VArr !(Vector Value)
-  | VThunk !Core !Env
-  | VIndir !Ref
-  | VPrim !Prim
-  | VClos !Lam !Env
-  | VFun !Fun
-  | VThunk' !(Eval Value)
+    = VNull
+    | VBool !Bool
+    | VStr !Text
+    | VNum !Scientific
+    | VObj !Object -- !Object
+    | VArr !(Vector Value)
+    | VThunk !Core !Env
+    | VIndir !Ref
+    | VPrim !Prim
+    | VClos !Lam !Env
+    | VFun !Fun
+    | VThunk' !(Eval Value)
 
 data VField = VField
-  { fieldKey :: Value,
-    fieldValWHNF :: Value,
-    fieldVal :: Value,
-    fieldVis :: Visibility,
-    assertField :: Bool
-  }
-  deriving (Generic)
+    { fieldKey :: Value
+    , fieldValWHNF :: Value
+    , fieldVal :: Value
+    , fieldVis :: Visibility
+    , assertField :: Bool
+    }
+    deriving (Generic)
 
 type Fun = Value -> Eval Value
 
 type Object = HashMap Text VField
 
 data Cell = Cell {cellVal :: Value, cellIsWHNF :: Bool}
-  deriving (Generic)
+    deriving (Generic)
 
 type Ref = IORef Cell
 
 instance HasVisibility VField where
-  visible VField {..} = fieldVis == Visible
-  forced VField {..} = fieldVis == Forced
-  hidden VField {..} = fieldVis == Hidden
+    visible VField{..} = fieldVis == Visible
+    forced VField{..} = fieldVis == Forced
+    hidden VField{..} = fieldVis == Hidden
 
 class HasValue a where
-  inj :: a -> Value
-  proj :: Value -> Eval a
+    inj :: a -> Value
+    proj :: Value -> Eval a
 
 instance HasValue Value where
-  inj = id
-  proj = pure
+    inj = id
+    proj = pure
 
 mkCell :: Value -> Cell
 mkCell v = Cell v False
@@ -79,8 +76,8 @@ mkCell v = Cell v False
 mkIndirV :: (MonadIO m) => Value -> m Value
 mkIndirV v = VIndir <$> allocate v
 
-mkThunk :: Core -> Eval Value
-mkThunk c = VThunk c <$> view ctx
+mkThunk :: (MonadReader EvalState m) => Core -> m Value
+mkThunk c = VThunk c <$> view env
 
-allocate :: (MonadIO m) => Value -> m (IORef Cell)
-allocate = liftIO . newIORef . mkCell
+allocate :: (MonadIO m) => Value -> m (Data.IORef.IORef Cell)
+allocate = liftIO . Data.IORef.newIORef . mkCell

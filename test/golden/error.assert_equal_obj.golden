@@ -1,3 +1,2 @@
-Runtime error: Assertion failed. {"a":1} != {"b":1}
-  error.assert_equal_obj.jsonnet:17:1-16 function <anonymous>
-  error.assert_equal_obj.jsonnet:17:1-16 
+Runtime error: Assertion failed. {"a": 1} != {"b": 1}
+  

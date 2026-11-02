@@ -15,12 +15,11 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Lens (view)
-import Control.Monad (filterM, foldM, forM, join, (<=<), (>=>))
-import Control.Monad.Catch (throwM)
+import Control.Monad (foldM, forM, join, (<=<), (>=>))
+import Control.Monad.Catch (handle)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.Aeson.KeyMap qualified as KeyMap
-import Data.Aeson.Text (encodeToLazyText)
 import Data.Bifunctor (second)
 import Data.Bits ((.&.), (.|.))
 import Data.Bits qualified as Bits
@@ -38,23 +37,18 @@ import Data.Scientific
 import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import Data.Text.IO qualified as TIO
-import Data.Text.Lazy (toStrict)
+import Data.Text.Encoding qualified as TE
 import Data.Traversable (for)
 import Data.Vector (Vector, (!?))
 import Data.Vector qualified as V
-import Data.Word (Word8)
 import Language.Jsonnet.Common
 import Language.Jsonnet.Compiler
-import Language.Jsonnet.Core
+import Language.Jsonnet.Core hiding (fieldVis)
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Pretty ()
+import Language.Jsonnet.Eval.Types
+import Language.Jsonnet.Pretty (ppJsonCompact)
 import Language.Jsonnet.Value
-import System.Directory (doesFileExist)
-import System.FilePath (normalise, takeDirectory, (</>))
-import System.FilePath.Posix (isAbsolute)
-import System.IO.Error
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
@@ -69,21 +63,22 @@ whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
 whnf (CLoc sp c) = withCurrentPos sp (whnf c)
 whnf (CLit l) = pure (whnfLiteral l)
-whnf (CObj bnd) = whnfObj bnd
+whnf (CObj bnd) = view env >>= flip whnfObj bnd
 whnf (CArr cs) = VArr . V.fromList <$> mapM mkValue cs
 whnf (CLet bnd) = whnfLetrec bnd
 whnf (CPrim p) = pure (VPrim p)
 whnf (CApp e es) = whnfApp e es
-whnf (CLam f) = VClos f <$> view ctx
+whnf (CLam f) = VClos f <$> view env
 whnf (CComp comp e) = whnfComp comp e
 whnf (CImp it path) = whnfImport it path
 
 force :: (HasValue a) => Value -> Eval a
-force (VIndir loc) = whnfIndir loc >>= force
-force (VThunk c e) = withEnv e (whnf c) >>= proj
-force (VThunk' v) = v >>= proj
-force v = proj v
-{-# INLINE force #-}
+force =
+    handle asEvalError . \case
+        VIndir loc -> whnfIndir loc >>= force
+        VThunk c e -> withEnv e (whnf c) >>= proj
+        VThunk' v -> v >>= proj
+        v -> proj v
 
 mkValue :: Core -> Eval Value
 mkValue c@(CLit _) = whnf c
@@ -93,7 +88,7 @@ mkValue c = mkThunk c >>= mkIndirV
 
 lookupVar :: Name Core -> Eval Value
 lookupVar n = do
-    rho <- view ctx
+    rho <- view env
     v <- liftMaybe (VarNotFound (n2s n)) (M.lookup n rho)
     force v
 
@@ -110,7 +105,7 @@ whnfArgs = \case
     as@(Args _ Lazy) -> args <$> mapM mkValue as
 
 whnfApp :: Core -> Args Core -> Eval Value
-whnfApp e es = withStackFrame e $ do
+whnfApp e es = withStackFrame e $ handle asEvalError $ do
     vs <- whnfArgs es
     whnf e >>= force >>= \case
         VClos f env -> whnfClos env f vs
@@ -155,7 +150,7 @@ appDefaults rs e = mdo
     extendEnv bnds (whnf e)
 
 -- returns a triple with unapplied binders, positional and named
-splitArgs :: [Arg c] -> [(Name a, b)] -> EvalM s ([(Name a, b)], [(Name a, c)], [(Name a, c)])
+splitArgs :: [Arg c] -> [(Name a, b)] -> EvalM ([(Name a, b)], [(Name a, c)], [(Name a, c)])
 splitArgs args bnds = do
     named <- getNamed
     pos <- getPos
@@ -213,10 +208,10 @@ whnfBinOp Mod (VNum _) (VNum 0) = throwE DivByZero
 whnfBinOp Mod n1 n2 = liftF2 (mod @Int64) n1 n2
 whnfBinOp Eq e1 e2 = inj <$> equals e1 e2
 whnfBinOp Ne e1 e2 = inj . not <$> equals e1 e2
-whnfBinOp Lt e1 e2 = liftF2 ((<) @Double) e1 e2
-whnfBinOp Gt e1 e2 = liftF2 ((>) @Double) e1 e2
-whnfBinOp Le e1 e2 = liftF2 ((<=) @Double) e1 e2
-whnfBinOp Ge e1 e2 = liftF2 ((>=) @Double) e1 e2
+whnfBinOp Lt e1 e2 = inj . (== LT) <$> cmpValue e1 e2
+whnfBinOp Gt e1 e2 = inj . (== GT) <$> cmpValue e1 e2
+whnfBinOp Le e1 e2 = inj . (/= GT) <$> cmpValue e1 e2
+whnfBinOp Ge e1 e2 = inj . (/= LT) <$> cmpValue e1 e2
 whnfBinOp And e1 e2 = liftF2 ((.&.) @Int64) e1 e2
 whnfBinOp Or e1 e2 = liftF2 ((.|.) @Int64) e1 e2
 whnfBinOp Xor e1 e2 = liftF2 (Bits.xor @Int64) e1 e2
@@ -231,6 +226,25 @@ whnfLogical f e1 e2 = do
         then inj <$> (force @Bool) e2
         else pure (inj x)
 
+cmpValue :: Value -> Value -> Eval Ordering
+cmpValue (VNum a) (VNum b) = pure (compare a b)
+cmpValue (VStr a) (VStr b) = pure (compare a b)
+cmpValue (VArr a) (VArr b) = do
+    -- Jsonnet compares arrays element by element lexicographically
+    as <- mapM force (V.toList a)
+    bs <- mapM force (V.toList b)
+    go as bs
+  where
+    go [] [] = pure EQ
+    go [] _ = pure LT
+    go _ [] = pure GT
+    go (x : xs) (y : ys) = do
+        ord <- cmpValue x y
+        case ord of
+            EQ -> go xs ys
+            _ -> pure ord
+cmpValue v1 _ = throwTypeMismatch "number, string, or array" v1
+
 append :: Value -> Value -> Eval Text
 append v1 v2 = T.append <$> toString v1 <*> toString v2
 
@@ -243,8 +257,8 @@ whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
 
 whnfImport :: Import -> FilePath -> Eval Value
 whnfImport it fp = do
-    absPath <- resolveImportPath fp
-    let key = ImpKey it absPath
+    ImportResult{..} <- fetchImport fp
+    let key = ImpKey it foundAt
     ref <- view loadedModules
     mods <- liftIO $ readIORef ref
     case M.lookup key mods of
@@ -252,46 +266,17 @@ whnfImport it fp = do
         Nothing -> do
             val <- case it of
                 Code -> do
-                    content <- readImportFile absPath
-                    core <- either throwM pure (compileModule absPath content)
-                    env <- view ctx
-                    pure $ VThunk' (withCurrentFile fp $ withEnv env $ whnf core)
-                Bin -> inj <$> readBinaryFile absPath
-                Str -> inj <$> readImportFile absPath
+                    core <- compileThrow foundAt (TE.decodeUtf8 content)
+                    pure $ VThunk' (withCurrentFile foundAt $ withBaseEnv $ whnf core)
+                Bin -> pure $ inj (BS.unpack content)
+                Str -> pure $ inj (TE.decodeUtf8 content)
             ptr <- mkIndirV val
             liftIO $ writeIORef ref (M.insert key ptr mods)
             return ptr
-  where
-    resolveImportPath :: FilePath -> Eval FilePath
-    resolveImportPath importPath = do
-        candidates <-
-            if isAbsolute importPath
-                then pure [importPath]
-                else do
-                    baseFile <- view currentFile
-                    paths <- view jpaths
-                    pure $ (takeDirectory baseFile </> importPath) : map (</> importPath) paths
-
-        matches <- liftIO $ filterM doesFileExist candidates
-
-        case matches of
-            (firstMatch : _) -> pure (normalise firstMatch)
-            [] -> throwE $ ImportError importPath (userError "File not found")
-
-    readImportFile :: FilePath -> Eval Text
-    readImportFile = readFileWith TIO.readFile
-
-    readBinaryFile :: FilePath -> Eval [Word8]
-    readBinaryFile = readFileWith (fmap BS.unpack . BS.readFile)
-
-    readFileWith :: (FilePath -> IO a) -> FilePath -> Eval a
-    readFileWith reader absPath = do
-        inp <- liftIO $ tryIOError (reader absPath)
-        either (throwE . ImportError fp) pure inp
 
 toString :: Value -> Eval Text
 toString (VStr s) = pure s
-toString v = toStrict . encodeToLazyText <$> force @JSON.Value v
+toString v = T.show . ppJsonCompact <$> force @JSON.Value v
 
 whnfCond :: Value -> Value -> Value -> Eval Value
 whnfCond c e1 e2 = do
@@ -346,51 +331,52 @@ whnfLetrec bnd = mdo
                 (unrec r)
     extendEnv bnds (mkValue e1)
 
-whnfObj :: [CField] -> Eval Value
-whnfObj xs = mdo
+-- | whnfObj now requires the current lexical environment to be passed in.
+whnfObj :: Env -> [CField] -> Eval Value
+whnfObj outerEnv xs = mdo
+    let emptySuper = VObj H.empty
+
     obj <-
         mkIndirV . VObj . H.fromList . catMaybes
             =<< mapM
                 ( \field ->
-                    let self = M.singleton (s2n "self") obj
-                     in whnfField self field
+                    let valueEnv =
+                            M.insert (s2n "super") emptySuper $
+                                M.insert
+                                    (s2n "self")
+                                    obj
+                                    outerEnv
+                     in whnfField outerEnv valueEnv field
                 )
                 xs
     pure obj
 
-whnfField ::
-    -- | self object
-    Env ->
-    CField ->
-    Eval (Maybe (Text, VField))
-whnfField self (CRegularField (RegularField k v h)) = do
+whnfField :: Env -> Env -> CField -> Eval (Maybe (Text, VField))
+whnfField keyEnv valueEnv (CRegularField (RegularField k v h)) = do
     let fieldVis = h
-    fieldKey <- whnf k -- keys are strictly evaluated
-    fieldValWHNF <- extendEnv self (mkValue v)
-    fieldVal <- extendEnv self (mkThunk v)
+    fieldKey <- withEnv keyEnv (whnf k)
+    mKeyText <- force fieldKey
+    let valueEnv' = case mKeyText of
+            Just keyText -> M.insert (s2n "$$key") (VStr keyText) valueEnv
+            Nothing -> valueEnv
+    fieldValWHNF <- extendEnv valueEnv' (mkValue v)
+    fieldVal <- extendEnv valueEnv' (mkThunk v)
     let assertField = False
-    fmap (,VField{..}) <$> force fieldKey
-whnfField self (CAssertField assertion) = do
-    assertion' <- extendEnv self (mkThunk assertion)
+    pure $ fmap (,VField{..}) mKeyText
+whnfField _keyEnv valueEnv (CAssertField assertion) = do
+    assertion' <- extendEnv valueEnv (mkThunk assertion)
     fieldKey <- nameToText <$> fresh (s2n "$$assert")
-    -- The field is "Visible" since we want the evaluation to happen to uncover
-    -- the assertion errors, but they will be removed from the final output
-    -- since the "assertField" flag is True.
     pure $ Just (fieldKey, VField (VStr fieldKey) assertion' assertion' Visible True)
   where
-    nameToText :: Name a -> Text
-    nameToText n = (T.pack (name2String n)) <> "_" <> T.pack (show (name2Integer n))
+    nameToText n = T.pack (name2String n) <> "_" <> T.pack (show (name2Integer n))
 
 flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
 
-whnfIfs :: [Core] -> EvalM Value Bool
+whnfIfs :: [Core] -> EvalM Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
-whnfComp ::
-    Comp ->
-    Core ->
-    Eval Value
+whnfComp :: Comp -> Core -> Eval Value
 whnfComp (ArrC bnd) cs = do
     xs <- comp
     liftF flattenArrays $ VArr $ V.mapMaybe id xs
@@ -404,27 +390,29 @@ whnfComp (ArrC bnd) cs = do
                     if b
                         then Just <$> mkValue e
                         else pure Nothing
-            v -> throwTypeMismatch "" v
-whnfComp (ObjC bnd) cs = do
-    xs <- comp
-    pure $ VObj $ H.fromList $ catMaybes $ V.toList xs
-  where
-    comp =
-        whnf cs >>= \case
-            VArr xs -> forM xs $ \x -> do
-                (n, (CRegularField (RegularField k v h), cond)) <- unbind bnd
-                extendEnv (M.fromList [(n, x)]) $ do
-                    b <- whnfIfs cond
+            v -> throwTypeMismatch "array" v
+whnfComp (ObjC bnd) cs = mdo
+    let emptySuper = VObj H.empty
+    obj <- mdo
+        fieldsList <-
+            whnf cs >>= \case
+                VArr xs -> forM (V.toList xs) $ \x -> do
+                    (n, (cField, cond)) <- unbind bnd
+                    outerEnv <- view env
+                    let elemEnv = M.insert n x outerEnv
+                    b <- withEnv elemEnv (whnfIfs cond)
                     if b
                         then do
-                            fieldKey <- whnf k
-                            fieldValWHNF <- mkValue v
-                            fieldVal <- mkThunk v
-                            let fieldVis = h
-                                assertField = False
-                            fmap (,VField{..}) <$> force fieldKey
+                            let valueEnv =
+                                    M.insert (s2n "super") emptySuper $
+                                        M.insert (s2n "self") obj $
+                                            elemEnv
+
+                            whnfField elemEnv valueEnv cField
                         else pure Nothing
-            v -> throwTypeMismatch "array" v
+                v -> throwTypeMismatch "array" v
+        mkIndirV $ VObj $ H.fromList $ catMaybes fieldsList
+    pure obj
 
 {- | Right-biased union of two objects, i.e. '{x : 1} + {x : 2} == {x : 2}'
   with OO-like `self` and `super` support via value recursion (knot-tying)
@@ -441,9 +429,9 @@ mergeWith xs ys = mdo
   where
     self = s2n "self"
     super = s2n "super"
-    f a b
-        | hidden a && visible b = a
-        | otherwise = b
+    f a b = b{fieldVis = combineVis (fieldVis a) (fieldVis b)}
+    combineVis visA Visible = visA
+    combineVis _ visB = visB
     update name xs' f'@VField{..} = case fieldVal of
         VThunk c env -> do
             let env' = M.insert name xs' env

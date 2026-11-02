@@ -33,6 +33,7 @@ limitations under the License.
   isObject(v):: std.type(v) == 'object',
   isArray(v):: std.type(v) == 'array',
   isFunction(v):: std.type(v) == 'function',
+  isNull(v):: v == null,
 
   toString(a)::
     if std.type(a) == 'string' then a else '' + a,
@@ -206,27 +207,27 @@ limitations under the License.
     local invar =
       // loop invariant with defaults applied
       {
+        length: std.length(indexable),
         indexable: indexable,
         index:
           if index == null
           then 0
           else
             if index < 0
-            then std.max(0, std.length(indexable) + index)
+            then std.max(0, self.length + index)
             else index,
         end:
           if end == null
-          then std.length(indexable)
+          then self.length
           else
             if end < 0
-            then std.length(indexable) + end
+            then self.length + end
             else end,
         step:
           if step == null
           then 1
           else step,
-        length: std.length(indexable),
-        type: std.type(indexable),
+        type: std.type(indexable)
       };
     assert invar.step >= 0 : 'got [%s:%s:%s] but negative steps are not supported' % [invar.index, invar.end, invar.step];
     assert step != 0 : 'got %s but step must be greater than 0' % step;
@@ -298,9 +299,19 @@ limitations under the License.
     if !std.isFunction(func) then
       error ('std.flatMap first param must be function, got ' + std.type(func))
     else if std.isArray(arr) then
-      std.flattenArrays(std.makeArray(std.length(arr), function(i) func(arr[i])))
+      std.flattenArrays(std.makeArray(
+        std.length(arr), function(i)
+          local o = func(arr[i]);
+          if std.isArray(o) then o else
+            error ('std.flatMap on arrays, provided function must return an array, got ' + std.type(o))
+      ))
     else if std.isString(arr) then
-      std.join('', std.makeArray(std.length(arr), function(i) func(arr[i])))
+      std.join('', std.makeArray(
+        std.length(arr), function(i)
+          local o = func(arr[i]);
+          if std.isString(o) then o else
+            error ('std.flatMap on strings, provided function must return a string, got ' + std.type(o))
+      ))
     else error ('std.flatMap second param must be array / string, got ' + std.type(arr)),
 
   join(sep, arr)::
@@ -840,10 +851,14 @@ limitations under the License.
       std.map(map_func, std.filter(filter_func, arr)),
 
   assertEqual(a, b)::
+    // If the values are strings, escape them for printing.
+    // If not, they'll be JSON-stringified anyway by the later string concatenation.
+    local astr = if std.type(a) == 'string' then std.escapeStringJson(a) else a;
+    local bstr = if std.type(b) == 'string' then std.escapeStringJson(b) else b;
     if a == b then
       true
     else
-      error 'Assertion failed. ' + a + ' != ' + b,
+      error 'Assertion failed. ' + astr + ' != ' + bstr,
 
   abs(n)::
     if !std.isNumber(n) then
@@ -1765,14 +1780,14 @@ limitations under the License.
   isOdd(x):: std.round(x) % 2 != 0,
   isInteger(x):: std.round(x) == x,
   isDecimal(x):: std.round(x) != x,
-
+  
   removeAt(arr, at):: [
     arr[i],
     for i in std.range(0, std.length(arr) - 1)
     if i != at
   ],
 
-  remove(arr, elem)::
+  remove(arr, elem):: 
     local indexes = std.find(elem, arr);
     if std.length(indexes) == 0
     then
@@ -1780,12 +1795,6 @@ limitations under the License.
     else
       std.removeAt(arr, indexes[0])
   ,
-
-  objectRemoveKey(obj, key):: {
-    [k]: obj[k],
-    for k in std.objectFields(obj)
-    if k != key
-  },
 
   sha1(str):: go_only_function,
   sha256(str):: go_only_function,

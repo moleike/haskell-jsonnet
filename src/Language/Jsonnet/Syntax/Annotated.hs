@@ -12,6 +12,7 @@ import Language.Jsonnet.Annotate
 import Language.Jsonnet.Common
 import Language.Jsonnet.Parser.SrcSpan
 import Language.Jsonnet.Syntax
+import Control.Arrow ((&&&))
 
 type Expr = Ann ExprF SrcSpan
 
@@ -39,3 +40,6 @@ mkBinOp op a@(Fix (AnnF _ ann1)) b@(Fix (AnnF _ ann2)) =
 mkUnyOp :: UnyOp -> Expr -> Expr
 mkUnyOp op a@(Fix (AnnF _ ann)) =
   Fix $ AnnF (EUnyOp op a) ann
+
+para :: Functor f => (f (Fix f, a) -> a) -> Fix f -> a
+para f = f . fmap (id &&& para f) . unFix

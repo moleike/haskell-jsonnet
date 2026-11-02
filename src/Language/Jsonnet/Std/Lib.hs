@@ -19,8 +19,11 @@ where
 
 import Control.Lens (view)
 import Control.Monad.IO.Class (liftIO)
+import Crypto.Hash.MD5 qualified as MD5
 import Data.Aeson qualified as JSON
 import Data.ByteString qualified as B
+import Data.ByteString.Base16 qualified as B16
+import Data.Fixed (mod')
 import Data.Functor
 import Data.HashMap.Lazy qualified as H
 import Data.List qualified as L (intercalate)
@@ -30,10 +33,12 @@ import Data.Text (Text)
 import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Vector qualified as V
+import Data.Yaml qualified as Yaml
 import Language.Jsonnet.Common
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Value
 import System.IO
 import Unbound.Generics.LocallyNameless
@@ -57,7 +62,7 @@ std (ExtVars extVars) (UserFuncs userFuncs) = VObj (H.fromList xs)
         , "primitiveEquals" ~> primitiveEquals
         , "equals" ~> equals
         , "length" ~> length
-        , "pow" ~> (^^) @Double @Int
+        , "pow" ~> (**) @Double
         , "exp" ~> exp @Double
         , "log" ~> log @Double
         , "exponent" ~> exponent @Double
@@ -73,7 +78,7 @@ std (ExtVars extVars) (UserFuncs userFuncs) = VObj (H.fromList xs)
         , "atan" ~> atan @Double
         , "atan2" ~> atan2 @Double
         , "hypot" ~> \a b -> (sqrt @Double) (a * a + b * b)
-        , "modulo" ~> mod @Integer
+        , "modulo" ~> mod' @Double
         , "codepoint" ~> fromEnum . T.head
         , "char" ~> T.singleton . toEnum
         , "encodeUTF8" ~> B.unpack . T.encodeUtf8
@@ -83,11 +88,14 @@ std (ExtVars extVars) (UserFuncs userFuncs) = VObj (H.fromList xs)
         , "join" ~> intercalate
         , "objectHasEx" ~> objectHasEx
         , "objectFieldsEx" ~> objectFieldsEx
-        , "parseJson" ~> JSON.decodeStrict @JSON.Value
+        , "objectRemoveKey" ~> flip (H.delete @Text @Value)
+        , "parseJson" ~> JSON.throwDecodeStrict @JSON.Value @Eval
+        , "parseYaml" ~> parseYaml
         , "extVar" ~> (liftMaybe . ExtVarNotFound <*> (`Map.lookup` extVars))
-        , "thisFile" ~> getFileName @Value
+        , "thisFile" ~> getFileName
         , "trace" ~> trace
         , "native" ~> (`Map.lookup` userFuncs)
+        , "md5" ~> T.decodeUtf8 . B16.encode . MD5.hash . T.encodeUtf8
         ]
 
 intercalate :: Value -> [Value] -> Eval Value
@@ -123,3 +131,10 @@ trace str =
                     Nothing -> fn
             liftIO $ hPutStrLn stderr ("TRACE: " ++ loc ++ " " ++ str)
         )
+
+parseYaml :: B.ByteString -> Eval Value
+parseYaml bs =
+    Yaml.decodeAllThrow @Eval @JSON.Value bs <&> \case
+        [] -> VNull
+        [doc] -> inj doc
+        docs -> inj docs

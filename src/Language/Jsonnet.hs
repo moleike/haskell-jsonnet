@@ -23,16 +23,16 @@ module Language.Jsonnet (
     ExtVarContent (..),
     interpretExtVar,
     constructExtVars,
-    registerFun,
 )
 where
 
-import Control.Monad ((<=<), (>=>))
+import Control.Monad (filterM, (<=<), (>=>))
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, throwM, try)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Reader
 import Data.Aeson qualified as JSON
 import Data.Binary (decode)
+import Data.ByteString qualified as BS
 import Data.Map.Lazy qualified as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
@@ -42,13 +42,18 @@ import Language.Jsonnet.Compiler
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
-import Language.Jsonnet.Eval.Monad hiding (jpaths)
+import Language.Jsonnet.Eval.Monad
+import Language.Jsonnet.Eval.Types (ImportResult (..), Importer (..))
 import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Std.Lib
 import Language.Jsonnet.Std.Lib qualified as Lib
 import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
+import System.Directory (doesFileExist)
 import System.Exit (die)
+import System.FilePath (takeDirectory, (</>))
+import System.FilePath.Posix (isAbsolute)
+import System.IO.Error (tryIOError)
 
 newtype JsonnetM a = JsonnetM
     { unJsonnetM :: ReaderT Config IO a
@@ -89,17 +94,15 @@ interpret :: Config -> Text -> IO (Either Error JSON.Value)
 interpret conf = runJsonnetM conf . (compile >=> evaluate)
 
 compile :: Text -> JsonnetM Core
-compile inp = do
-    fp <- asks fname
-    either throwM pure (compileModule fp inp)
+compile inp = asks fname >>= flip compileThrow inp
 
 -- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
     fp <- asks fname
-    paths <- asks jpaths
+    importer <- Importer . resolveImportPath <$> asks jpaths
     env <- singleton "std" <$> stdlib
-    JsonnetM $ liftIO $ runEvalM fp paths env (manifest expr)
+    JsonnetM $ liftIO $ runEvalM fp importer env (manifest expr)
 
 {- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
   the native (a small subset) with the interpreted (the splice mkStdlib)
@@ -109,9 +112,9 @@ stdlib = do
     extVars <- asks extVars
     userFuncs <- asks userFuncs
     fp <- asks fname
-    paths <- asks jpaths
+    importer <- Importer . resolveImportPath <$> asks jpaths
     let lib = whnf core >>= flip mergeObjects (Lib.std extVars userFuncs)
-    JsonnetM $ liftIO $ runEvalM fp paths M.empty lib
+    JsonnetM $ liftIO $ runEvalM fp importer M.empty lib
   where
     core = decode $(mkStdlib)
     mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
@@ -148,8 +151,8 @@ interpretExtVar = \case
     evaluateToValue expr = do
         env <- singleton "std" <$> stdlib
         fp <- asks fname
-        paths <- asks jpaths
-        JsonnetM $ liftIO $ runEvalM fp paths env (whnf expr)
+        importer <- Importer . resolveImportPath <$> asks jpaths
+        JsonnetM $ liftIO $ runEvalM fp importer env (whnf expr)
 
     dieError :: Error -> IO a
     dieError = die . show . prettyError
@@ -160,5 +163,16 @@ constructExtVars = fmap (ExtVars . M.fromList) . traverse interpretExtVarPair
     interpretExtVarPair :: (Text, ExtVar) -> IO (Text, Value)
     interpretExtVarPair (s, extVar) = (s,) <$> interpretExtVar extVar
 
-registerFun :: (HasValue a) => Text -> a -> (Text, Value)
-registerFun name fn = (name, inj fn)
+resolveImportPath :: [FilePath] -> FilePath -> String -> IO ImportResult
+resolveImportPath jpaths baseFile importPath = do
+    matches <- filterM doesFileExist candidates
+    case matches of
+        (firstMatch : _) -> do
+            inp <- tryIOError $ BS.readFile firstMatch
+            either (throwM . UnresolvedImport importPath) (pure . ImportResult firstMatch) inp
+        [] -> throwM $ UnresolvedImport importPath (userError "Could not resolve import path")
+  where
+    candidates =
+        if isAbsolute importPath
+            then [importPath]
+            else (takeDirectory baseFile </> importPath) : map (</> importPath) jpaths

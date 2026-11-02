@@ -46,7 +46,7 @@ data EvalError
   | StdError Text
   | RuntimeError Text
   | ManifestError Text
-  | ImportError FilePath IOError
+  | UnresolvedImport FilePath IOError
   deriving (Eq, Show, Typeable)
 
 instance Exception EvalError

@@ -15,7 +15,7 @@ run :: Config -> IO String
 run conf = do
     prog <- T.readFile (fname conf)
     outp <- interpret conf prog
-    pure (either show (show . ppJson 4) outp)
+    pure (either show (show . ppJsonIndent 4) outp)
 
 jpathTests :: TestTree
 jpathTests =

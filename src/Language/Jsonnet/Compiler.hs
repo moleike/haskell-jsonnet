@@ -7,6 +7,7 @@
 -- Portability             : non-portable
 module Language.Jsonnet.Compiler (
     compileModule,
+    compileThrow
 ) where
 
 import Control.Monad.Except (MonadError)
@@ -17,9 +18,13 @@ import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser (parse)
+import Control.Monad.Catch (MonadThrow, throwM)
 
 compileModule :: MonadError Error m => FilePath -> Text -> m Core
 compileModule path content = do
     expr <- parse path content
     check expr
     pure (desugar expr)
+
+compileThrow :: MonadThrow m => FilePath -> Text -> m Core
+compileThrow  fp = either throwM pure . compileModule fp

@@ -19,9 +19,9 @@ limitations under the License.
 // Can capture std from another file.
 std.assertEqual((import 'lib/capture_std_func.libsonnet')().sqrt(4), 2) &&
 
-// Each import has its own std. (not implemented in haskell-jsonnet)
+// Each import has its own std.
 std.assertEqual(
-  //local std = { sqrt: function(x) x };
+  local std = { sqrt: function(x) x };
   local lib = import 'lib/capture_std.libsonnet';
   lib.sqrt(4),
   2
@@ -180,16 +180,36 @@ std.assertEqual(std.objectKeysValues({ x::: 1 } { x: 1 }), [{ key: 'x', value: 1
 std.assertEqual(std.objectKeysValues({ x::: 1 } { x:: 1 }), []) &&
 std.assertEqual(std.objectKeysValues({ x::: 1 } { x::: 1 }), [{ key: 'x', value: 1 }]) &&
 
-//std.assertEqual(std.toString({ a: 1, b: 2 }), '{"b":2,"a":1}') &&
-std.assertEqual(std.toString({}), '{}') &&
-std.assertEqual(std.toString([1, 2]), '[1,2]') &&
-std.assertEqual(std.toString([]), '[]') &&
+std.assertEqual(std.get({ x: 1, y: 2 }, 'x', 5), 1) &&
+std.assertEqual(std.get({ x: 1, y: 2 }, 'z', 5), 5) &&
+std.assertEqual(std.get({ x: 1, y: 2 }, 'z'), null) &&
+std.assertEqual(std.get({ x::: 1, y::: 2 }, 'x', 5), 1) &&
+std.assertEqual(std.get({ x::: 1, y::: 2 }, 'z', 5), 5) &&
+std.assertEqual(std.get({ x::: 1, y::: 2 }, 'z'), null) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'x', 5), 1) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'x'), 1) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'z', 5), 5) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'z'), null) &&
+std.assertEqual(std.get({}, 'z', 5), 5) &&
+std.assertEqual(std.get({}, 'z'), null) &&
+std.assertEqual(std.get({ x: 1, y: 2 }, 'x', 5, false), 1) &&
+std.assertEqual(std.get({ x: 1, y: 2 }, 'z', 5, false), 5) &&
+std.assertEqual(std.get({ x::: 1, y::: 2 }, 'x', 5, false), 1) &&
+std.assertEqual(std.get({ x::: 1, y::: 2 }, 'z', 5, false), 5) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'x', 5, false), 5) &&
+std.assertEqual(std.get({ x:: 1, y:: 2 }, 'z', 5, false), 5) &&
+std.assertEqual(std.get({}, 'z', 5, false), 5) &&
+
+std.assertEqual(std.toString({ a: 1, b: 2 }), '{"a": 1, "b": 2}') &&
+std.assertEqual(std.toString({}), '{ }') &&
+std.assertEqual(std.toString([1, 2]), '[1, 2]') &&
+std.assertEqual(std.toString([]), '[ ]') &&
 std.assertEqual(std.toString(null), 'null') &&
 std.assertEqual(std.toString(true), 'true') &&
 std.assertEqual(std.toString(false), 'false') &&
 std.assertEqual(std.toString('str'), 'str') &&
 std.assertEqual(std.toString(''), '') &&
-std.assertEqual(std.toString([1, 2, 'foo']), '[1,2,"foo"]') &&
+std.assertEqual(std.toString([1, 2, 'foo']), '[1, 2, "foo"]') &&
 
 std.assertEqual(std.substr('cookie', 1, 3), 'ook') &&
 std.assertEqual(std.substr('cookie', 1, 0), '') &&
@@ -292,6 +312,11 @@ std.assertEqual(std.join('ab', ['', '12']), 'ab12') &&
 std.assertEqual(std.lines(['a', null, 'b']), 'a\nb\n') &&
 
 std.assertEqual(std.flattenArrays([[1, 2, 3], [4, 5, 6], []]), [1, 2, 3, 4, 5, 6]) &&
+
+std.assertEqual(std.flattenDeepArray([]), []) &&
+std.assertEqual(std.flattenDeepArray([1, 2, 3]), [1, 2, 3]) &&
+std.assertEqual(std.flattenDeepArray([1, [2, 3]]), [1, 2, 3]) &&
+std.assertEqual(std.flattenDeepArray([[1], [2, 3], [[null]]]), [1, 2, 3, null]) &&
 
 std.assertEqual(
   std.manifestIni({
@@ -407,12 +432,12 @@ std.assertEqual(std.sort([]), []) &&
 std.assertEqual(std.sort([1]), [1]) &&
 std.assertEqual(std.sort([1, 2]), [1, 2]) &&
 std.assertEqual(std.sort([2, 1]), [1, 2]) &&
-//std.assertEqual(std.sort(['1', '2']), ['1', '2']) &&
-//std.assertEqual(std.sort(['2', '1']), ['1', '2']) &&
-//std.assertEqual(
-//  std.sort(['The', 'rain', 'in', 'spain', 'falls', 'mainly', 'on', 'the', 'plain.']),
-//  ['The', 'falls', 'in', 'mainly', 'on', 'plain.', 'rain', 'spain', 'the']
-//) &&
+std.assertEqual(std.sort(['1', '2']), ['1', '2']) &&
+std.assertEqual(std.sort(['2', '1']), ['1', '2']) &&
+std.assertEqual(
+  std.sort(['The', 'rain', 'in', 'spain', 'falls', 'mainly', 'on', 'the', 'plain.']),
+  ['The', 'falls', 'in', 'mainly', 'on', 'plain.', 'rain', 'spain', 'the']
+) &&
 
 std.assertEqual(std.uniq([]), []) &&
 std.assertEqual(std.uniq([1]), [1]) &&
@@ -430,32 +455,32 @@ std.assertEqual(
   animal_set
 ) &&
 
-//std.assertEqual(
-//  std.set(['dog', 'ant', 'bat', 'cat', 'dog', 'elephant', 'fish', 'giraffe', 'fish']),
-//  animal_set
-//) &&
+std.assertEqual(
+  std.set(['dog', 'ant', 'bat', 'cat', 'dog', 'elephant', 'fish', 'giraffe', 'fish']),
+  animal_set
+) &&
 
 std.assertEqual(std.setUnion(animal_set, animal_set), animal_set) &&
 std.assertEqual(std.setUnion(animal_set, []), animal_set) &&
 std.assertEqual(std.setUnion([], animal_set), animal_set) &&
 std.assertEqual(std.setUnion([], []), []) &&
-//std.assertEqual(std.setUnion(['a', 'b'], ['b', 'c']), ['a', 'b', 'c']) &&
+std.assertEqual(std.setUnion(['a', 'b'], ['b', 'c']), ['a', 'b', 'c']) &&
 
 std.assertEqual(std.setInter(animal_set, animal_set), animal_set) &&
 std.assertEqual(std.setInter(animal_set, []), []) &&
 std.assertEqual(std.setInter([], animal_set), []) &&
 std.assertEqual(std.setInter([], []), []) &&
-//std.assertEqual(std.setInter(['a', 'b'], ['b', 'c']), ['b']) &&
+std.assertEqual(std.setInter(['a', 'b'], ['b', 'c']), ['b']) &&
 
 std.assertEqual(std.setDiff(animal_set, animal_set), []) &&
 std.assertEqual(std.setDiff(animal_set, []), animal_set) &&
 std.assertEqual(std.setDiff([], animal_set), []) &&
 std.assertEqual(std.setDiff([], []), []) &&
-//std.assertEqual(std.setDiff(['a', 'b'], ['b', 'c']), ['a']) &&
+std.assertEqual(std.setDiff(['a', 'b'], ['b', 'c']), ['a']) &&
 
-//std.assertEqual(std.setMember('a', ['a', 'b', 'c']), true) &&
-//std.assertEqual(std.setMember('a', []), false) &&
-//std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
+std.assertEqual(std.setMember('a', ['a', 'b', 'c']), true) &&
+std.assertEqual(std.setMember('a', []), false) &&
+std.assertEqual(std.setMember('a', ['b', 'c']), false) &&
 
 (
   if std.thisFile == '<stdin>' then
@@ -465,15 +490,15 @@ std.assertEqual(std.setDiff([], []), []) &&
     std.assertEqual(std.thisFile, 'stdlib.jsonnet')
 ) &&
 
-std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
-std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
+//std.assertEqual(import 'this_file/a.libsonnet', 'this_file/a.libsonnet') &&
+//std.assertEqual(import 'this_file/b.libsonnet', 'this_file/a.libsonnet') &&
 
 
 std.assertEqual(std.extVar('var1'), 'test') &&
 
+std.assertEqual(std.toString(std.extVar('var2')), '{"x": 1, "y": 2}') &&
 std.assertEqual(std.extVar('var2'), { x: 1, y: 2 }) &&
-//std.assertEqual(std.toString(std.extVar('var2')), '{"x": 1, "y": 2}') &&
-//std.assertEqual(std.extVar('var2') { x+: 2 }.x, 3) &&
+std.assertEqual(std.extVar('var2') { x+: 2 }.x, 3) &&
 
 std.assertEqual(std.split('foo/bar', '/'), ['foo', 'bar']) &&
 std.assertEqual(std.split('/foo/', '/'), ['', 'foo', '']) &&
@@ -523,60 +548,60 @@ local some_toml = {
   '"': 4,
 };
 
-//std.assertEqual(
-//  std.manifestTomlEx(some_toml, '  ') + '\n',
-//  |||
-//    "\"" = 4
-//    array = [
-//      "s",
-//      1,
-//      [ 2, 3 ],
-//      { a = [ "0", "z" ], r = 6 }
-//    ]
-//    bool = true
-//    emptyArray = []
-//    key = "value"
-//    notBool = false
-//    number = 7
-//
-//    [[arraySection]]
-//      q = 1
-//
-//    [[arraySection]]
-//      w = 2
-//
-//    [[emptyArraySection]]
-//
-//    [emptySection]
-//
-//    ["escaped\"Section"]
-//      z = "q"
-//
-//    [section]
-//      a = 1
-//
-//      [[section.array]]
-//        c = 3
-//
-//      [[section.array]]
-//        d = 4
-//
-//      [section."e$caped"]
-//        q = "t"
-//
-//      [section.nested]
-//        b = 2
-//
-//      [[section.nestedArray]]
-//        k = "v"
-//
-//        [section.nestedArray.nested]
-//          e = 5
-//
-//    [simple]
-//      t = 5
-//  |||
-//) &&
+std.assertEqual(
+  std.manifestTomlEx(some_toml, '  ') + '\n',
+  |||
+    "\"" = 4
+    array = [
+      "s",
+      1,
+      [ 2, 3 ],
+      { a = [ "0", "z" ], r = 6 }
+    ]
+    bool = true
+    emptyArray = []
+    key = "value"
+    notBool = false
+    number = 7
+
+    [[arraySection]]
+      q = 1
+
+    [[arraySection]]
+      w = 2
+
+    [[emptyArraySection]]
+
+    [emptySection]
+
+    ["escaped\"Section"]
+      z = "q"
+
+    [section]
+      a = 1
+
+      [[section.array]]
+        c = 3
+
+      [[section.array]]
+        d = 4
+
+      [section."e$caped"]
+        q = "t"
+
+      [section.nested]
+        b = 2
+
+      [[section.nestedArray]]
+        k = "v"
+
+        [section.nestedArray.nested]
+          e = 5
+
+    [simple]
+      t = 5
+  |||
+) &&
 
 local some_json = {
   x: [1, 2, 3, true, false, null, 'string\nstring\n'],
@@ -714,6 +739,16 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], quote_keys=false) + '\n',
+  |||
+    - x:
+      - 1
+      - 2
+      - 3
+  |||
+) &&
+
+std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }]) + '\n',
   |||
     - "x":
@@ -775,6 +810,21 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(
+  std.manifestYamlDoc({ x: [[[1, { f: 3, g: [1, 2] }, 1]]] }, quote_keys=false) + '\n',
+  |||
+    x:
+    -
+      -
+        - 1
+        - f: 3
+          g:
+          - 1
+          - 2
+        - 1
+  |||
+) &&
+
+std.assertEqual(
   std.manifestYamlDoc('hello\nworld\n') + '\n',
   |||
     |
@@ -796,6 +846,15 @@ std.assertEqual(
   std.manifestYamlDoc({ f: 'hello\nworld\n' }) + '\n',
   |||
     "f": |
+      hello
+      world
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlDoc({ f: 'hello\nworld\n' }, quote_keys=false) + '\n',
+  |||
+    f: |
       hello
       world
   |||
@@ -832,9 +891,49 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(
+  std.manifestYamlDoc(some_json, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+  |||
+) &&
+
+std.assertEqual(
   std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true) + '\n',
   |||
     - "x":
+        - 1
+        - 2
+        - 3
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlDoc([{ x: [1, 2, 3] }], indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    - x:
         - 1
         - 2
         - 3
@@ -950,6 +1049,173 @@ std.assertEqual(
 ) &&
 
 std.assertEqual(
+  std.manifestYamlDoc(some_json, indent_array_in_object=true, quote_keys=false) + '\n',
+  |||
+    "\"": null
+    arr:
+      -
+        - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+      - f: 3
+    x:
+      - 1
+      - 2
+      - 3
+      - true
+      - false
+      - null
+      - |
+        string
+        string
+    "y":
+      a: 1
+      b: 2
+      c:
+        - 1
+        - 2
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlDoc(bare_yaml_test, quote_keys=false) + '\n',
+  |||
+    "": "empty key"
+    "+.inf": "positive infinity"
+    "+685_230": "decimal"
+    "-": "invalid bare key"
+    "---": "triple dash key"
+    "-.inf": "negative infinity"
+    "-0.1_0_0": "negative float"
+    -0B1010_0111_0100_1010_1110: "BARE_KEY"
+    "-0b1010_0111_0100_1010_1110": "binary"
+    "-0x_0A_74_AE": "negative hexadecimal"
+    "-190:20:30": "negative sexagesimal"
+    "-190:20:30.15": "negative sexagesimal"
+    "-1_0": "negative integer"
+    "-6.8523015e+5": "negative canonical"
+    "-685.230_15E-03": "negative w/ negative exponential"
+    "-685.230_15e+03": "negative exponential"
+    "-685.230_15e-03": "negative w/ negative exponential"
+    "-685_230.15": "negative fixed"
+    ".NaN": "not a number"
+    ".inf": "positive infinity"
+    "02472256": "octal"
+    0X_0a_74_ae: "BARE_KEY"
+    "0b1010_0111_0100_1010_1110": "binary"
+    "0x_0A_74_AE": "hexadecimal"
+    1-234-567-8901: "BARE_KEY"
+    "190:20:30": "sexagesimal"
+    "190:20:30.15": "sexagesimal"
+    192.168.0.1: "BARE_KEY"
+    "2001-12-14 21:59:43.10 -5": "space separated"
+    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
+    "2001-12-15 2:59:43.10": "no time zone (Z)"
+    "2001-12-15T02:59:43.1Z": "canonical"
+    "2002-12-14": "date"
+    "6.8523015e+5": "canonical"
+    "6.8523015e-5": "canonical"
+    "685.230_15e+03": "exponential"
+    "685230": "canonical"
+    "685_230.15": "fixed"
+    "N": "boolean false"
+    "NO": "boolean false"
+    "NULL": "null word capital"
+    "Null": "null word"
+    "OFF": "boolean false"
+    "On": "boolean true"
+    "True": "boolean true"
+    "Yes": "boolean true"
+    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
+    __-0X_0a_74_ae: "BARE_KEY"
+    b: "BARE_KEY"
+    jsonnet.org/k8s-label-like: "BARE_KEY"
+    just-letters-dashes: "BARE_KEY"
+    just_letters_underscores: "BARE_KEY"
+    "n": "boolean false"
+    "null": "null word"
+    "off": "boolean false"
+    "on": "boolean true"
+    "true": "boolean true"
+    x: "BARE_KEY"
+    "y": "boolean true"
+    "yes": "boolean true"
+    "~": "null key"
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlStream([bare_yaml_quoted, bare_yaml_unquoted], quote_keys=false),
+  |||
+    ---
+    "": "empty key"
+    "+.inf": "positive infinity"
+    "+685_230": "decimal"
+    "-": "invalid bare key"
+    "---": "triple dash key"
+    "-.inf": "negative infinity"
+    "-0.1_0_0": "negative float"
+    "-0b1010_0111_0100_1010_1110": "binary"
+    "-0x_0A_74_AE": "negative hexadecimal"
+    "-190:20:30": "negative sexagesimal"
+    "-190:20:30.15": "negative sexagesimal"
+    "-1_0": "negative integer"
+    "-6.8523015e+5": "negative canonical"
+    "-685.230_15E-03": "negative w/ negative exponential"
+    "-685.230_15e+03": "negative exponential"
+    "-685.230_15e-03": "negative w/ negative exponential"
+    "-685_230.15": "negative fixed"
+    ".NaN": "not a number"
+    ".inf": "positive infinity"
+    "02472256": "octal"
+    "0b1010_0111_0100_1010_1110": "binary"
+    "0x_0A_74_AE": "hexadecimal"
+    "190:20:30": "sexagesimal"
+    "190:20:30.15": "sexagesimal"
+    "2001-12-14 21:59:43.10 -5": "space separated"
+    "2001-12-14t21:59:43.10-05:00": "valid iso8601"
+    "2001-12-15 2:59:43.10": "no time zone (Z)"
+    "2001-12-15T02:59:43.1Z": "canonical"
+    "2002-12-14": "date"
+    "6.8523015e+5": "canonical"
+    "6.8523015e-5": "canonical"
+    "685.230_15e+03": "exponential"
+    "685230": "canonical"
+    "685_230.15": "fixed"
+    "N": "boolean false"
+    "NO": "boolean false"
+    "NULL": "null word capital"
+    "Null": "null word"
+    "OFF": "boolean false"
+    "On": "boolean true"
+    "True": "boolean true"
+    "Yes": "boolean true"
+    "n": "boolean false"
+    "null": "null word"
+    "off": "boolean false"
+    "on": "boolean true"
+    "true": "boolean true"
+    "y": "boolean true"
+    "yes": "boolean true"
+    "~": "null key"
+    ---
+    -0B1010_0111_0100_1010_1110: "BARE_KEY"
+    0X_0a_74_ae: "BARE_KEY"
+    1-234-567-8901: "BARE_KEY"
+    192.168.0.1: "BARE_KEY"
+    __-0B1010_0111_0100_1010_1110: "BARE_KEY"
+    __-0X_0a_74_ae: "BARE_KEY"
+    b: "BARE_KEY"
+    jsonnet.org/k8s-label-like: "BARE_KEY"
+    just-letters-dashes: "BARE_KEY"
+    just_letters_underscores: "BARE_KEY"
+    x: "BARE_KEY"
+    ...
+  |||
+) &&
+
+std.assertEqual(
   std.manifestYamlStream([some_json, some_json, {}, [], 3, '"']),
   |||
     ---
@@ -1000,6 +1266,71 @@ std.assertEqual(
       "a": 1
       "b": 2
       "c":
+      - 1
+      - 2
+    ---
+    {}
+    ---
+    []
+    ---
+    3
+    ---
+    "\""
+    ...
+  |||
+) &&
+
+std.assertEqual(
+  std.manifestYamlStream([some_json, some_json, {}, [], 3, '"'], quote_keys=false),
+  |||
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
+      - 1
+      - 2
+    ---
+    "\"": null
+    arr:
+    -
+      - []
+    emptyArray: []
+    emptyObject: {}
+    objectInArray:
+    - f: 3
+    x:
+    - 1
+    - 2
+    - 3
+    - true
+    - false
+    - null
+    - |
+      string
+      string
+    "y":
+      a: 1
+      b: 2
+      c:
       - 1
       - 2
     ---
@@ -1106,10 +1437,10 @@ std.assertEqual(std.parseHex('A'), 10) &&
 std.assertEqual(std.parseHex('4a'), 74) &&
 
 // verified by running md5 -s value
-//std.assertEqual(std.md5(''), 'd41d8cd98f00b204e9800998ecf8427e') &&
-//std.assertEqual(std.md5('grape'), 'b781cbb29054db12f88f08c6e161c199') &&
-//std.assertEqual(std.md5("{}[]01234567890\"'+=-_/<>?,.!@#$%^&*|\\:;`~"), 'a680db28332f0c9647376e5b2aeb4b3d') &&
-//std.assertEqual(std.md5('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum sit amet pede facilisis laoreet. Donec lacus nunc, viverra nec, blandit vel, egestas et, augue. Vestibulum tincidunt malesuada tellus. Ut ultrices ultrices enim. Curabitur sit amet mauris. Morbi in dui quis est pulvinar ullamcorper. Nulla facilisi. Integer lacinia sollicitudin massa. Cras metus. Sed aliquet risus a tortor. Integer id quam. Morbi mi. Quisque nisl felis, venenatis tristique, dignissim in, ultrices sit amet, augue. Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lectus, commodo ac, facilisis ac, ultricies eu, pede. Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci. Ut eu diam at pede suscipit sodales. Aenean lectus elit, fermentum non, convallis id, sagittis at, neque. Nullam mauris orci, aliquet et, iaculis et, viverra vitae, ligula. Nulla ut felis in purus aliquam imperdiet. Maecenas aliquet mollis lectus. Vivamus consectetuer risus et tortor. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum sit amet pede facilisis laoreet. Donec lacus nunc, viverra nec, blandit vel, egestas et, augue. Vestibulum tincidunt malesuada tellus. Ut ultrices ultrices enim. Curabitur sit amet mauris. Morbi in dui quis est pulvinar ullamcorper. Nulla facilisi. Integer lacinia sollicitudin massa. Cras metus. Sed aliquet risus a tortor. Integer id quam. Morbi mi. Quisque nisl felis, venenatis tristique, dignissim in, ultrices sit amet, augue. Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lectus, commodo ac, facilisis ac, ultricies eu, pede. Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci. Ut eu diam at pede suscipit sodales. Aenean lectus elit, fermentum non, convallis id, sagittis at, neque. Nullam mauris orci, aliquet et, iaculis et, viverra vitae, ligula. Nulla ut felis in purus aliquam imperdiet. Maecenas aliquet mollis lectus. Vivamus consectetuer risus et tortor. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum si.'), '3496bb633e830e7679ce53700d42de1e') &&
+std.assertEqual(std.md5(''), 'd41d8cd98f00b204e9800998ecf8427e') &&
+std.assertEqual(std.md5('grape'), 'b781cbb29054db12f88f08c6e161c199') &&
+std.assertEqual(std.md5("{}[]01234567890\"'+=-_/<>?,.!@#$%^&*|\\:;`~"), 'a680db28332f0c9647376e5b2aeb4b3d') &&
+std.assertEqual(std.md5('Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum sit amet pede facilisis laoreet. Donec lacus nunc, viverra nec, blandit vel, egestas et, augue. Vestibulum tincidunt malesuada tellus. Ut ultrices ultrices enim. Curabitur sit amet mauris. Morbi in dui quis est pulvinar ullamcorper. Nulla facilisi. Integer lacinia sollicitudin massa. Cras metus. Sed aliquet risus a tortor. Integer id quam. Morbi mi. Quisque nisl felis, venenatis tristique, dignissim in, ultrices sit amet, augue. Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lectus, commodo ac, facilisis ac, ultricies eu, pede. Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci. Ut eu diam at pede suscipit sodales. Aenean lectus elit, fermentum non, convallis id, sagittis at, neque. Nullam mauris orci, aliquet et, iaculis et, viverra vitae, ligula. Nulla ut felis in purus aliquam imperdiet. Maecenas aliquet mollis lectus. Vivamus consectetuer risus et tortor. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum sit amet pede facilisis laoreet. Donec lacus nunc, viverra nec, blandit vel, egestas et, augue. Vestibulum tincidunt malesuada tellus. Ut ultrices ultrices enim. Curabitur sit amet mauris. Morbi in dui quis est pulvinar ullamcorper. Nulla facilisi. Integer lacinia sollicitudin massa. Cras metus. Sed aliquet risus a tortor. Integer id quam. Morbi mi. Quisque nisl felis, venenatis tristique, dignissim in, ultrices sit amet, augue. Proin sodales libero eget ante. Nulla quam. Aenean laoreet. Vestibulum nisi lectus, commodo ac, facilisis ac, ultricies eu, pede. Ut orci risus, accumsan porttitor, cursus quis, aliquet eget, justo. Sed pretium blandit orci. Ut eu diam at pede suscipit sodales. Aenean lectus elit, fermentum non, convallis id, sagittis at, neque. Nullam mauris orci, aliquet et, iaculis et, viverra vitae, ligula. Nulla ut felis in purus aliquam imperdiet. Maecenas aliquet mollis lectus. Vivamus consectetuer risus et tortor. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam. Sed nisi. Nulla quis sem at nibh elementum imperdiet. Duis sagittis ipsum. Praesent mauris. Fusce nec tellus sed augue semper porta. Mauris massa. Vestibulum lacinia arcu eget nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Curabitur sodales ligula in libero. Sed dignissim lacinia nunc. Curabitur tortor. Pellentesque nibh. Aenean quam. In scelerisque sem at dolor. Maecenas mattis. Sed convallis tristique sem. Proin ut ligula vel nunc egestas porttitor. Morbi lectus risus, iaculis vel, suscipit quis, luctus non, massa. Fusce ac turpis quis ligula lacinia aliquet. Mauris ipsum. Nulla metus metus, ullamcorper vel, tincidunt sed, euismod in, nibh. Quisque volutpat condimentum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nam nec ante. Sed lacinia, urna non tincidunt mattis, tortor neque adipiscing diam, a cursus ipsum ante quis turpis. Nulla facilisi. Ut fringilla. Suspendisse potenti. Nunc feugiat mi a tellus consequat imperdiet. Vestibulum sapien. Proin quam. Etiam ultrices. Suspendisse in justo eu magna luctus suscipit. Sed lectus. Integer euismod lacus luctus magna. Quisque cursus, metus vitae pharetra auctor, sem massa mattis sem, at interdum magna augue eget diam. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Morbi lacinia molestie dui. Praesent blandit dolor. Sed non quam. In vel mi sit amet augue congue elementum. Morbi in ipsum si.'), '3496bb633e830e7679ce53700d42de1e') &&
 std.assertEqual(std.parseInt('-01234567890'), -1234567890) &&
 
 std.assertEqual(std.prune({}), {}) &&
@@ -1128,6 +1459,61 @@ std.assertEqual(std.parseJson('null'), null) &&
 std.assertEqual(std.parseJson('12'), 12) &&
 std.assertEqual(std.parseJson('12.123'), 12.123) &&
 std.assertEqual(std.parseJson('{"a": {"b": ["c", 42]}}'), { a: { b: ['c', 42] } }) &&
+
+std.assertEqual(std.parseYaml('{}'), {}) &&
+std.assertEqual(std.parseYaml('[]'), []) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      foo:
+        bar:
+        - true
+        - 42
+        - 1.0
+    |||
+  ), { foo: { bar: [true, 42, 1] } }
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      ---
+      foo:
+        bar:
+        - true
+        - 42
+        - 1.0
+      ---
+      wibble:
+        wobble:
+        - true
+        - 42
+        - 1.0
+    |||
+  ), [{ foo: { bar: [true, 42, 1] } }, { wibble: { wobble: [true, 42, 1] } }]
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      - 1
+      - 2
+      - 3
+    |||
+  ), [1, 2, 3]
+) &&
+std.assertEqual(
+  std.parseYaml(
+    |||
+      f1: |
+        a
+        b
+      f2: "a\nb\n"
+    |||
+  ), { f1: 'a\nb\n', f2: 'a\nb\n' }
+) &&
+// Issue https://github.com/google/jsonnet/issues/1014
+std.assertEqual(std.parseYaml('version: 1.2.3'), { version: '1.2.3' }) &&
+// Issue https://github.com/google/jsonnet/issues/1050
+std.assertEqual(std.type(std.parseYaml('id: "12345"').id), 'string') &&
 
 std.assertEqual(std.asciiUpper('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()ASDFGHFGHJKL09876 ') &&
 std.assertEqual(std.asciiLower('!@#$%&*()asdfghFGHJKL09876 '), '!@#$%&*()asdfghfghjkl09876 ') &&
@@ -1177,6 +1563,18 @@ std.assertEqual(std.all([]), true) &&
 
 std.assertEqual(std.sum([1, 2, 3]), 6) &&
 
+std.assertEqual(std.avg([1, 2, 3]), 2) &&
+std.assertEqual(std.avg([0, 0, 0]), 0) &&
+std.assertEqual(std.avg([1, 1, 2.5]), 1.5) &&
+
+std.assertEqual(std.minArray([1, 2, 3]), 1) &&
+std.assertEqual(std.minArray(['1', '2', '3']), '1') &&
+
+std.assertEqual(std.maxArray([1, 2, 3]), 3) &&
+std.assertEqual(std.maxArray(['1', '2', '3']), '3') &&
+std.assertEqual(std.maxArray(['a', 'x', 'z']), 'z') &&
+
+
 std.assertEqual(std.xor(true, false), true) &&
 std.assertEqual(std.xor(true, true), false) &&
 
@@ -1188,5 +1586,33 @@ std.assertEqual(std.round(1.5), 2) &&
 
 std.assertEqual(std.isEmpty(''), true) &&
 std.assertEqual(std.isEmpty('non-empty string'), false) &&
+
+std.assertEqual(std.contains([1, 2, 3], 2), true) &&
+std.assertEqual(std.contains([1, 2, 3], 'foo'), false) &&
+
+std.assertEqual(std.equalsIgnoreCase('foo', 'FOO'), true) &&
+std.assertEqual(std.equalsIgnoreCase('foo', 'bar'), false) &&
+
+std.assertEqual(std.isEven(10), true) &&
+std.assertEqual(std.isEven(5), false) &&
+std.assertEqual(std.isOdd(5), true) &&
+std.assertEqual(std.isOdd(10), false) &&
+std.assertEqual(std.isInteger(1), true) &&
+std.assertEqual(std.isInteger(1.1), false) &&
+std.assertEqual(std.isDecimal(1.1), true) &&
+std.assertEqual(std.isDecimal(1), false) &&
+
+std.assertEqual(std.remove([1, 2, 3], 2), [1, 3]) &&
+std.assertEqual(std.removeAt([1, 2, 3], 1), [1, 3]) &&
+
+std.assertEqual(std.objectRemoveKey({ foo: 1, bar: 2, baz: 3 }, 'foo'), { bar: 2, baz: 3 }) &&
+
+std.assertEqual(std.trim('already trimmed string'), 'already trimmed string') &&
+std.assertEqual(std.trim('    string with spaces on both ends     '), 'string with spaces on both ends') &&
+std.assertEqual(std.trim('string with newline character at end\n'), 'string with newline character at end') &&
+std.assertEqual(std.trim('string with tabs at end\t\t'), 'string with tabs at end') &&
+// The last character here was previously expressed as \u00A0, but this is rewritten by jsonnetfmt.
+// To avoid ambiguity but allow the code to pass unchanged through jsonnetfmt, this now uses a std.char() call.
+std.assertEqual(std.trim('string with other special whitespaces at end\f\r\u0085' + std.char(160)), 'string with other special whitespaces at end') &&
 
 true

@@ -1,3 +1,2 @@
 Runtime error: Assertion failed. 1 != 2
-  error.sanity.jsonnet:14:1-16 function <anonymous>
-  error.sanity.jsonnet:14:1-16 
+  

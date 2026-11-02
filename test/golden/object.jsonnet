@@ -31,7 +31,7 @@ std.assertEqual({ x: 1, y: 2 } != { x: 1, y: 2 }, false) &&
 std.assertEqual({ x: 1, y: 2 } != { x: 1, y: 2, z: 3 }, true) &&
 
 std.assertEqual({ f(x, y, z): x, y: self.f(1, 2, 3) }.y, 1) &&
-//std.assertEqual({ ["f"](x, y, z):: x, "y"(x): self.f(x, 2, 3), z: self.y(4) }.z, 4) &&
+std.assertEqual({ ["f"](x, y, z):: x, "y"(x): self.f(x, 2, 3), z: self.y(4) }.z, 4) &&
 
 // Object Local
 
@@ -46,8 +46,8 @@ std.assertEqual(local t = { a: 1, b: 2, c: null, d: 4 }; { [x]: t[x] for x in [y
 
 // Comprehension object
 std.assertEqual(local x = 10; { ["" + x]: x for x in [x, x + 1, x + 2] }, { "10": 10, "11": 11, "12": 12 }) &&
-//std.assertEqual(local x = "foo"; { local x = "bar", [x]: 1 }, { foo: 1 }) &&
-//std.assertEqual({ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }, { "1": 1, "2": 3, "3": 4 }) &&
+std.assertEqual(local x = "foo"; { local x = "bar", [x]: 1 }, { foo: 1 }) &&
+std.assertEqual({ [x + ""]: if x == 1 then 1 else x + $["1"] for x in [1, 2, 3] }, { "1": 1, "2": 3, "3": 4 }) &&
 
 std.assertEqual(local x = "baz"; { local x = "bar", [x]: x for x in ["foo"] }, { foo: "bar" }) &&
 
@@ -80,26 +80,31 @@ local obj = {
 
 std.assertEqual(obj, { ["f" + x + y + z]: { x: x, y: y, z: z } for x in [1, 2, 3] for y in [1, 4, 6] if x + 2 < y for z in [true, false] }) &&
 
-//std.assertEqual({ f: { foo: 7, bar: 1 } { [self.name]+: 3, name:: "foo" }, name:: "bar" },
-//                { f: { foo: 7, bar: 4 } }) &&
+// Tests for #1111 - object comprehension fields should use "inherit" visibility.
+std.assertEqual(std.objectFields({ x: 1 } + { [k]: 2 for k in ['x'] }), ['x']) &&
+std.assertEqual(std.objectFields({ x:: 1 } + { [k]: 2 for k in ['x'] }), []) &&
+std.assertEqual(std.objectFields({ x::: 1 } + { [k]: 2 for k in ['x'] }), ['x']) &&
 
-//std.assertEqual({ name:: "supername" } { name:: "selfname", f: { wrongname: 7, supername: 1, name:: "wrongname" } { [super.name]+: 3 } },
-//                { f: { wrongname: 7, supername: 4 } }) &&
+std.assertEqual({ f: { foo: 7, bar: 1 } { [self.name]+: 3, name:: "foo" }, name:: "bar" },
+                { f: { foo: 7, bar: 4 } }) &&
+
+std.assertEqual({ name:: "supername" } { name:: "selfname", f: { wrongname: 7, supername: 1, name:: "wrongname" } { [super.name]+: 3 } },
+                { f: { wrongname: 7, supername: 4 } }) &&
 
 std.assertEqual({} + { f+: 3 }, { f: 3 }) &&
 std.assertEqual({} + { f+: { g+: "foo" } }, { f: { g: "foo" } }) &&
 std.assertEqual({} + { f+: [3] }, { f: [3] }) &&
 
-//std.assertEqual({ f+: 3 }, { f: 3 }) &&
-//std.assertEqual({ f+: { g+: "foo" } }, { f: { g: "foo" } }) &&
-//std.assertEqual({ f+: [3] }, { f: [3] }) &&
+std.assertEqual({ f+: 3 }, { f: 3 }) &&
+std.assertEqual({ f+: { g+: "foo" } }, { f: { g: "foo" } }) &&
+std.assertEqual({ f+: [3] }, { f: [3] }) &&
 
 // Ensure that e in super is handled correctly during the +: desugaring, because it moves
 // into a different object scope:
-//std.assertEqual(
-//    { opt:: true, f: { y: 5 } } + { f+: { [if "opt" in super then "x" else "y"]+: 3 } },
-//    { f: { x: 3, y: 5 } }
-//) &&
+std.assertEqual(
+    { opt:: true, f: { y: 5 } } + { f+: { [if "opt" in super then "x" else "y"]+: 3 } },
+    { f: { x: 3, y: 5 } }
+) &&
 
 std.assertEqual({ x: 1 } + { a: "x" in super, b: "y" in super }, { x: 1, a: true, b: false }) &&
 std.assertEqual({ x:: 1 } + { a: "x" in super, b: "y" in super }, { a: true, b: false }) &&

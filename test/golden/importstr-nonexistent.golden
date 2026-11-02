@@ -1,2 +1,2 @@
-Runtime error: this file does not exist (File not found)
+Runtime error: import error: Could not resolve import path 'this file does not exist'
   importstr-nonexistent.jsonnet:1:1-37 

@@ -4,7 +4,7 @@ import Data.ByteString.Lazy qualified as LBS
 import Data.Text.Lazy hiding (show)
 import Data.Text.Lazy.Encoding (encodeUtf8)
 import Language.Jsonnet
-import Language.Jsonnet.Pretty (ppJson, prettyError)
+import Language.Jsonnet.Pretty (ppJsonIndent, prettyError)
 import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
 import Prettyprinter (Doc)
@@ -17,7 +17,7 @@ render printer = encodeUtf8 . pack . show . printer
 eval :: Expr -> IO LBS.ByteString
 eval expr = do
   outp <- runJsonnetM defaultConfig (evaluate $ desugar expr)
-  pure (either (render prettyError) (render (ppJson 4)) outp)
+  pure (either (render prettyError) (render (ppJsonIndent 4)) outp)
 
 main :: IO ()
 main =

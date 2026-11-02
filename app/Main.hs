@@ -20,7 +20,7 @@ import Data.Version (showVersion)
 import Data.Void (Void)
 import Language.Jsonnet
 import Language.Jsonnet.Error
-import Language.Jsonnet.Pretty (ppJson, prettyError)
+import Language.Jsonnet.Pretty (ppJsonIndent, prettyError)
 import Options.Applicative hiding (str)
 import Paths_jsonnet (version)
 import System.Directory qualified as Dir
@@ -35,9 +35,7 @@ main = do
     runProgram =<< execParser options
     return ()
 
-runProgram ::
-    Options ->
-    IO ()
+runProgram :: Options -> IO ()
 runProgram opts@Options{..} = do
     src <- readSource input
     conf <- mkConfig opts
@@ -77,7 +75,7 @@ printResult outp outputMode format val =
   where
     encode :: JSON.Value -> L.ByteString
     encode = case outputMode of
-        Pretty -> encodeToLazyByteString . T.pack . show . ppJson 4
+        Pretty -> encodeToLazyByteString . T.pack . show . ppJsonIndent 4
         Compact -> JSON.encode
 
     encodeToLazyByteString :: Text -> L.ByteString

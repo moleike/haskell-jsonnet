@@ -42,14 +42,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 type Parser = Parsec Void Text
 
-parse ::
-  (MonadError Error m) =>
-  -- | File name (only for source location annotations)
-  FilePath ->
-  -- | Input for parser
-  Text ->
-  -- | AST with unresolved imports
-  m Expr
+parse :: (MonadError Error m) => FilePath -> Text -> m Expr
 parse fp inp =
   liftEither $
     left (ParserError . ParseError) $
@@ -317,8 +310,7 @@ objectP = Fix <$> annotateLoc (braces (try objectComp <|> object)) <?> "object"
     keyP = ((,True) <$> brackets exprP) <|> ((,False) <$> (identStringP <|> stringP))
     methodP = do
       let override = False
-          computed = False
-      key <- identStringP
+      (key, computed) <- keyP
       ps <- paramsP
       visibility <- sepP
       value <- function (pure ps) exprP
@@ -394,8 +386,7 @@ opTable =
       binary "%" (mkBinOp Mod)
     ],
     [ binary "+" (mkBinOp Add),
-      binary "-" (mkBinOp Sub),
-      Postfix postfixObjectMerge
+      binary "-" (mkBinOp Sub)
     ],
     [ binary ">>" (mkBinOp ShiftR),
       binary "<<" (mkBinOp ShiftL)
@@ -422,8 +413,9 @@ opTable =
 postfixObjectMerge :: Parser (Expr -> Expr)
 postfixObjectMerge = flip (mkBinOp Add) <$> objectP
 
--- | application, indexing and lookup: e(...) e[...] e.f
--- all have the same precedence (the highest)
+-- | application, indexing, lookup, and implicit object composition:
+-- e(...) e[...] e.f e{...}
+-- All have the exact same precedence (the highest) and chain left-to-right.
 postfixOperators :: Parser (Expr -> Expr)
 postfixOperators =
   foldr1 (flip (.))
@@ -432,6 +424,7 @@ postfixOperators =
           <|> try sliceP
           <|> indexP
           <|> lookupP
+          <|> postfixObjectMerge
       )
 
 indexP :: Parser (Expr -> Expr)

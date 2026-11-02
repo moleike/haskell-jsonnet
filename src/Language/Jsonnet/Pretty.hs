@@ -10,7 +10,6 @@ Portability             : non-portable
 -}
 module Language.Jsonnet.Pretty where
 
-import Control.Applicative (Const (..))
 import Data.Aeson qualified as JSON
 import Data.Aeson.Key qualified as Key
 import Data.Aeson.KeyMap qualified as KeyMap
@@ -18,7 +17,6 @@ import Data.Aeson.Text qualified as JSON (encodeToLazyText)
 import Data.Bifunctor (bimap, first)
 import Data.Bool (bool)
 import Data.Fix
-import Data.Functor.Sum
 import Data.List (sortOn)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
@@ -91,26 +89,38 @@ ppNumber s
   where
     e = base10Exponent s
 
-ppJson :: Int -> JSON.Value -> Doc ann
-ppJson i = \case
+ppJsonIndent :: Int -> JSON.Value -> Doc ann
+ppJsonIndent indentLevel = ppJson False indentLevel
+
+ppJsonCompact :: JSON.Value -> Doc ann
+ppJsonCompact = ppJson True 0
+
+ppJson :: Bool -> Int -> JSON.Value -> Doc ann
+ppJson isCompact i = \case
     JSON.Null -> pnull
     JSON.Number n -> ppNumber n
     JSON.Bool True -> ptrue
     JSON.Bool False -> pfalse
     JSON.String s -> ppString (Key.fromText s)
     JSON.Array a -> ppArray a
-    JSON.Object o -> ppObject' o
+    JSON.Object o -> ppObject o
   where
-    encloseSep' l r s ds = case ds of
-        [] -> l <> r
-        _ -> l <$$> indent i (vcat $ punctuate s ds) <$$> r
-    ppObject' o = encloseSep' lbrace rbrace comma xs
+    encloseSep' l r ds = case ds of
+        [] -> if isCompact then l <> space <> r else l <> r
+        _ ->
+            if isCompact
+                then l <> hcat (punctuate (comma <> space) ds) <> r
+                else l <$$> indent i (vcat $ punctuate comma ds) <$$> r
+
+    ppObject o = encloseSep' lbrace rbrace xs
       where
-        prop (k, v) = ppString k <> colon <+> ppJson i v
+        prop (k, v) = ppString k <> colon <+> ppJson isCompact i v
         xs = map prop (sortOn fst $ KeyMap.toList o)
-    ppArray a = encloseSep' lbracket rbracket comma xs
+
+    ppArray a = encloseSep' lbracket rbracket xs
       where
-        xs = map (ppJson i) (V.toList a)
+        xs = map (ppJson isCompact i) (V.toList a)
+
     ppString = pretty . LT.unpack . JSON.encodeToLazyText
 
 prettySrcSpan :: SrcSpan -> Doc ann
@@ -200,8 +210,10 @@ prettyEvalError = \case
         pretty "too many args, function has"
             <+> pretty n
             <+> pretty "parameter(s)"
-    ImportError f (IOError _ _ _ desc _ _) ->
-        pretty f <+> parens (pretty desc)
+    UnresolvedImport f (IOError _ _ _ desc _ _) ->
+        pretty "import error:"
+            <+> pretty desc
+            <+> squotes (pretty f)
 
 prettyStackFrame :: StackFrame a -> Doc ann
 prettyStackFrame StackFrame{name, span = span'} =

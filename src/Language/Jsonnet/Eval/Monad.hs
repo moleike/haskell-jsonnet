@@ -10,68 +10,33 @@ Portability             : non-portable
 -}
 module Language.Jsonnet.Eval.Monad where
 
-import Control.Lens (locally, makeLenses, view)
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, throwM)
+import Control.Lens (locally, view)
+import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, SomeException, fromException, throwM, try)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Reader (MonadReader, ReaderT (..))
+import Control.Monad.Reader (MonadReader, ReaderT (..), local)
 import Data.IORef
 import Data.Map
 import Data.Map.Lazy qualified as M (union)
-import Language.Jsonnet.Common (Backtrace (..), Import, StackFrame (..))
+import Data.Text qualified as T
+import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
 import Language.Jsonnet.Core (Core)
-import Language.Jsonnet.Error (Error (EvalError), EvalError)
+import Language.Jsonnet.Error (Error (EvalError), EvalError (RuntimeError))
+import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Text.Megaparsec.Pos
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Name
-import System.FilePath (takeFileName)
 
-type Ctx a = Map (Name Core) a
-
--- | Simulate a call-stack to report stack traces
-data CallStack = CallStack
-    { _spans :: [Maybe SrcSpan]
-    -- ^ source location of call-sites
-    , _scopes :: [Name Core]
-    -- ^ names of called functions
-    }
-
-makeLenses ''CallStack
-
-emptyStack :: CallStack
-emptyStack = CallStack [] [s2n "top-level"]
-
-data ImpKey = ImpKey !Import !FilePath deriving (Eq, Ord)
-
-data EvalState a = EvalState
-    { _ctx :: Ctx a
-    -- ^ binding local variables to their values
-    , _callStack :: CallStack
-    -- ^ call-stack simulation
-    , _currentPos :: Maybe SrcSpan
-    -- ^ source span of expression being evaluated
-    , _gen :: IORef Integer
-    -- ^ fresh names
-    , _currentFile :: FilePath
-    -- ^ current file being evaluated
-    , _loadedModules :: IORef (Map ImpKey a)
-    -- ^ memoization of imports
-    , _jpaths :: [FilePath]
-    -- ^ additional search paths for modules
-    }
-
-makeLenses ''EvalState
-
-newtype EvalM a b = EvalM
-    { unEval :: ReaderT (EvalState a) IO b
+newtype EvalM a = EvalM
+    { unEval :: ReaderT EvalState IO a
     }
     deriving newtype
         ( Functor
         , Applicative
         , Monad
         , MonadIO
-        , MonadReader (EvalState a)
+        , MonadReader EvalState
         , MonadThrow
         , MonadCatch
         , MonadMask
@@ -79,62 +44,97 @@ newtype EvalM a b = EvalM
         , MonadFix
         )
 
-instance Fresh (EvalM a) where
-    fresh (Fn s _) = EvalM $ do
-        ref <- view gen
-        n <- liftIO $ readIORef ref
-        liftIO $ modifyIORef' ref (+ 1)
-        return $ (Fn s n)
+instance Fresh EvalM where
+    fresh (Fn s _) = Fn s <$> genUniqueId
     fresh nm@(Bn{}) = return nm
 
-runEvalM :: FilePath -> [FilePath] -> Ctx a -> EvalM a b -> IO b
-runEvalM fp ps ctx' e = do
+genUniqueId :: EvalM Integer
+genUniqueId = do
+    ref <- view gen
+    n <- liftIO $ readIORef ref
+    liftIO $ modifyIORef' ref (+ 1)
+    pure n
+
+runEvalM :: FilePath -> Importer -> Env -> EvalM a -> IO a
+runEvalM fp importer' env' e = do
     gen' <- newIORef 0
     mods <- newIORef empty
     let st =
             EvalState
-                { _ctx = ctx'
+                { _env = env'
+                , _baseEnv = env'
                 , _callStack = emptyStack
                 , _currentPos = Nothing
                 , _gen = gen'
                 , _currentFile = fp
                 , _loadedModules = mods
-                , _jpaths = ps
+                , _importer = importer'
                 }
     runReaderT (unEval e) st
 
-throwE :: EvalError -> EvalM a b
+throwE :: EvalError -> EvalM a
 throwE e = throwM . EvalError e =<< getBacktrace
 
-extendEnv :: Ctx a -> EvalM a b -> EvalM a b
-extendEnv = locally ctx . M.union
+asEvalError :: SomeException -> EvalM a
+asEvalError ex = case fromException ex of
+    Just (e :: Error) -> throwM e
+    Nothing -> throwE (RuntimeError (T.pack (show ex)))
 
-withEnv :: Ctx a -> EvalM a b -> EvalM a b
-withEnv = locally ctx . const
+extendEnv :: Env -> EvalM a -> EvalM a
+extendEnv = locally env . M.union
 
-withCurrentFile :: FilePath -> EvalM a b -> EvalM a b
+withEnv :: Env -> EvalM a -> EvalM a
+withEnv = locally env . const
+
+withCurrentFile :: FilePath -> EvalM a -> EvalM a
 withCurrentFile = locally currentFile . const
 
-withCurrentPos :: SrcSpan -> EvalM a b -> EvalM a b
+withBaseEnv :: EvalM a -> EvalM a
+withBaseEnv = local (\st -> st{_env = _baseEnv st})
+
+withCurrentPos :: SrcSpan -> EvalM a -> EvalM a
 withCurrentPos = locally currentPos . const . Just
 
-pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a b -> EvalM a b
+emptyStack :: CallStack
+emptyStack = CallStack [] [s2n "top-level"]
+
+pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a -> EvalM a
 pushStackFrame (name, span') =
     locally (callStack . scopes) (name :)
         . locally (callStack . spans) (span' :)
 
-getBacktrace :: EvalM a (Backtrace Core)
+-- getBacktrace :: EvalM (Backtrace Core)
+-- getBacktrace = do
+--    sp <- (:) <$> view currentPos <*> view (callStack . spans)
+--    sc <- view (callStack . scopes)
+--    pure $
+--        Backtrace $
+--            case sequence sp of
+--                Just sp' -> zipWith StackFrame sc sp'
+--                Nothing -> []
+
+getBacktrace :: EvalM (Backtrace Core)
 getBacktrace = do
+    mPos <- view currentPos
     sp <- (:) <$> view currentPos <*> view (callStack . spans)
     sc <- view (callStack . scopes)
-    pure $
-        Backtrace $
-            case sequence sp of
-                Just sp' -> zipWith StackFrame sc sp'
-                Nothing -> []
+    pure $ Backtrace $ case sequence sp of
+        Just sp' -> zipWith StackFrame sc sp'
+        Nothing -> case mPos of
+            Just pos -> [StackFrame (s2n "top-level") pos]
+            Nothing -> []
 
-getFileName :: EvalM a FilePath
+getFileName :: EvalM FilePath
 getFileName = view currentFile
 
-getLineNum :: EvalM a (Maybe Int)
+getLineNum :: EvalM (Maybe Int)
 getLineNum = (unPos . sourceLine . spanBegin <$>) <$> view currentPos
+
+fetchImport :: String -> EvalM ImportResult
+fetchImport path = do
+    cf <- view currentFile
+    Importer fn <- view importer
+    res <- liftIO $ try (fn cf path)
+    case res of
+        Left err -> throwE err
+        Right result -> pure result
