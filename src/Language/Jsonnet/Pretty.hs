@@ -214,6 +214,8 @@ prettyEvalError = \case
         pretty "import error:"
             <+> pretty desc
             <+> squotes (pretty f)
+    InfiniteRecursion ->
+        pretty "infinite recursion detected"
 
 prettyStackFrame :: StackFrame a -> Doc ann
 prettyStackFrame StackFrame{name, span = span'} =

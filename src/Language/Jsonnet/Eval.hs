@@ -14,6 +14,7 @@ Portability             : non-portable
 module Language.Jsonnet.Eval where
 
 import Control.Applicative
+import Control.Arrow ((&&&))
 import Control.Lens (view)
 import Control.Monad (foldM, forM, join, (<=<), (>=>))
 import Control.Monad.Catch (handle)
@@ -74,11 +75,31 @@ whnf (CImp it path) = whnfImport it path
 
 force :: (HasValue a) => Value -> Eval a
 force =
-    handle asEvalError . \case
-        VIndir loc -> whnfIndir loc >>= force
-        VThunk c e -> withEnv e (whnf c) >>= proj
-        VThunk' v -> v >>= proj
+    handle asEvalError . go
+  where
+    go = \case
+        VIndir ref -> memoizeIORef ref >>= go
+        VThunk c e -> withEnv e (whnf c) >>= go
+        VThunk' v -> v >>= go
         v -> proj v
+
+memoize :: IO Value -> (Value -> IO ()) -> Eval Value
+memoize readCache writeCache = do
+    val <- liftIO readCache
+    case val of
+        VBlackhole -> throwE InfiniteRecursion
+        VThunk{} -> go val
+        VThunk'{} -> go val
+        v -> pure v
+  where
+    go thunk = do
+        liftIO $ writeCache VBlackhole
+        result <- force thunk
+        liftIO $ writeCache result
+        pure result
+
+memoizeIORef :: IORef Value -> Eval Value
+memoizeIORef = uncurry memoize . (readIORef &&& writeIORef)
 
 mkValue :: Core -> Eval Value
 mkValue c@(CLit _) = whnf c
@@ -307,16 +328,16 @@ whnfLookup (VStr _) _ =
     throwE (InvalidIndex "string index was not integer")
 whnfLookup v _ = throwTypeMismatch "array/object/string" v
 
-whnfIndir :: Ref -> Eval Value
-whnfIndir ref = do
-    c <- liftIO $ readIORef ref
-    case c of
-        Cell v True ->
-            return v -- Already evaluated, just return it
-        Cell v False -> do
-            v' <- force v -- Needs to be reduced
-            liftIO $ writeIORef ref (Cell v' True)
-            return v'
+-- whnfIndir :: Ref -> Eval Value
+-- whnfIndir ref = do
+--    c <- liftIO $ readIORef ref
+--    case c of
+--        Cell v True ->
+--            return v -- Already evaluated, just return it
+--        Cell v False -> do
+--            v' <- force v -- Needs to be reduced
+--            liftIO $ writeIORef ref (Cell v' True)
+--            return v'
 
 whnfLetrec :: Let -> Eval Value
 whnfLetrec bnd = mdo
@@ -373,7 +394,7 @@ whnfField _keyEnv valueEnv (CAssertField assertion) = do
 flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
 
-whnfIfs :: [Core] -> EvalM Bool
+whnfIfs :: [Core] -> Eval Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
 whnfComp :: Comp -> Core -> Eval Value

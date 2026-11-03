@@ -47,6 +47,7 @@ data EvalError
   | RuntimeError Text
   | ManifestError Text
   | UnresolvedImport FilePath IOError
+  | InfiniteRecursion
   deriving (Eq, Show, Typeable)
 
 instance Exception EvalError

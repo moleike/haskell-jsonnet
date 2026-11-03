@@ -33,11 +33,12 @@ data Value
     | VObj !Object -- !Object
     | VArr !(Vector Value)
     | VThunk !Core !Env
-    | VIndir !Ref
+    | VIndir !(IORef Value)
     | VPrim !Prim
     | VClos !Lam !Env
     | VFun !Fun
     | VThunk' !(Eval Value)
+    | VBlackhole
 
 data VField = VField
     { fieldKey :: Value
@@ -52,11 +53,6 @@ type Fun = Value -> Eval Value
 
 type Object = HashMap Text VField
 
-data Cell = Cell {cellVal :: Value, cellIsWHNF :: Bool}
-    deriving (Generic)
-
-type Ref = IORef Cell
-
 instance HasVisibility VField where
     visible VField{..} = fieldVis == Visible
     forced VField{..} = fieldVis == Forced
@@ -70,14 +66,11 @@ instance HasValue Value where
     inj = id
     proj = pure
 
-mkCell :: Value -> Cell
-mkCell v = Cell v False
-
 mkIndirV :: (MonadIO m) => Value -> m Value
 mkIndirV v = VIndir <$> allocate v
 
 mkThunk :: (MonadReader EvalState m) => Core -> m Value
 mkThunk c = VThunk c <$> view env
 
-allocate :: (MonadIO m) => Value -> m (Data.IORef.IORef Cell)
-allocate = liftIO . Data.IORef.newIORef . mkCell
+allocate :: (MonadIO m) => Value -> m (IORef Value)
+allocate = liftIO . newIORef
