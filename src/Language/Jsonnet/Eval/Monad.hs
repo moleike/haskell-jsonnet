@@ -11,7 +11,7 @@ Portability             : non-portable
 module Language.Jsonnet.Eval.Monad where
 
 import Control.Lens (locally, view)
-import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, SomeException, fromException, throwM, try)
+import Control.Monad.Catch
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..), local)
@@ -21,7 +21,7 @@ import Data.Map.Lazy qualified as M (union)
 import Data.Text qualified as T
 import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
 import Language.Jsonnet.Core (Core)
-import Language.Jsonnet.Error (Error (EvalError), EvalError (RuntimeError))
+import Language.Jsonnet.Error (Error (EvalError), EvalError (..))
 import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Text.Megaparsec.Pos
@@ -74,6 +74,12 @@ runEvalM fp importer' env' e = do
 
 throwE :: EvalError -> EvalM a
 throwE e = throwM . EvalError e =<< getBacktrace
+
+liftMaybe :: EvalError -> Maybe a -> EvalM a
+liftMaybe e =
+    \case
+        Nothing -> throwE e
+        Just a -> pure a
 
 asEvalError :: SomeException -> EvalM a
 asEvalError ex = case fromException ex of

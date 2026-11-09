@@ -189,6 +189,12 @@ prettyEvalError = \case
         pretty "variable"
             <+> squotes (pretty $ show v)
             <+> pretty "is not defined"
+    UnboundSelf ->
+        pretty "can't use self outside of an object."
+    UnboundSuper ->
+        pretty "can't use super outside of an object."
+    NoSuperClass ->
+        pretty "attempt to use super when there is no super class."
     ExtVarNotFound v ->
         pretty "external variable"
             <+> squotes (pretty v)

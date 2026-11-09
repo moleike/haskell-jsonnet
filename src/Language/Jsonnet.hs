@@ -113,7 +113,8 @@ stdlib = do
     userFuncs <- asks userFuncs
     fp <- asks fname
     importer <- Importer . resolveImportPath <$> asks jpaths
-    let lib = whnf core >>= flip mergeObjects (Lib.std extVars userFuncs)
+    native <- Lib.std extVars userFuncs
+    let lib = whnf core >>= flip mergeObjects native
     JsonnetM $ liftIO $ runEvalM fp importer M.empty lib
   where
     core = decode $(mkStdlib)

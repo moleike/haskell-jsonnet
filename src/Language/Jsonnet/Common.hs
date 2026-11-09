@@ -97,6 +97,7 @@ data UnyOp
     | Plus
     | Minus
     | Err
+    | Super
     deriving
         ( Eq
         , Show
@@ -229,10 +230,12 @@ data Visibility = Visible | Hidden | Forced
         , Binary
         )
 
-class HasVisibility a where
-    visible :: a -> Bool
-    forced :: a -> Bool
-    hidden :: a -> Bool
+instance Semigroup Visibility where
+    a <> Visible = a
+    _ <> b       = b
+
+instance Monoid Visibility where
+    mempty = Visible
 
 data Import = Code | Str | Bin
     deriving (Show, Eq, Ord, Generic, Typeable, Data, Alpha, Binary)

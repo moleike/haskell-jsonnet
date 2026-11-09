@@ -18,7 +18,7 @@ module Language.Jsonnet.Std.Lib (
 where
 
 import Control.Lens (view)
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Crypto.Hash.MD5 qualified as MD5
 import Data.Aeson qualified as JSON
 import Data.ByteString qualified as B
@@ -39,11 +39,13 @@ import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval.Types
+import Language.Jsonnet.Object
 import Language.Jsonnet.Value
 import System.IO
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
+import Data.IORef
 
 newtype ExtVars = ExtVars (Map Text Value)
     deriving newtype (Semigroup, Monoid)
@@ -52,11 +54,13 @@ newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
     deriving newtype (Semigroup, Monoid)
 
 -- | Jsonnet standard library built-in methods
-std :: ExtVars -> UserFuncs -> Value
-std (ExtVars extVars) (UserFuncs userFuncs) = VObj (H.fromList xs)
+std :: (MonadIO m) => ExtVars -> UserFuncs -> m Value
+std (ExtVars extVars) (UserFuncs userFuncs) = do
+  cache <- liftIO (newIORef H.empty)
+  pure $ VObj (mkBaseObject (H.fromList xs)) cache
   where
     infixr 8 ~>
-    k ~> v = (k, VField (VStr k) (inj v) (inj v) Hidden False)
+    k ~> v = (k, Field (VStr k) (inj v) Hidden False)
     xs =
         [ "type" ~> showTy
         , "primitiveEquals" ~> primitiveEquals
@@ -112,7 +116,7 @@ length :: Value -> Eval Int
 length = \case
     VStr s -> pure $ T.length s
     VArr a -> pure $ P.length a
-    VObj o -> pure $ P.length (objectFieldsEx o True)
+    VObj o _ -> pure $ P.length (objectFieldsEx o True)
     VClos f _ -> do
         (ps, _) <- unbind f
         pure $ P.length (unrec ps)
