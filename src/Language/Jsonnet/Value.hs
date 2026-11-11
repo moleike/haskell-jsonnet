@@ -37,12 +37,11 @@ data Value
     | VNum !Scientific
     | VObj !Object !(IORef (HashMap Text Value))
     | VArr !(Vector Value)
-    | VThunk !Core !Env
+    | VThunk !(Eval Value)
     | VIndir !(IORef Value)
     | VPrim !Prim
     | VClos !Lam !Env
     | VFun !(Value -> Eval Value)
-    | VThunk' !(Eval Value)
     | VBlackhole
 
 class HasValue a where
@@ -56,8 +55,12 @@ instance HasValue Value where
 mkIndirV :: (MonadIO m) => Value -> m Value
 mkIndirV v = VIndir <$> allocate v
 
-mkThunk :: (MonadReader EvalState m) => Core -> m Value
-mkThunk c = VThunk c <$> view env
+mkObject :: (MonadIO m, HasValue a) => HashMap Text a -> m Value
+mkObject =
+    flip fmap (liftIO (newIORef H.empty))
+        . VObj
+        . mkBaseObject
+        . H.mapWithKey mkField
 
 allocate :: (MonadIO m) => Value -> m (IORef Value)
 allocate = liftIO . newIORef

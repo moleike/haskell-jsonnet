@@ -80,8 +80,7 @@ force =
   where
     go = \case
         VIndir ref -> memoizeIORef ref >>= go
-        VThunk c e -> withEnv e (whnf c) >>= go
-        VThunk' v -> v >>= go
+        VThunk v -> v >>= go
         v -> proj v
 
 memoize :: IO Value -> (Value -> IO ()) -> Eval Value
@@ -90,7 +89,6 @@ memoize readCache writeCache = do
     case val of
         VBlackhole -> throwE InfiniteRecursion
         VThunk{} -> go val
-        VThunk'{} -> go val
         v -> pure v
   where
     go thunk = do
@@ -113,6 +111,11 @@ mkValue c@(CLit _) = whnf c
 mkValue c@(CLam _) = whnf c
 mkValue c@(CPrim _) = whnf c
 mkValue c = mkThunk c >>= mkIndirV
+
+mkThunk :: Core -> Eval Value
+mkThunk c = do
+    e <- view env
+    pure $ VThunk (withEnv e (whnf c))
 
 getSelf :: Eval Value
 getSelf = view env >>= liftMaybe UnboundSelf . M.lookup (s2n "self")
@@ -315,7 +318,7 @@ whnfImport it fp = do
             val <- case it of
                 Code -> do
                     core <- compileThrow foundAt (TE.decodeUtf8 content)
-                    pure $ VThunk' (withCurrentFile foundAt $ withBaseEnv $ whnf core)
+                    pure $ VThunk (withCurrentFile foundAt $ withBaseEnv $ whnf core)
                 Bin -> pure $ inj (BS.unpack content)
                 Str -> pure $ inj (TE.decodeUtf8 content)
             ptr <- mkIndirV val
@@ -389,13 +392,13 @@ whnfField (CRegularField (RegularField k v vis)) = do
         >>= traverse
             ( \key -> do
                 env' <- M.insert (s2n "$$key") (VStr key) <$> view env
-                let fieldVal = VThunk' $ extendWithLateBound env' (whnf v)
+                let fieldVal = VThunk $ extendWithLateBound env' (whnf v)
                 pure (key, Field fieldKey fieldVal vis False)
             )
 whnfField (CAssertField assertion) = do
     env' <- view env
     keyName <- nameToText <$> fresh (s2n "$$assert")
-    let val = VThunk' $ extendWithLateBound env' (whnf assertion)
+    let val = VThunk $ extendWithLateBound env' (whnf assertion)
     pure $ Just (keyName, Field (VStr keyName) val Visible True)
   where
     nameToText n = T.pack (name2String n) <> "_" <> T.pack (show (name2Integer n))
@@ -449,7 +452,7 @@ withSuper Nothing action =
     locally env (M.delete (s2n "super")) action
 
 evalField :: Object -> Text -> Value
-evalField obj key = VThunk' $ do
+evalField obj key = VThunk $ do
     (field, superTree) <- liftMaybe (NoSuchKey key) (Object.lookupField key obj)
     withSuper superTree (force $ fieldVal field)
 
@@ -552,7 +555,6 @@ showTy = \case
     VPrim _ -> pure "function"
     VThunk{} -> pure "thunk"
     VIndir{} -> pure "pointer"
-    VThunk' _ -> pure "thunk"
 
 instance HasValue Bool where
     proj (VBool n) = pure n
@@ -606,7 +608,7 @@ instance (HasValue a) => HasValue (Maybe a) where
 instance {-# OVERLAPS #-} HasValue Object where
     proj (VObj o _) = pure o
     proj v = throwTypeMismatch "object" v
-    inj o = VThunk' $ liftIO $ VObj o <$> (newIORef H.empty)
+    inj o = VThunk $ liftIO $ VObj o <$> (newIORef H.empty)
     {-# INLINE inj #-}
 
 instance (HasValue a) => HasValue (Vector a) where
@@ -621,7 +623,7 @@ instance {-# OVERLAPPABLE #-} (HasValue a) => HasValue [a] where
     {-# INLINE inj #-}
 
 instance (HasValue a) => HasValue (HashMap Text a) where
-    inj m = VThunk' $ liftIO $ VObj (mkBaseObject $ H.mapWithKey mkField m) <$> (newIORef H.empty)
+    inj = VThunk . mkObject
     proj selfVal@(VObj obj cache) = do
         let keys = Object.visibleKeys obj
         pairs <- forM keys $ \k -> do
@@ -641,7 +643,7 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a ->
     proj = throwTypeMismatch "impossible"
 
 instance {-# OVERLAPS #-} (HasValue a) => HasValue (Eval a) where
-    inj a = VThunk' $ inj <$> a
+    inj a = VThunk $ inj <$> a
     proj = force
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) where
