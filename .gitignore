@@ -21,3 +21,14 @@ cabal.project.local~
 .HTF/
 .ghc.environment.*
 .pre-commit-config.yaml
+# Haskell Language Server
+.hie/
+.hls/
+.hie-bios/
+.lsp-test/
+# Environment and Tags
+.direnv/
+result
+result-*
+tags
+TAGS
