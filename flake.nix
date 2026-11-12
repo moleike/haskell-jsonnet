@@ -9,9 +9,19 @@
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system: let
+
       pkgs = nixpkgs.legacyPackages.${system};
+
       hspkgs = pkgs.haskellPackages;
-      jsonnet = hspkgs.callCabal2nix "jsonnet" ./. {};
+
+      cabalOnly = pkgs.lib.sourceFilesBySuffices ./. [ ".cabal" ];
+
+      jsonnetPkg = hspkgs.callCabal2nix "jsonnet" cabalOnly {};
+
+      jsonnet = jsonnetPkg.overrideAttrs (oldAttrs: {
+        src = pkgs.lib.cleanSource ./.;
+      });
+
       ghc = hspkgs.ghcWithHoogle (p: jsonnet.buildInputs);
       # wasmPkgs = ghc-wasm-meta.packages.${system};
     in {
@@ -25,7 +35,6 @@
           ghc
           hspkgs.cabal-install
           hspkgs.haskell-language-server
-          hspkgs.hasktags
           # wasmPkgs.wasmtime
         ];
 
