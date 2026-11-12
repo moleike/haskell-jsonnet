@@ -1,0 +1,118 @@
+name: bench
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: bench-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    env:
+      FAIL_IF_SLOWER: "10"
+      # tracks memory allocations
+      GHCRTS: "-T"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: haskell-actions/setup@v2
+        with:
+          ghc-version: "9.10.1"
+          cabal-version: "3.12.1.0"
+
+      - name: Enable benchmarks
+        run: echo "benchmarks: True" >> cabal.project.local
+
+      - name: Freeze dependencies
+        run: |
+          cabal update
+          cabal freeze
+
+      - name: Cache Cabal store
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cabal/store
+            dist-newstyle
+          key: ${{ runner.os }}-ghc-9.10.1-bench-${{ hashFiles('cabal.project.freeze') }}
+          restore-keys: |
+            ${{ runner.os }}-ghc-9.10.1-bench-
+
+      - name: Build benchmarks
+        run: cabal build jsonnet-bench
+
+      - name: Run benchmarks (master)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          cabal run jsonnet-bench -- \
+            --csv bench-baseline.csv \
+            --timeout 30
+
+      - name: Store baseline CSV
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: bench-baseline.csv
+          # Use SHA to ensure we save a new cache on every master commit
+          key: bench-baseline-${{ runner.os }}-ghc-9.10.1-${{ github.sha }}
+
+      - name: Restore baseline CSV
+        if: github.event_name == 'pull_request'
+        id: restore-baseline
+        uses: actions/cache/restore@v4
+        with:
+          path: bench-baseline.csv
+          # Looks for exact match first, then falls back to most recent prefix match
+          key: bench-baseline-${{ runner.os }}-ghc-9.10.1-${{ github.sha }}
+          restore-keys: |
+            bench-baseline-${{ runner.os }}-ghc-9.10.1-
+
+      - name: Run benchmarks & Capture Output (PR)
+        if: >
+          github.event_name == 'pull_request' &&
+          steps.restore-baseline.outputs.cache-matched-key != ''
+        run: |
+          echo "## Benchmark Comparison" > bench-output.md
+          # Note: I also updated this text so it doesn't say "Only showing regressions"
+          echo "Comparing against \`master\`. Failing if any benchmark is >${{ env.FAIL_IF_SLOWER }}% slower." >> bench-output.md
+          echo "\`\`\`text" >> bench-output.md
+          
+          cabal run jsonnet-bench -- \
+            --baseline bench-baseline.csv \
+            --fail-if-slower ${{ env.FAIL_IF_SLOWER }} \
+            --csv bench-pr.csv \
+            --timeout 30 | tee -a bench-output.md || echo "BENCH_FAILED=true" >> $GITHUB_ENV
+            
+          echo "\`\`\`" >> bench-output.md
+
+      - name: Run benchmarks without baseline (PR)
+        if: >
+          github.event_name == 'pull_request' &&
+          steps.restore-baseline.outputs.cache-matched-key == ''
+        run: |
+          echo "## Benchmark Comparison" > bench-output.md
+          echo "No baseline found from master. Run without comparison." >> bench-output.md
+          cabal run jsonnet-bench -- --csv bench-pr.csv --timeout 30
+
+      - name: Post PR Comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: bench-output.md
+          # Automatically replaces the previous benchmark comment on new commits
+          hide_and_recreate: true
+
+      - name: Fail pipeline if regression detected
+        if: env.BENCH_FAILED == 'true'
+        run: |
+          echo "Failing pipeline due to >10% performance regression."
+          exit 1
