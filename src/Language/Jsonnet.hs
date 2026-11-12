@@ -31,13 +31,11 @@ import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow, throwM, try)
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.Reader
 import Data.Aeson qualified as JSON
-import Data.Binary (decode)
 import Data.ByteString qualified as BS
 import Data.Map.Lazy qualified as M
 import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import Data.Text.IO qualified as T
-import Language.Jsonnet.Common
 import Language.Jsonnet.Compiler
 import Language.Jsonnet.Core
 import Language.Jsonnet.Error
@@ -45,9 +43,8 @@ import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval.Types (ImportResult (..), Importer (..))
 import Language.Jsonnet.Pretty (prettyError)
-import Language.Jsonnet.Std.Lib
+import Language.Jsonnet.Std.Lib hiding (std)
 import Language.Jsonnet.Std.Lib qualified as Lib
-import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
 import System.Directory (doesFileExist)
 import System.Exit (die)
@@ -94,7 +91,15 @@ interpret :: Config -> Text -> IO (Either Error JSON.Value)
 interpret conf = runJsonnetM conf . (compile >=> evaluate)
 
 compile :: Text -> JsonnetM Core
-compile inp = asks fname >>= flip compileThrow inp
+compile inp = do
+    fname <- asks fname
+    compileThrow fname inp
+
+stdlib :: JsonnetM Value
+stdlib = do
+    extVars <- asks extVars
+    userFuncs <- asks userFuncs
+    Lib.std extVars userFuncs
 
 -- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
@@ -103,22 +108,6 @@ evaluate expr = do
     importer <- Importer . resolveImportPath <$> asks jpaths
     env <- singleton "std" <$> stdlib
     JsonnetM $ liftIO $ runEvalM fp importer env (manifest expr)
-
-{- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
-  the native (a small subset) with the interpreted (the splice mkStdlib)
--}
-stdlib :: JsonnetM Value
-stdlib = do
-    extVars <- asks extVars
-    userFuncs <- asks userFuncs
-    fp <- asks fname
-    importer <- Importer . resolveImportPath <$> asks jpaths
-    native <- Lib.std extVars userFuncs
-    let lib = whnf core >>= flip mergeObjects native
-    JsonnetM $ liftIO $ runEvalM fp importer M.empty lib
-  where
-    core = decode $(mkStdlib)
-    mergeObjects x y = whnfPrim (BinOp Add) [Pos x, Pos y]
 
 data ExtVar = ExtVar
     { extVarType :: !ExtVarType

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 {- |
@@ -21,11 +22,13 @@ import Control.Lens (view)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Crypto.Hash.MD5 qualified as MD5
 import Data.Aeson qualified as JSON
+import Data.Binary (decode)
 import Data.ByteString qualified as B
 import Data.ByteString.Base16 qualified as B16
 import Data.Fixed (mod')
 import Data.Functor
 import Data.HashMap.Lazy qualified as H
+import Data.IORef
 import Data.List qualified as L (intercalate)
 import Data.Map (Map)
 import Data.Map qualified as Map
@@ -34,18 +37,19 @@ import Data.Text qualified as T
 import Data.Text.Encoding qualified as T
 import Data.Vector qualified as V
 import Data.Yaml qualified as Yaml
-import Language.Jsonnet.Common
+import Language.Jsonnet.Common (BinOp (Add))
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Object
+import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
 import System.IO
+import System.IO.Unsafe (unsafePerformIO)
 import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
-import Data.IORef
 
 newtype ExtVars = ExtVars (Map Text Value)
     deriving newtype (Semigroup, Monoid)
@@ -53,14 +57,28 @@ newtype ExtVars = ExtVars (Map Text Value)
 newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
     deriving newtype (Semigroup, Monoid)
 
--- | Jsonnet standard library built-in methods
+{-# NOINLINE nonnative #-}
+nonnative :: Value
+nonnative =
+    unsafePerformIO $
+        runEvalM "<stdlib>" dummyImporter Map.empty (whnf core)
+  where
+    core = decode $(mkStdlib)
+    dummyImporter = Importer $ \_ _ ->
+        fail "Fatal: std.jsonnet attempted to import a file!"
+
+{- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
+  the native (a small subset) with the interpreted (the splice mkStdlib)
+-}
 std :: (MonadIO m) => ExtVars -> UserFuncs -> m Value
-std (ExtVars extVars) (UserFuncs userFuncs) = do
-  cache <- liftIO (newIORef H.empty)
-  pure $ VObj (mkBaseObject (H.fromList xs)) cache
+std (ExtVars extVars) (UserFuncs userFuncs) =
+    mkIndirV $ VThunk $ do
+        cache <- liftIO (newIORef H.empty)
+        let native = VObj (mkBaseObject (H.fromList xs)) cache
+        whnfBinOp Add nonnative native
   where
     infixr 8 ~>
-    k ~> v = (k, Field (VStr k) (inj v) Hidden False)
+    k ~> v = (k, mkHiddenField k v)
     xs =
         [ "type" ~> showTy
         , "primitiveEquals" ~> primitiveEquals

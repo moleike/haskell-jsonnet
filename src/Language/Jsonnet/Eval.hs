@@ -4,6 +4,8 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-missing-signatures #-}
 
 {- |
 Module      : Language.Jsonnet.Eval
@@ -65,7 +67,7 @@ whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
 whnf (CLoc sp c) = withCurrentPos sp (whnf c)
 whnf (CLit l) = pure (whnfLiteral l)
-whnf (CObj bnd) = whnfObj bnd -- No view env >>= flip!
+whnf (CObj bnd) = whnfObj bnd
 whnf (CArr cs) = VArr . V.fromList <$> mapM mkValue cs
 whnf (CLet bnd) = whnfLetrec bnd
 whnf (CPrim p) = pure (VPrim p)

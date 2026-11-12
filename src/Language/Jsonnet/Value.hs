@@ -13,9 +13,7 @@ Portability             : non-portable
 -}
 module Language.Jsonnet.Value where
 
-import Control.Lens hiding (para)
 import Control.Monad.IO.Class (MonadIO (..))
-import Control.Monad.Reader (MonadReader)
 import Data.HashMap.Lazy as H
 import Data.IORef
 import Data.Scientific
@@ -25,8 +23,8 @@ import Language.Jsonnet.Common
 import Language.Jsonnet.Core hiding (fieldVis, mkField)
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval.Types
-import Language.Jsonnet.Pretty ()
 import Language.Jsonnet.Object
+import Language.Jsonnet.Pretty ()
 
 type Eval = EvalM
 
@@ -71,5 +69,14 @@ mkField k v =
         { fieldKey = (VStr k)
         , fieldVal = inj v
         , fieldVis = Visible
+        , assertField = False
+        }
+
+mkHiddenField :: (HasValue a) => Text -> a -> Field
+mkHiddenField k v =
+    Field
+        { fieldKey = (VStr k)
+        , fieldVal = inj v
+        , fieldVis = Hidden
         , assertField = False
         }
