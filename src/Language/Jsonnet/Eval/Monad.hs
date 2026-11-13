@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {- |
 Module                  : Language.Jsonnet.Eval.Monad
@@ -19,14 +20,12 @@ import Data.IORef
 import Data.Map
 import Data.Map.Lazy qualified as M (union)
 import Data.Text qualified as T
-import Language.Jsonnet.Common (Backtrace (..), StackFrame (..))
+import Language.Jsonnet.Common (Backtrace (..), StackFrame (..), Name)
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Error (Error (EvalError), EvalError (..))
 import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Text.Megaparsec.Pos
-import Unbound.Generics.LocallyNameless
-import Unbound.Generics.LocallyNameless.Name
 
 newtype EvalM a = EvalM
     { unEval :: ReaderT EvalState IO a
@@ -44,20 +43,8 @@ newtype EvalM a = EvalM
         , MonadFix
         )
 
-instance Fresh EvalM where
-    fresh (Fn s _) = Fn s <$> genUniqueId
-    fresh nm@(Bn{}) = return nm
-
-genUniqueId :: EvalM Integer
-genUniqueId = do
-    ref <- view gen
-    n <- liftIO $ readIORef ref
-    liftIO $ modifyIORef' ref (+ 1)
-    pure n
-
 runEvalM :: FilePath -> Importer -> Env -> EvalM a -> IO a
 runEvalM fp importer' env' e = do
-    gen' <- newIORef 0
     mods <- newIORef empty
     let st =
             EvalState
@@ -65,7 +52,6 @@ runEvalM fp importer' env' e = do
                 , _baseEnv = env'
                 , _callStack = emptyStack
                 , _currentPos = Nothing
-                , _gen = gen'
                 , _currentFile = fp
                 , _loadedModules = mods
                 , _importer = importer'
@@ -102,7 +88,7 @@ withCurrentPos :: SrcSpan -> EvalM a -> EvalM a
 withCurrentPos = locally currentPos . const . Just
 
 emptyStack :: CallStack
-emptyStack = CallStack [] [s2n "top-level"]
+emptyStack = CallStack { _spans = [], _scopes = ["top-level"] }
 
 pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a -> EvalM a
 pushStackFrame (name, span') =
@@ -127,7 +113,7 @@ getBacktrace = do
     pure $ Backtrace $ case sequence sp of
         Just sp' -> zipWith StackFrame sc sp'
         Nothing -> case mPos of
-            Just pos -> [StackFrame (s2n "top-level") pos]
+            Just pos -> [StackFrame "top-level" pos]
             Nothing -> []
 
 getFileName :: EvalM FilePath

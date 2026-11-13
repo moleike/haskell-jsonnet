@@ -90,7 +90,7 @@ library
     megaparsec >=9.5 && <9.8 || ^>=9.8.1,
     mtl >=2.2.2 && <2.4,
     parser-combinators >=1.2.1 && <1.4,
-    prettyprinter >=1.7.0 && <1.8,
+    prettyprinter >=1.7.2 && <1.8,
     scientific >=0.3.7 && <0.4,
     template-haskell >=2.16.0 && <2.23 || ^>=2.23.0 || ^>=2.24.0,
     text >=2.1.2 && <2.2,

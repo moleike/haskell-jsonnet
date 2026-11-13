@@ -4,12 +4,12 @@
 {-# LANGUAGE TupleSections #-}
 
 {- |
-Module                  : Language.Jsonnet.Value
-Copyright               : (c) 2020-2021 Alexandre Moreno
+Module      : Language.Jsonnet.Value
+Copyright   : (c) 2020-2021 Alexandre Moreno
 SPDX-License-Identifier : BSD-3-Clause OR Apache-2.0
-Maintainer              : Alexandre Moreno <alexmorenocano@gmail.com>
-Stability               : experimental
-Portability             : non-portable
+Maintainer  : Alexandre Moreno <alexmorenocano@gmail.com>
+Stability   : experimental
+Portability : non-portable
 -}
 module Language.Jsonnet.Value where
 
@@ -38,7 +38,7 @@ data Value
     | VThunk !(Eval Value)
     | VIndir !(IORef Value)
     | VPrim !Prim
-    | VClos !Lam !Env
+    | VClos !([Param Core], Core) !Env
     | VFun !(Value -> Eval Value)
     | VBlackhole
 
@@ -66,7 +66,7 @@ allocate = liftIO . newIORef
 mkField :: (HasValue a) => Text -> a -> Field
 mkField k v =
     Field
-        { fieldKey = (VStr k)
+        { fieldKey = VStr k
         , fieldVal = inj v
         , fieldVis = Visible
         , assertField = False
@@ -75,7 +75,7 @@ mkField k v =
 mkHiddenField :: (HasValue a) => Text -> a -> Field
 mkHiddenField k v =
     Field
-        { fieldKey = (VStr k)
+        { fieldKey = VStr k
         , fieldVal = inj v
         , fieldVis = Hidden
         , assertField = False

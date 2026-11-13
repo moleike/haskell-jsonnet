@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 
 {- |
@@ -22,8 +23,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
 import Data.Maybe (fromMaybe)
 import Data.Scientific (Scientific (..))
-import Data.Text qualified as T
-import Data.Text.Lazy qualified as LT
+import Data.Text (Text)
 import Data.Text.Lazy.Builder
 import Data.Text.Lazy.Builder.Scientific (scientificBuilder)
 import Data.Vector qualified as V
@@ -37,7 +37,6 @@ import Language.Jsonnet.Syntax.Annotated qualified as Ann
 import Prettyprinter
 import Text.Megaparsec.Error (errorBundlePretty)
 import Text.Megaparsec.Pos
-import Unbound.Generics.LocallyNameless (Name, name2String)
 
 (<$$>) :: Doc ann -> Doc ann -> Doc ann
 (<$$>) = \x y -> vcat [x, y]
@@ -59,32 +58,31 @@ pnull
     , pfor
     , pin ::
         Doc ann
-pnull = pretty "null"
-ptrue = pretty "true"
-pfalse = pretty "false"
-pif = pretty "if"
-pthen = pretty "then"
-pelse = pretty "else"
-pimport = pretty "import"
-pimportstr = pretty "importstr"
-pimportbin = pretty "importbin"
-perror = pretty "error"
-plocal = pretty "local"
-pfunction = pretty "function"
-passert = pretty "assert"
-pfor = pretty "for"
-pin = pretty "in"
+pnull = "null"
+ptrue = "true"
+pfalse = "false"
+pif = "if"
+pthen = "then"
+pelse = "else"
+pimport = "import"
+pimportstr = "importstr"
+pimportbin = "importbin"
+perror = "error"
+plocal = "local"
+pfunction = "function"
+passert = "assert"
+pfor = "for"
+pin = "in"
 
 prettyName :: Name a -> Doc ann
-prettyName = pretty . name2String
+prettyName = pretty
 
 ppNumber :: Scientific -> Doc ann
 ppNumber s
     | e < 0 || e > 1024 =
         pretty $
-            LT.unpack $
-                toLazyText $
-                    scientificBuilder s
+            toLazyText $
+                scientificBuilder s
     | otherwise = pretty (coefficient s * 10 ^ e)
   where
     e = base10Exponent s
@@ -121,7 +119,7 @@ ppJson isCompact i = \case
       where
         xs = map (ppJson isCompact i) (V.toList a)
 
-    ppString = pretty . LT.unpack . JSON.encodeToLazyText
+    ppString = pretty . JSON.encodeToLazyText
 
 prettySrcSpan :: SrcSpan -> Doc ann
 prettySrcSpan SrcSpan{spanBegin, spanEnd} =
@@ -152,83 +150,84 @@ prettyParserError (ParseError e) = pretty (errorBundlePretty e)
 prettyCheckError :: CheckError -> Doc ann
 prettyCheckError = \case
     DuplicateParam e ->
-        pretty "duplicate parameter"
+        "duplicate parameter"
             <+> squotes (pretty e)
     DuplicateBinding e ->
-        pretty "duplicate local var"
+        "duplicate local var"
             <+> squotes (pretty e)
     PosAfterNamedParam ->
-        pretty "positional after named argument"
+        "positional after named argument"
 
 prettyEvalError :: EvalError -> Doc ann
 prettyEvalError = \case
     TypeMismatch expected actual ->
-        pretty "type mismatch:"
-            <+> pretty "expected"
-            <+> pretty (T.unpack expected)
-            <+> pretty "but got"
-            <+> pretty (T.unpack actual)
+        "type mismatch:"
+            <+> "expected"
+            <+> pretty expected
+            <+> "but got"
+            <+> pretty actual
     InvalidKey k ->
-        pretty "invalid key:"
+        "invalid key:"
             <+> pretty k
     DuplicateKey k ->
-        pretty "duplicate key:"
+        "duplicate key:"
             <+> pretty k
     InvalidIndex k ->
-        pretty "invalid index:"
+        "invalid index:"
             <+> pretty k
     NoSuchKey k ->
-        pretty "no such key:"
+        "no such key:"
             <+> pretty k
     IndexOutOfBounds i ->
-        pretty "index out of bounds:"
+        "index out of bounds:"
             <+> ppNumber i
     DivByZero ->
-        pretty "divide by zero exception"
+        "divide by zero exception"
     VarNotFound v ->
-        pretty "variable"
+        "variable"
             <+> squotes (pretty $ show v)
-            <+> pretty "is not defined"
+            <+> "is not defined"
     UnboundSelf ->
-        pretty "can't use self outside of an object."
+        "can't use self outside of an object."
     UnboundSuper ->
-        pretty "can't use super outside of an object."
+        "can't use super outside of an object."
     NoSuperClass ->
-        pretty "attempt to use super when there is no super class."
+        "attempt to use super when there is no super class."
     ExtVarNotFound v ->
-        pretty "external variable"
+        "external variable"
             <+> squotes (pretty v)
-            <+> pretty "is not defined"
+            <+> "is not defined"
     AssertionFailed e ->
-        pretty "assertion failed:" <+> pretty e
+        "assertion failed:" <+> pretty e
     StdError e -> pretty e
     RuntimeError e -> pretty e
     ParamNotBound s ->
-        pretty "parameter not bound:"
+        "parameter not bound:"
             <+> pretty (show s)
     BadParam s ->
-        pretty "function has no parameter"
+        "function has no parameter"
             <+> squotes (pretty s)
     ManifestError e ->
-        pretty "manifest error:"
+        "manifest error:"
             <+> pretty e
     TooManyArgs n ->
-        pretty "too many args, function has"
+        "too many args, function has"
             <+> pretty n
-            <+> pretty "parameter(s)"
+            <+> "parameter(s)"
     UnresolvedImport f (IOError _ _ _ desc _ _) ->
-        pretty "import error:"
+        "import error:"
             <+> pretty desc
             <+> squotes (pretty f)
     InfiniteRecursion ->
-        pretty "infinite recursion detected"
+        "infinite recursion detected"
 
 prettyStackFrame :: StackFrame a -> Doc ann
 prettyStackFrame StackFrame{name, span = span'} =
-    prettySrcSpan span' <+> f (name2String name)
+    prettySrcSpan span' <+> f name
   where
+    f :: Text -> Doc ann
     f "top-level" = mempty
-    f x = pretty "function" <+> angles (pretty x)
+    f x = "function" <+> angles (pretty x)
 
 prettyBacktrace :: Backtrace a -> Doc ann
 prettyBacktrace (Backtrace xs) = vcat $ prettyStackFrame <$> xs
@@ -236,20 +235,20 @@ prettyBacktrace (Backtrace xs) = vcat $ prettyStackFrame <$> xs
 prettyError :: Error -> Doc ann
 prettyError = \case
     EvalError e bt ->
-        pretty "Runtime error:"
+        "Runtime error:"
             <+> prettyEvalError e
                 <$$> indent 2 (prettyBacktrace bt)
     ParserError e -> prettyParserError e
     CheckError e sp ->
-        pretty "Static error:"
+        "Static error:"
             <+> prettyCheckError e
                 <$$> indent 2 (maybe mempty prettySrcSpan sp)
 
 prettyVisibility :: Visibility -> Doc ann
 prettyVisibility = \case
-    Visible -> pretty ":"
-    Hidden -> pretty "::"
-    Forced -> pretty ":::"
+    Visible -> ":"
+    Hidden -> "::"
+    Forced -> ":::"
 
 commaSep :: [Doc ann] -> Doc ann
 commaSep = concatWith (surround comma)
@@ -267,7 +266,7 @@ ppField :: EField (Doc ann) -> Doc ann
 ppField EField{..} =
     surround (ppOverride <> prettyVisibility visibility) key' value
   where
-    ppOverride = pretty (bool "" "+" override)
+    ppOverride = bool mempty "+" override
     key' = bool key (brackets key) computed
 
 ppObject :: forall ann. [(Ident, Doc ann)] -> [Assert (Doc ann)] -> [Doc ann] -> Doc ann
@@ -302,34 +301,34 @@ ppLocal xs e =
 
 prettyUnyOp :: UnyOp -> Doc ann
 prettyUnyOp = \case
-    Compl -> pretty "~"
-    LNot -> pretty "!"
-    Plus -> pretty "+"
-    Minus -> pretty "-"
-    Err -> pretty "<prim:err>"
+    Compl -> "~"
+    LNot -> "!"
+    Plus -> "+"
+    Minus -> "-"
+    Err -> "<prim:err>"
 
 prettyBinOp :: BinOp -> Doc ann
 prettyBinOp = \case
-    Add -> pretty "+"
-    Sub -> pretty "-"
-    Mul -> pretty "*"
-    Div -> pretty "/"
-    Mod -> pretty "%"
-    Lt -> pretty "<"
-    Le -> pretty "<="
-    Gt -> pretty ">"
-    Ge -> pretty ">="
-    Eq -> pretty "=="
-    Ne -> pretty "!="
-    And -> pretty "&"
-    Or -> pretty "|"
-    Xor -> pretty "^"
-    ShiftL -> pretty "<<"
-    ShiftR -> pretty ">>"
-    LAnd -> pretty "&&"
-    LOr -> pretty "||"
-    In -> pretty "in"
-    Lookup -> pretty "<prim:lookup>"
+    Add -> "+"
+    Sub -> "-"
+    Mul -> "*"
+    Div -> "/"
+    Mod -> "%"
+    Lt -> "<"
+    Le -> "<="
+    Gt -> ">"
+    Ge -> ">="
+    Eq -> "=="
+    Ne -> "!="
+    And -> "&"
+    Or -> "|"
+    Xor -> "^"
+    ShiftL -> "<<"
+    ShiftR -> ">>"
+    LAnd -> "&&"
+    LOr -> "||"
+    In -> "in"
+    Lookup -> "<prim:lookup>"
 
 ppFun :: [Param (Doc ann)] -> Doc ann -> Doc ann
 ppFun ps e = pfunction <> parens (commaSep ps') <+> e

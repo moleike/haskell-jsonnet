@@ -19,7 +19,6 @@ import Data.Text qualified as T
 import Data.Typeable (Typeable)
 import GHC.Generics
 import Language.Jsonnet.Common
-import Unbound.Generics.LocallyNameless
 
 type Ident = String
 
@@ -44,7 +43,6 @@ data EField a = EField
       Foldable,
       Traversable
     )
-  deriving anyclass (Alpha)
   deriving
     (Eq1, Show1)
     via FunctorClassesDefault EField

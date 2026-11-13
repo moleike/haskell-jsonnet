@@ -10,21 +10,12 @@
 module Language.Jsonnet.Core where
 
 import Data.Binary (Binary)
-import Data.String (IsString (..))
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic)
-import Language.Jsonnet.Common (Args, Literal, Prim, Visibility, Import)
+import Language.Jsonnet.Common (Args, Literal, Prim, Visibility, Import, Name)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Unbound.Generics.LocallyNameless
-  ( Alpha,
-    Bind,
-    Embed,
-    Name,
-    Rec,
-    string2Name,
-  )
 
-type Param a = (Name a, Embed a)
+type Param a = (Name a, a)
 
 data RegularField = RegularField
   { fieldKey :: Core,
@@ -32,49 +23,36 @@ data RegularField = RegularField
     fieldVis :: Visibility
   }
   deriving stock (Show, Generic)
-  deriving anyclass (Alpha, Binary)
+  deriving anyclass (Binary)
 
 data CField
   = CRegularField RegularField
   | -- | The desugared assertion expression
     CAssertField Core
   deriving stock (Show, Generic)
-  deriving anyclass (Alpha, Binary)
+  deriving anyclass (Binary)
 
 mkField :: Core -> Core -> Visibility -> CField
 mkField k v h = CRegularField (RegularField k v h)
 
-instance (Binary a) => Binary (Name a)
-
-instance (Binary a) => Binary (Rec a)
-
-instance (Binary a) => Binary (Embed a)
-
-instance (Binary a, Binary b) => Binary (Bind a b)
-
 data Comp
-  = ArrC (Bind (Name Core) (Core, [Core]))
-  | ObjC (Bind (Name Core) (CField, [Core]))
+  = ArrC (Name Core) (Core, [Core])
+  | ObjC (Name Core) (CField, [Core])
   deriving
     ( Show,
       Typeable,
       Generic,
-      Alpha,
       Binary
     )
-
-type Lam = Bind (Rec [Param Core]) Core
-
-type Let = Bind (Rec [(Name Core, Embed Core)]) Core
 
 data Core where
   CLoc :: SrcSpan -> Core -> Core
   CLit :: Literal -> Core
   CVar :: Name Core -> Core
-  CLam :: Lam -> Core
+  CLam :: [Param Core] -> Core -> Core
   CPrim :: Prim -> Core
   CApp :: Core -> Args Core -> Core
-  CLet :: Let -> Core
+  CLet :: [(Name Core, Core)] -> Core -> Core
   CObj :: [CField] -> Core
   CArr :: [Core] -> Core
   CComp :: Comp -> Core -> Core
@@ -83,7 +61,6 @@ data Core where
     ( Show,
       Typeable,
       Generic,
-      Alpha,
       Binary
     )
 
@@ -92,6 +69,3 @@ data Core where
 --  | ConsPs (Rebind (Name Core, Embed (Maybe Core)) Params)
 --  deriving (Show, Typeable, Generic)
 -- instance Alpha Params
-
-instance IsString (Name Core) where
-  fromString = string2Name

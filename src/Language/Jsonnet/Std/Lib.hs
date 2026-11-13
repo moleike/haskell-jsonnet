@@ -47,7 +47,6 @@ import Language.Jsonnet.Std.TH (mkStdlib)
 import Language.Jsonnet.Value
 import System.IO
 import System.IO.Unsafe (unsafePerformIO)
-import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 import Prelude qualified as P (length)
 
@@ -135,9 +134,7 @@ length = \case
     VStr s -> pure $ T.length s
     VArr a -> pure $ P.length a
     VObj o _ -> pure $ P.length (objectFieldsEx o True)
-    VClos f _ -> do
-        (ps, _) <- unbind f
-        pure $ P.length (unrec ps)
+    VClos (ps, _) _ -> pure $ P.length ps
     _ ->
         throwE
             (StdError "length operates on strings, objects, functions and arrays, got ")

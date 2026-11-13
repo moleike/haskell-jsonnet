@@ -25,7 +25,6 @@ import Control.Monad.Catch (handle)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
 import Data.Aeson.KeyMap qualified as KeyMap
-import Data.Bifunctor (second)
 import Data.Bits ((.&.), (.|.))
 import Data.Bits qualified as Bits
 import Data.ByteString (ByteString)
@@ -54,7 +53,6 @@ import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Object as Object
 import Language.Jsonnet.Pretty (ppJsonCompact)
 import Language.Jsonnet.Value
-import Unbound.Generics.LocallyNameless
 import Prelude hiding (length)
 
 manifest :: Core -> Eval JSON.Value
@@ -67,12 +65,12 @@ whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
 whnf (CLoc sp c) = withCurrentPos sp (whnf c)
 whnf (CLit l) = pure (whnfLiteral l)
-whnf (CObj bnd) = whnfObj bnd
+whnf (CObj fields) = whnfObj fields
 whnf (CArr cs) = VArr . V.fromList <$> mapM mkValue cs
-whnf (CLet bnd) = whnfLetrec bnd
+whnf (CLet bnd body) = whnfLetrec bnd body
 whnf (CPrim p) = pure (VPrim p)
 whnf (CApp e es) = whnfApp e es
-whnf (CLam f) = VClos f <$> view env
+whnf (CLam params body) = VClos (params, body) <$> view env
 whnf (CComp comp e) = whnfComp comp e
 whnf (CImp it path) = whnfImport it path
 
@@ -110,7 +108,7 @@ memoizedLookup cacheRef key defVal =
 
 mkValue :: Core -> Eval Value
 mkValue c@(CLit _) = whnf c
-mkValue c@(CLam _) = whnf c
+mkValue c@(CLam _ _) = whnf c
 mkValue c@(CPrim _) = whnf c
 mkValue c = mkThunk c >>= mkIndirV
 
@@ -120,26 +118,26 @@ mkThunk c = do
     pure $ VThunk (withEnv e (whnf c))
 
 getSelf :: Eval Value
-getSelf = view env >>= liftMaybe UnboundSelf . M.lookup (s2n "self")
+getSelf = view env >>= liftMaybe UnboundSelf . M.lookup "self"
 
 getSuper :: Eval Value
 getSuper = do
     rho <- view env
-    case M.lookup (s2n "super") rho of
+    case M.lookup "super" rho of
         Just v -> pure v
         Nothing ->
-            if M.member (s2n "self") rho
+            if M.member "self" rho
                 -- Gracefully yield an empty object to satisfy the "+:" desugaring
                 then VObj (mkBaseObject H.empty) <$> liftIO (newIORef H.empty)
                 else throwE UnboundSuper
 
-lookupVar :: Name Core -> Eval Value
+lookupVar :: Text -> Eval Value
 lookupVar = \case
-    (n2s -> "self") -> getSelf
-    (n2s -> "super") -> getSuper
+    "self" -> getSelf
+    "super" -> getSuper
     n -> do
         rho <- view env
-        v <- liftMaybe (VarNotFound (n2s n)) (M.lookup n rho)
+        v <- liftMaybe (VarNotFound n) (M.lookup n rho)
         force v
 
 whnfLiteral :: Literal -> Value
@@ -170,20 +168,19 @@ withStackFrame :: Core -> Eval a -> Eval a
 withStackFrame (CLoc sp (CVar n)) e =
     pushStackFrame (n, Just sp) e
 withStackFrame (CLoc sp _) e =
-    pushStackFrame (s2n "anonymous", Just sp) e
+    pushStackFrame ("anonymous", Just sp) e
 withStackFrame (CVar _) e = e
 withStackFrame _ e = e
 
-whnfClos :: Env -> Lam -> [Arg Value] -> Eval Value
-whnfClos rho f args = do
-    (bnds, e) <- unbind f
-    (rs, ps, ns) <- splitArgs args (second unembed <$> unrec bnds)
+whnfClos :: Env -> ([Param Core], Core) -> [Arg Value] -> Eval Value
+whnfClos rho (params, body) args = do
+    (rs, ps, ns) <- splitArgs args params
     withEnv rho $
         extendEnv (M.fromList ps) $
             extendEnv (M.fromList ns) $
-                appDefaults rs e
+                appDefaults rs body
 
-appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
+appDefaults :: [(Text, Core)] -> Core -> Eval Value
 appDefaults rs e = mdo
     bnds <-
         M.fromList
@@ -195,7 +192,7 @@ appDefaults rs e = mdo
                 rs
     extendEnv bnds (whnf e)
 
-splitArgs :: [Arg c] -> [(Name a, b)] -> EvalM ([(Name a, b)], [(Name a, c)], [(Name a, c)])
+splitArgs :: [Arg c] -> [(Text, b)] -> EvalM ([(Text, b)], [(Text, c)], [(Text, c)])
 splitArgs args bnds = do
     named <- getNamed
     pos <- getPos
@@ -213,10 +210,10 @@ splitArgs args bnds = do
 
     getNamed = traverse f ns
       where
-        f (a, b) = case g a of
+        f (a, b) = case g (T.pack a) of
             Nothing -> throwE $ BadParam (T.pack a)
             Just n -> pure (n, b)
-        g a = find ((a ==) . name2String) pNames
+        g a = find (a ==) pNames
 
     getUnapp named =
         pure $ filter ((`notElem` ns') . fst) bnds2
@@ -300,11 +297,11 @@ whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
 whnfUnyOp Super x = do
     rho <- view env
     let err =
-            if M.member (s2n "self") rho
+            if M.member "self" rho
                 then NoSuperClass
                 else UnboundSuper
 
-    case M.lookup (s2n "super") rho of
+    case M.lookup "super" rho of
         Just (VObj s c) -> force x >>= objectLookup s c
         _ -> throwE err
 
@@ -359,18 +356,18 @@ whnfLookup (VStr _) _ =
     throwE (InvalidIndex "string index was not integer")
 whnfLookup v _ = throwTypeMismatch "array/object/string" v
 
-whnfLetrec :: Let -> Eval Value
-whnfLetrec bnd = mdo
-    (r, e1) <- unbind bnd
+-- whnfLetrec drops unbind and destructures the tuple directly
+whnfLetrec :: [(Text, Core)] -> Core -> Eval Value
+whnfLetrec binds body = mdo
     bnds <-
         M.fromList
             <$> mapM
-                ( \(n, Embed e) -> do
+                ( \(n, e) -> do
                     v <- extendEnv bnds (mkValue e)
                     pure (n, v)
                 )
-                (unrec r)
-    extendEnv bnds (mkValue e1)
+                binds
+    extendEnv bnds (mkValue body)
 
 whnfObj :: [CField] -> Eval Value
 whnfObj xs = do
@@ -385,7 +382,7 @@ extendWithLateBound :: Env -> Eval a -> Eval a
 extendWithLateBound baseEnv m = do
     dynEnv <- view env
     let inherit key = M.alter (const $ M.lookup key dynEnv) key
-    withEnv (inherit (s2n "self") . inherit (s2n "super") $ baseEnv) m
+    withEnv (inherit "self" . inherit "super" $ baseEnv) m
 
 whnfField :: CField -> Eval (Maybe (Text, Field))
 whnfField (CRegularField (RegularField k v vis)) = do
@@ -393,17 +390,17 @@ whnfField (CRegularField (RegularField k v vis)) = do
     force fieldKey
         >>= traverse
             ( \key -> do
-                env' <- M.insert (s2n "$$key") (VStr key) <$> view env
+                env' <- M.insert "$$key" (VStr key) <$> view env
                 let fieldVal = VThunk $ extendWithLateBound env' (whnf v)
                 pure (key, Field fieldKey fieldVal vis False)
             )
 whnfField (CAssertField assertion) = do
     env' <- view env
-    keyName <- nameToText <$> fresh (s2n "$$assert")
+    -- Because freshNames are now handled purely at compile/desugar time,
+    -- we can just use a single static key for runtime assertions per field loop.
+    let keyName = "$$assert_runtime" 
     let val = VThunk $ extendWithLateBound env' (whnf assertion)
     pure $ Just (keyName, Field (VStr keyName) val Visible True)
-  where
-    nameToText n = T.pack (name2String n) <> "_" <> T.pack (show (name2Integer n))
 
 flattenArrays :: Vector (Vector Value) -> Vector Value
 flattenArrays = join
@@ -411,22 +408,22 @@ flattenArrays = join
 whnfIfs :: [Core] -> Eval Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
+-- whnfComp drops unbind and destructures the LoopVar directly
 whnfComp :: Comp -> Core -> Eval Value
-whnfComp (ArrC bnd) cs = do
+whnfComp (ArrC varName (e, conds)) cs = do
     xs <- comp
     liftF flattenArrays $ VArr $ V.mapMaybe id xs
   where
     comp =
         whnf cs >>= \case
             VArr xs -> forM xs $ \x -> do
-                (n, (e, cond)) <- unbind bnd
-                extendEnv (M.singleton n x) $ do
-                    b <- whnfIfs cond
+                extendEnv (M.singleton varName x) $ do
+                    b <- whnfIfs conds
                     if b
                         then Just <$> mkValue e
                         else pure Nothing
             v -> throwTypeMismatch "array" v
-whnfComp (ObjC bnd) cs = do
+whnfComp (ObjC varName (cField, conds)) cs = do
     xs <- mkBaseObject . H.fromList . catMaybes <$> comp
     cache <- liftIO (newIORef H.empty)
     pure (VObj xs cache)
@@ -434,9 +431,8 @@ whnfComp (ObjC bnd) cs = do
     comp =
         whnf cs >>= force >>= \case
             VArr arr -> forM (V.toList arr) $ \x -> do
-                (n, (cField, cond)) <- unbind bnd
-                extendEnv (M.singleton n x) $ do
-                    b <- whnfIfs cond
+                extendEnv (M.singleton varName x) $ do
+                    b <- whnfIfs conds
                     if b
                         then whnfField cField
                         else pure Nothing
@@ -444,14 +440,14 @@ whnfComp (ObjC bnd) cs = do
 
 withSelf :: Value -> Eval a -> Eval a
 withSelf selfVal action =
-    extendEnv (M.singleton (s2n "self") selfVal) action
+    extendEnv (M.singleton "self" selfVal) action
 
 withSuper :: Maybe Object -> Eval a -> Eval a
 withSuper (Just s) action = do
     cache <- liftIO (newIORef H.empty)
-    extendEnv (M.singleton (s2n "super") (VObj s cache)) action
+    extendEnv (M.singleton "super" (VObj s cache)) action
 withSuper Nothing action =
-    locally env (M.delete (s2n "super")) action
+    locally env (M.delete "super") action
 
 evalField :: Object -> Text -> Value
 evalField obj key = VThunk $ do
@@ -515,7 +511,6 @@ equals e1 e2 = do
         let selfVal = VObj obj cache
         allM
             ( \k ->
-                -- Use withSelf and objectLookup directly!
                 withSelf selfVal (objectLookup obj cache k) >>= force >>= \case
                     VBool b -> pure b
                     _ -> pure True
@@ -652,14 +647,14 @@ instance {-# OVERLAPS #-} (HasValue a, HasValue b) => HasValue (a -> Eval b) whe
     inj f = VFun $ force >=> fmap inj . f
     {-# INLINE inj #-}
     proj (VFun f) = pure $ \x -> f (inj x) >>= force
-    proj (VClos f e) = pure $ \x -> proj =<< whnfClos e f [Pos (inj x)]
+    proj (VClos (f, e) env) = pure $ \x -> proj =<< whnfClos env (f, e) [Pos (inj x)]
     proj v = throwTypeMismatch "function" v
 
 instance {-# OVERLAPS #-} (HasValue a, HasValue b, HasValue c) => HasValue (a -> b -> Eval c) where
     inj f = inj $ \x -> inj (f x)
     {-# INLINE inj #-}
     proj (VFun f) = pure $ \x y -> f (inj x) >>= \(VFun g) -> g (inj y) >>= force
-    proj (VClos f env) = pure $ \x y -> force =<< whnfClos env f [Pos (inj x), Pos (inj y)]
+    proj (VClos (f, e) env) = pure $ \x y -> force =<< whnfClos env (f, e) [Pos (inj x), Pos (inj y)]
     proj v = throwTypeMismatch "function" v
 
 instance HasValue JSON.Value where

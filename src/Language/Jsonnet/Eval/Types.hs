@@ -7,10 +7,9 @@ import Control.Lens (makeLenses)
 import Data.ByteString (ByteString)
 import Data.IORef ( IORef )
 import Data.Map ( Map )
-import Language.Jsonnet.Common (Import)
+import Language.Jsonnet.Common (Import, Name)
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Unbound.Generics.LocallyNameless ( Name )
 import {-# SOURCE #-} Language.Jsonnet.Value (Value)
 
 type Env = Map (Name Core) Value
@@ -44,8 +43,6 @@ data EvalState = EvalState
     -- ^ call-stack simulation
     , _currentPos :: Maybe SrcSpan
     -- ^ source span of expression being evaluated
-    , _gen :: IORef Integer
-    -- ^ fresh names
     , _currentFile :: FilePath
     -- ^ current file being evaluated
     , _loadedModules :: IORef (Map ImpKey Value)

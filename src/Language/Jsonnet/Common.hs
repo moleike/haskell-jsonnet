@@ -17,15 +17,11 @@ import Data.Functor.Classes
 import Data.Functor.Classes.Generic
 import Data.Scientific (Scientific)
 import Data.Text (Text)
-import Data.Text qualified as T (pack)
 import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
-import Unbound.Generics.LocallyNameless (Alpha (..), Name, name2String)
-import Unbound.Generics.LocallyNameless.TH (makeClosedAlpha)
 
-n2s :: Name a -> Text
-n2s = T.pack . name2String
+type Name a = Text
 
 data Literal
     = Null
@@ -42,8 +38,6 @@ data Literal
         , Binary
         )
 
-makeClosedAlpha ''Literal
-
 data Prim
     = UnyOp UnyOp
     | BinOp BinOp
@@ -54,7 +48,6 @@ data Prim
         , Generic
         , Typeable
         , Data
-        , Alpha
         , Binary
         )
 
@@ -87,7 +80,6 @@ data BinOp
         , Generic
         , Typeable
         , Data
-        , Alpha
         , Binary
         )
 
@@ -107,7 +99,6 @@ data UnyOp
         , Generic
         , Typeable
         , Data
-        , Alpha
         , Binary
         )
 
@@ -119,7 +110,6 @@ data Strictness = Strict | Lazy
         , Generic
         , Typeable
         , Data
-        , Alpha
         , Binary
         )
 
@@ -135,7 +125,6 @@ data Arg a = Pos a | Named String a
         , Functor
         , Foldable
         , Traversable
-        , Alpha
         , Binary
         )
     deriving
@@ -157,7 +146,6 @@ data Args a = Args
         , Functor
         , Foldable
         , Traversable
-        , Alpha
         , Binary
         )
     deriving
@@ -179,7 +167,6 @@ data Assert a = Assert
         , Functor
         , Foldable
         , Traversable
-        , Alpha
         )
     deriving
         (Eq1, Show1)
@@ -201,7 +188,6 @@ data CompSpec a = CompSpec
         , Functor
         , Foldable
         , Traversable
-        , Alpha
         )
     deriving
         (Eq1, Show1)
@@ -226,7 +212,6 @@ data Visibility = Visible | Hidden | Forced
         , Generic
         , Typeable
         , Data
-        , Alpha
         , Binary
         )
 
@@ -238,4 +223,4 @@ instance Monoid Visibility where
     mempty = Visible
 
 data Import = Code | Str | Bin
-    deriving (Show, Eq, Ord, Generic, Typeable, Data, Alpha, Binary)
+    deriving (Show, Eq, Ord, Generic, Typeable, Data, Binary)
