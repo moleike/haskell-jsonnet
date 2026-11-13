@@ -2,10 +2,10 @@
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 {- |
 Module      : Language.Jsonnet.Eval
@@ -59,7 +59,7 @@ manifest :: Core -> Eval JSON.Value
 manifest = rnf >=> proj
 
 rnf :: Core -> Eval Value
-rnf = whnf >=> force
+rnf = handle asEvalError . whnf >=> force
 
 whnf :: Core -> Eval Value
 whnf (CVar n) = lookupVar n
@@ -75,13 +75,10 @@ whnf (CComp comp e) = whnfComp comp e
 whnf (CImp it path) = whnfImport it path
 
 force :: (HasValue a) => Value -> Eval a
-force =
-    handle asEvalError . go
-  where
-    go = \case
-        VIndir ref -> memoizeIORef ref >>= go
-        VThunk v -> v >>= go
-        v -> proj v
+force = \case
+    VIndir ref -> memoizeIORef ref >>= force
+    VThunk v -> v >>= force
+    v -> proj v
 
 memoize :: IO Value -> (Value -> IO ()) -> Eval Value
 memoize readCache writeCache = do
@@ -175,12 +172,9 @@ withStackFrame _ e = e
 whnfClos :: Env -> ([Param Core], Core) -> [Arg Value] -> Eval Value
 whnfClos rho (params, body) args = do
     (rs, ps, ns) <- splitArgs args params
-    withEnv rho $
-        extendEnv (M.fromList ps) $
-            extendEnv (M.fromList ns) $
-                appDefaults rs body
+    withEnv rho $ extendEnv (M.fromList $ ps ++ ns) (appDefaults rs body)
 
-appDefaults :: [(Text, Core)] -> Core -> Eval Value
+appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
 appDefaults rs e = mdo
     bnds <-
         M.fromList
@@ -192,7 +186,7 @@ appDefaults rs e = mdo
                 rs
     extendEnv bnds (whnf e)
 
-splitArgs :: [Arg c] -> [(Text, b)] -> EvalM ([(Text, b)], [(Text, c)], [(Text, c)])
+splitArgs :: [Arg c] -> [(Name Core, b)] -> EvalM ([(Name Core, b)], [(Name Core, c)], [(Name Core, c)])
 splitArgs args bnds = do
     named <- getNamed
     pos <- getPos
@@ -356,8 +350,7 @@ whnfLookup (VStr _) _ =
     throwE (InvalidIndex "string index was not integer")
 whnfLookup v _ = throwTypeMismatch "array/object/string" v
 
--- whnfLetrec drops unbind and destructures the tuple directly
-whnfLetrec :: [(Text, Core)] -> Core -> Eval Value
+whnfLetrec :: [(Name Core, Core)] -> Core -> Eval Value
 whnfLetrec binds body = mdo
     bnds <-
         M.fromList
@@ -396,9 +389,7 @@ whnfField (CRegularField (RegularField k v vis)) = do
             )
 whnfField (CAssertField assertion) = do
     env' <- view env
-    -- Because freshNames are now handled purely at compile/desugar time,
-    -- we can just use a single static key for runtime assertions per field loop.
-    let keyName = "$$assert_runtime" 
+    let keyName = "$$assert_runtime"
     let val = VThunk $ extendWithLateBound env' (whnf assertion)
     pure $ Just (keyName, Field (VStr keyName) val Visible True)
 
@@ -408,7 +399,6 @@ flattenArrays = join
 whnfIfs :: [Core] -> Eval Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
--- whnfComp drops unbind and destructures the LoopVar directly
 whnfComp :: Comp -> Core -> Eval Value
 whnfComp (ArrC varName (e, conds)) cs = do
     xs <- comp
