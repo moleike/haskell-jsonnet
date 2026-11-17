@@ -174,7 +174,7 @@ whnfClos rho (params, body) args = do
     (rs, ps, ns) <- splitArgs args params
     withEnv rho $ extendEnv (M.fromList $ ps ++ ns) (appDefaults rs body)
 
-appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
+appDefaults :: [Param Core] -> Core -> Eval Value
 appDefaults [] e = whnf e
 appDefaults rs e = mdo
     bnds <-
@@ -187,7 +187,7 @@ appDefaults rs e = mdo
                 rs
     extendEnv bnds (whnf e)
 
-splitArgs :: [Arg c] -> [(Name Core, b)] -> EvalM ([(Name Core, b)], [(Name Core, c)], [(Name Core, c)])
+splitArgs :: [Arg c] -> [Param b] -> EvalM ([Param b], [Param c], [Param c])
 splitArgs args bnds = do
     named <- getNamed
     pos <- getPos

@@ -15,7 +15,7 @@ import GHC.Generics (Generic)
 import Language.Jsonnet.Common (Args, Literal, Prim, Visibility, Import, Name)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 
-type Param a = (Name a, a)
+type Param a = (Name Core, a)
 
 data RegularField = RegularField
   { fieldKey :: Core,
