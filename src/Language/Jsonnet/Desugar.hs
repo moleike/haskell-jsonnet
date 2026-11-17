@@ -158,7 +158,7 @@ desugarArrComp expr = foldr f (CArr [expr])
     f CompSpec{..} e =
         CComp (ArrC (T.pack var) (e, ifspec)) forspec
 
-desugarField :: EField Core -> CField
+desugarField :: EField Core -> CField Core
 desugarField EField{..} = mkField key value' visibility
   where
     -- If the key is computed, use $$key inside value' so it isn't re-evaluated in valueEnv
