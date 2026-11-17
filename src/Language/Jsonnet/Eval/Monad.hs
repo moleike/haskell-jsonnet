@@ -11,7 +11,7 @@ Portability             : non-portable
 -}
 module Language.Jsonnet.Eval.Monad where
 
-import Control.Lens (locally, view)
+import Control.Lens (locally, view, (%~), (^.))
 import Control.Monad.Catch
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
@@ -46,12 +46,14 @@ newtype EvalM a = EvalM
 runEvalM :: FilePath -> Importer -> Env -> EvalM a -> IO a
 runEvalM fp importer' env' e = do
     mods <- newIORef empty
+    cs <- newIORef emptyStack
+    pos <- newIORef Nothing
     let st =
             EvalState
                 { _env = env'
                 , _baseEnv = env'
-                , _callStack = emptyStack
-                , _currentPos = Nothing
+                , _callStack = cs
+                , _currentPos = pos
                 , _currentFile = fp
                 , _loadedModules = mods
                 , _importer = importer'
@@ -84,43 +86,49 @@ withCurrentFile = locally currentFile . const
 withBaseEnv :: EvalM a -> EvalM a
 withBaseEnv = local (\st -> st{_env = _baseEnv st})
 
-withCurrentPos :: SrcSpan -> EvalM a -> EvalM a
-withCurrentPos = locally currentPos . const . Just
-
 emptyStack :: CallStack
-emptyStack = CallStack { _spans = [], _scopes = ["top-level"] }
+emptyStack = CallStack{_spans = [], _scopes = ["top-level"]}
 
 pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a -> EvalM a
-pushStackFrame (name, span') =
-    locally (callStack . scopes) (name :)
-        . locally (callStack . spans) (span' :)
+pushStackFrame (name, sp) action = do
+    ref <- view callStack
+    old@(CallStack sps scs) <- liftIO $ readIORef ref
+    liftIO $ writeIORef ref (CallStack (sp : sps) (name : scs))
+    res <- action
+    liftIO $ writeIORef ref old
+    pure res
 
--- getBacktrace :: EvalM (Backtrace Core)
--- getBacktrace = do
---    sp <- (:) <$> view currentPos <*> view (callStack . spans)
---    sc <- view (callStack . scopes)
---    pure $
---        Backtrace $
---            case sequence sp of
---                Just sp' -> zipWith StackFrame sc sp'
---                Nothing -> []
+withCurrentPos :: SrcSpan -> EvalM a -> EvalM a
+withCurrentPos sp action = do
+    ref <- view currentPos
+    old <- liftIO $ readIORef ref
+    liftIO $ writeIORef ref (Just sp)
+    res <- action
+    liftIO $ writeIORef ref old
+    pure res
 
 getBacktrace :: EvalM (Backtrace Core)
 getBacktrace = do
-    mPos <- view currentPos
-    sp <- (:) <$> view currentPos <*> view (callStack . spans)
-    sc <- view (callStack . scopes)
+    mPos <- view currentPos >>= liftIO . readIORef
+    cs   <- view callStack  >>= liftIO . readIORef
+    
+    let sp = mPos : (cs ^. spans)
+        sc = cs ^. scopes
+        
     pure $ Backtrace $ case sequence sp of
         Just sp' -> zipWith StackFrame sc sp'
         Nothing -> case mPos of
             Just pos -> [StackFrame "top-level" pos]
             Nothing -> []
 
+getLineNum :: EvalM (Maybe Int)
+getLineNum = do
+    posRef <- view currentPos
+    mPos <- liftIO $ readIORef posRef
+    pure (unPos . sourceLine . spanBegin <$> mPos)
+
 getFileName :: EvalM FilePath
 getFileName = view currentFile
-
-getLineNum :: EvalM (Maybe Int)
-getLineNum = (unPos . sourceLine . spanBegin <$>) <$> view currentPos
 
 fetchImport :: String -> EvalM ImportResult
 fetchImport path = do
