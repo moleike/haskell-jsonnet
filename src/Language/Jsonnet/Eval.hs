@@ -378,7 +378,7 @@ whnfLetrec binds body = mdo
                 binds
     extendEnv bnds (mkValue body)
 
-whnfObj :: [CField] -> Eval Value
+whnfObj :: [CField Core] -> Eval Value
 whnfObj xs = do
     fields <- foldM insertField H.empty xs
     let obj = mkBaseObject fields
@@ -393,7 +393,7 @@ extendWithLateBound baseEnv m = do
     let inherit key = M.alter (const $ M.lookup key dynEnv) key
     withEnv (inherit "self" . inherit "super" $ baseEnv) m
 
-whnfField :: CField -> Eval (Maybe (Text, Field))
+whnfField :: CField Core -> Eval (Maybe (Text, Field))
 whnfField (CRegularField (RegularField k v vis)) = do
     fieldKey <- whnf k
     force fieldKey
@@ -415,7 +415,7 @@ flattenArrays = join
 whnfIfs :: [Core] -> Eval Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
-whnfComp :: Comp -> Core -> Eval Value
+whnfComp :: Comp Core -> Core -> Eval Value
 whnfComp (ArrC varName (e, conds)) cs = do
     xs <- comp
     liftF flattenArrays $ VArr $ V.mapMaybe id xs
