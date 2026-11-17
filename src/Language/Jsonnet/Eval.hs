@@ -150,7 +150,22 @@ whnfArgs = \case
     as@(Args _ Lazy) -> args <$> mapM mkValue as
 
 whnfApp :: Core -> Args Core -> Eval Value
-whnfApp e es = withStackFrame e $ handle asEvalError $ do
+whnfApp (CPrim Cond) (Args [Pos c, Pos t, Pos e] _) = do
+    b <- whnf c >>= force
+    if b then whnf t else whnf e
+whnfApp (CPrim (BinOp LAnd)) (Args [Pos e1, Pos e2] _) = do
+    b <- whnf e1 >>= force
+    if b then VBool <$> (whnf e2 >>= force) else pure (VBool False)
+whnfApp (CPrim (BinOp LOr)) (Args [Pos e1, Pos e2] _) = do
+    b <- whnf e1 >>= force
+    if b then pure (VBool True) else VBool <$> (whnf e2 >>= force)
+whnfApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] _) = do
+    v1 <- whnf e1 >>= force
+    v2 <- whnf e2 >>= force
+    whnfBinOp op v1 v2
+whnfApp (CPrim (UnyOp op)) (Args [Pos e1] _) =
+    whnf e1 >>= force >>= whnfUnyOp op
+whnfApp e es = withStackFrame e $ do
     vs <- whnfArgs es
     whnf e >>= force >>= \case
         VClos f env -> whnfClos env f vs
@@ -174,7 +189,7 @@ whnfClos rho (params, body) args = do
     (rs, ps, ns) <- splitArgs args params
     withEnv rho $ extendEnv (M.fromList $ ps ++ ns) (appDefaults rs body)
 
-appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
+appDefaults :: [Param Core] -> Core -> Eval Value
 appDefaults [] e = whnf e
 appDefaults rs e = mdo
     bnds <-
@@ -187,7 +202,7 @@ appDefaults rs e = mdo
                 rs
     extendEnv bnds (whnf e)
 
-splitArgs :: [Arg c] -> [(Name Core, b)] -> EvalM ([(Name Core, b)], [(Name Core, c)], [(Name Core, c)])
+splitArgs :: [Arg c] -> [Param b] -> EvalM ([Param b], [Param c], [Param c])
 splitArgs args bnds = do
     named <- getNamed
     pos <- getPos
