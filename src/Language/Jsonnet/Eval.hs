@@ -175,6 +175,7 @@ whnfClos rho (params, body) args = do
     withEnv rho $ extendEnv (M.fromList $ ps ++ ns) (appDefaults rs body)
 
 appDefaults :: [(Name Core, Core)] -> Core -> Eval Value
+appDefaults [] e = whnf e
 appDefaults rs e = mdo
     bnds <-
         M.fromList

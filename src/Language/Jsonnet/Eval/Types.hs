@@ -16,9 +16,9 @@ type Env = Map (Name Core) Value
 
 -- | Simulate a call-stack to report stack traces
 data CallStack = CallStack
-    { _spans :: [Maybe SrcSpan]
+    { _spans :: ![Maybe SrcSpan]
     -- ^ source location of call-sites
-    , _scopes :: [Name Core]
+    , _scopes :: ![Name Core]
     -- ^ names of called functions
     }
 
@@ -39,15 +39,15 @@ data EvalState = EvalState
     -- ^ binding local variables to their values
     , _baseEnv :: Env
     -- ^ pristine context with only std
-    , _callStack :: CallStack
+    , _callStack :: !(IORef CallStack)
     -- ^ call-stack simulation
-    , _currentPos :: Maybe SrcSpan
+    , _currentPos :: !(IORef (Maybe SrcSpan))
     -- ^ source span of expression being evaluated
-    , _currentFile :: FilePath
+    , _currentFile :: !FilePath
     -- ^ current file being evaluated
-    , _loadedModules :: IORef (Map ImpKey Value)
+    , _loadedModules :: !(IORef (Map ImpKey Value))
     -- ^ memoization of imports
-    , _importer :: Importer
+    , _importer :: !Importer
     -- ^ runs the IO for resolving paths
     }
 
