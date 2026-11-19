@@ -33,7 +33,6 @@ import Control.Monad.Reader
 import Data.Aeson qualified as JSON
 import Data.ByteString qualified as BS
 import Data.Map.Lazy qualified as M
-import Data.Map.Strict (singleton)
 import Data.Text (Text)
 import Data.Text.IO qualified as T
 import Language.Jsonnet.Compiler
@@ -41,9 +40,9 @@ import Language.Jsonnet.Core
 import Language.Jsonnet.Error
 import Language.Jsonnet.Eval
 import Language.Jsonnet.Eval.Monad
-import Language.Jsonnet.Eval.Types (ImportResult (..), Importer (..))
+import Language.Jsonnet.Eval.Types (ImportResult (..), Importer (..), Env (Env))
 import Language.Jsonnet.Pretty (prettyError)
-import Language.Jsonnet.Std.Lib hiding (std)
+import Language.Jsonnet.Std.Lib hiding (stdlib)
 import Language.Jsonnet.Std.Lib qualified as Lib
 import Language.Jsonnet.Value
 import System.Directory (doesFileExist)
@@ -99,14 +98,14 @@ stdlib :: JsonnetM Value
 stdlib = do
     extVars <- asks extVars
     userFuncs <- asks userFuncs
-    Lib.std extVars userFuncs
+    Lib.stdlib extVars userFuncs
 
 -- | evaluate a Core expression with the implicit stdlib
 evaluate :: Core -> JsonnetM JSON.Value
 evaluate expr = do
     fp <- asks fname
     importer <- Importer . resolveImportPath <$> asks jpaths
-    env <- singleton "std" <$> stdlib
+    env <- Env mempty Nothing Nothing <$> stdlib
     JsonnetM $ liftIO $ runEvalM fp importer env (manifest expr)
 
 data ExtVar = ExtVar
@@ -139,7 +138,7 @@ interpretExtVar = \case
 
     evaluateToValue :: Core -> JsonnetM Value
     evaluateToValue expr = do
-        env <- singleton "std" <$> stdlib
+        env <- Env mempty Nothing Nothing <$> stdlib
         fp <- asks fname
         importer <- Importer . resolveImportPath <$> asks jpaths
         JsonnetM $ liftIO $ runEvalM fp importer env (whnf expr)

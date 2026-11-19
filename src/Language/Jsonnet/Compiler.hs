@@ -14,7 +14,7 @@ import Control.Monad.Except (MonadError)
 import Data.Text (Text)
 
 import Language.Jsonnet.Check (check)
-import Language.Jsonnet.Core (Core)
+import Language.Jsonnet.Core (Core, resolve)
 import Language.Jsonnet.Desugar
 import Language.Jsonnet.Error
 import Language.Jsonnet.Parser (parse)
@@ -24,7 +24,8 @@ compileModule :: MonadError Error m => FilePath -> Text -> m Core
 compileModule path content = do
     expr <- parse path content
     check expr
-    pure (desugar expr)
+    let core = resolve (desugar expr)
+    pure core
 
 compileThrow :: MonadThrow m => FilePath -> Text -> m Core
 compileThrow  fp = either throwM pure . compileModule fp

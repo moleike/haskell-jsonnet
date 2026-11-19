@@ -102,7 +102,9 @@ library
     vector >=0.12.3 && <0.14,
     cryptohash-md5,
     base16-bytestring,
-    yaml
+    yaml,
+    bifunctors,
+    primitive
 
 executable hs-jsonnet
   import:
@@ -173,5 +175,4 @@ benchmark jsonnet-bench
     prettyprinter,
     tasty-bench,
     text
-
-  ghc-options:    "-with-rtsopts=-A32m --nonmoving-gc"
+  ghc-options: -O2 -rtsopts

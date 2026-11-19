@@ -15,7 +15,7 @@ Portability: non-portable
 module Language.Jsonnet.Desugar (desugar) where
 
 import Control.Monad.State
-import Data.Bifunctor qualified
+import Data.Bifunctor
 import Data.Fix as F
 import Data.List.NonEmpty (NonEmpty (..), toList)
 import Data.List.NonEmpty qualified as NE
@@ -38,10 +38,12 @@ freshName = do
     put (n + 1)
     pure $ "$" <> T.pack (show n)
 
-class Desugarer a where
-    desugarM :: a -> DesugarM Core
+mkVar n = CVar n n
 
-desugar :: (Desugarer a) => a -> Core
+class Desugarer a where
+    desugarM :: a -> DesugarM Desugared
+
+desugar :: (Desugarer a) => a -> Desugared
 desugar a = evalState (desugarM a) 0
 
 instance Desugarer (Ann ExprF ()) where
@@ -64,13 +66,13 @@ zipWithOutermost = annZip . inherit go False
     go (Fix (AnnF EObjComp{} _)) True = (False, True)
     go _ x = (False, x)
 
-alg :: Bool -> ExprF Core -> DesugarM Core
+alg :: Bool -> ExprF Desugared -> DesugarM Desugared
 alg outermost = \case
     ENull -> pure $ CLit Null
     EBool b -> pure $ CLit (Bool b)
     EStr s -> pure $ CLit (String s)
     ENum n -> pure $ CLit (Number n)
-    EIdent i -> pure $ CVar (T.pack i)
+    EIdent i -> pure $ mkVar (T.pack i)
     EFun ps e -> pure $ desugarFun ps e
     EApply e es -> pure $ CApp e es
     ELocal bnds e -> pure $ desugarLet bnds e
@@ -92,7 +94,7 @@ alg outermost = \case
     EObjComp{field, comp, locals} -> desugarObjComp outermost field comp locals
     EImport it fp -> pure $ CImp it fp
 
-desugarSlice :: Core -> Maybe Core -> Maybe Core -> Maybe Core -> Core
+desugarSlice :: Desugared -> Maybe Desugared -> Maybe Desugared -> Maybe Desugared -> Desugared
 desugarSlice expr start end step =
     stdFunc
         "slice"
@@ -107,29 +109,29 @@ desugarSlice expr start end step =
   where
     maybeNull = fromMaybe (CLit Null)
 
-desugarIfElse :: Core -> Core -> Core -> Core
+desugarIfElse :: Desugared -> Desugared -> Desugared -> Desugared
 desugarIfElse c t e = CApp (CPrim Cond) (Args [Pos c, Pos t, Pos e] Lazy)
 
-desugarLookup :: Core -> Core -> Core
+desugarLookup :: Desugared -> Desugared -> Desugared
 desugarLookup e1 e2 = CApp (CPrim (BinOp Lookup)) (Args [Pos e1, Pos e2] Lazy)
 
-desugarErr :: Core -> Core
+desugarErr :: Desugared -> Desugared
 desugarErr e = CApp (CPrim (UnyOp Err)) (Args [Pos e] Lazy)
 
-desugarBinOp :: BinOp -> Core -> Core -> Core
+desugarBinOp :: BinOp -> Desugared -> Desugared -> Desugared
 desugarBinOp op e1 e2 = CApp (CPrim (BinOp op)) (Args [Pos e1, Pos e2] Lazy)
 
-desugarUnyOp :: UnyOp -> Core -> Core
+desugarUnyOp :: UnyOp -> Desugared -> Desugared
 desugarUnyOp op e = CApp (CPrim (UnyOp op)) (Args [Pos e] Lazy)
 
-desugarObj :: Bool -> [(String, Core)] -> [EField Core] -> [Assert Core] -> Core
+desugarObj :: Bool -> [(String, Desugared)] -> [EField Desugared] -> [Assert Desugared] -> Desugared
 desugarObj outermost locals fields asserts = obj
   where
     obj = CObj (map desugarField fields' <> map (CAssertField . flip desugarAssert (CLit (Bool True))) asserts)
 
     bnds =
         if outermost
-            then ("$", CVar "self") : locals
+            then ("$", mkVar "self") : locals
             else locals
 
     f v@(CLit _) = v
@@ -141,7 +143,7 @@ desugarObj outermost locals fields asserts = obj
     fields' =
         (\(EField key val comp v o) -> EField key (f val) comp v o) <$> fields
 
-desugarAssert :: Assert Core -> Core -> Core
+desugarAssert :: Assert Desugared -> Desugared -> Desugared
 desugarAssert (Assert c m) e =
     desugarIfElse
         c
@@ -152,17 +154,17 @@ desugarAssert (Assert c m) e =
                 m
         )
 
-desugarArrComp :: Core -> NonEmpty (CompSpec Core) -> Core
+desugarArrComp :: Desugared -> NonEmpty (CompSpec Desugared) -> Desugared
 desugarArrComp expr = foldr f (CArr [expr])
   where
     f CompSpec{..} e =
         CComp (ArrC (T.pack var) (e, ifspec)) forspec
 
-desugarField :: EField Core -> CField Core
-desugarField EField{..} = mkField key value' visibility
+desugarField :: EField Desugared -> CField Desugared
+desugarField EField{..} = mkField key value'' visibility
   where
     -- If the key is computed, use $$key inside value' so it isn't re-evaluated in valueEnv
-    k = if computed then CVar "$$key" else key
+    k = if computed then mkVar "$$key" else key
 
     value' =
         if override
@@ -172,13 +174,17 @@ desugarField EField{..} = mkField key value' visibility
                     (desugarBinOp Add (desugarLookup super k) value)
                     value
             else value
-    super = CVar "super"
+
+    value'' = if computed 
+                 then CLet [("$$key", key)] value' 
+                 else value'
+    super = mkVar "super"
 
 -- | ONLY ObjComp requires state to generate a safe `$arr_N` name
-desugarObjComp :: Bool -> EField Core -> NonEmpty (CompSpec Core) -> [(String, Core)] -> DesugarM Core
+desugarObjComp :: Bool -> EField Desugared -> NonEmpty (CompSpec Desugared) -> [(String, Desugared)] -> DesugarM Desugared
 desugarObjComp outermost EField{..} comp locals = do
     arrVar <- freshName
-    let locals' = if outermost then ("$", CVar "self") : locals else locals
+    let locals' = if outermost then ("$", mkVar "self") : locals else locals
 
         kv' =
             desugarField
@@ -197,21 +203,21 @@ desugarObjComp outermost EField{..} comp locals = do
             [] -> desugarLet bnds value
             xs' -> desugarLet bnds $ desugarLet (NE.fromList xs') value
 
-        xs = desugarLookup (CVar arrVar) . CLit . Number . fromIntegral @Integer <$> [0 ..]
+        xs = desugarLookup (mkVar arrVar) . CLit . Number . fromIntegral @Integer <$> [0 ..]
         arrComp = desugarArrComp arr comp
-        arr = CArr $ NE.toList $ CVar . T.pack . var <$> comp
+        arr = CArr $ NE.toList $ mkVar . T.pack . var <$> comp
 
     pure $ CComp (ObjC arrVar (kv', [])) arrComp
 
-stdFunc :: Text -> Args Core -> Core
+stdFunc :: Text -> Args Desugared -> Desugared
 stdFunc f =
     CApp
         ( desugarLookup
-            (CVar "std")
+            (mkVar "std")
             (CLit $ String f)
         )
 
-desugarFun :: [(String, Maybe Core)] -> Core -> Core
+desugarFun :: [(String, Maybe Desugared)] -> Desugared -> Desugared
 desugarFun ps e =
     CLam
         ( fmap
@@ -231,13 +237,10 @@ desugarFun ps e =
                             ParamNotBound (T.pack n)
                     )
 
-desugarLet :: NonEmpty (String, Core) -> Core -> Core
+desugarLet :: NonEmpty (String, Desugared) -> Desugared -> Desugared
 desugarLet bnds e =
     CLet
         ( toList
-            ( fmap
-                (Data.Bifunctor.first T.pack)
-                bnds
-            )
+            (fmap (first T.pack) bnds)
         )
         e

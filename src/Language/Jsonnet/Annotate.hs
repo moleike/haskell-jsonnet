@@ -25,6 +25,11 @@ type Ann f a = Fix (AnnF f a)
 pattern AnnF :: f a -> ann -> AnnF f ann a
 pattern AnnF f a = Pair (Const a) f
 
+{-# COMPLETE Ann #-}
+  
+pattern Ann :: f (Ann f ann) -> ann -> Ann f ann
+pattern Ann e ann = Fix (AnnF e ann)
+
 annMap :: (Functor f) => (a -> b) -> Ann f a -> Ann f b
 annMap g = go
   where

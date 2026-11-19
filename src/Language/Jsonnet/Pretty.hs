@@ -74,7 +74,7 @@ passert = "assert"
 pfor = "for"
 pin = "in"
 
-prettyName :: Name a -> Doc ann
+prettyName :: Name -> Doc ann
 prettyName = pretty
 
 ppNumber :: Scientific -> Doc ann

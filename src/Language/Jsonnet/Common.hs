@@ -21,7 +21,7 @@ import Data.Typeable (Typeable)
 import GHC.Generics (Generic, Generic1)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 
-type Name a = Text
+type Name = Text
 
 data Literal
     = Null
@@ -194,7 +194,7 @@ data CompSpec a = CompSpec
         via FunctorClassesDefault CompSpec
 
 data StackFrame a = StackFrame
-    { name :: Name a
+    { name :: Name
     , span :: SrcSpan
     }
     deriving (Eq, Show)

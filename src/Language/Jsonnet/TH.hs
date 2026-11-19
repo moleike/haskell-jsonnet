@@ -22,6 +22,7 @@ import Language.Jsonnet.Desugar
 import Language.Jsonnet.Parser qualified as Parser
 import Language.Jsonnet.Pretty (prettyError)
 import Language.Jsonnet.Syntax.Annotated
+import Language.Jsonnet.Core (resolve)
 
 liftText :: Text -> Q Exp
 liftText txt = AppE (VarE 'T.pack) <$> lift (T.unpack txt)
@@ -51,5 +52,6 @@ compile path str =
   parse0 path str
     >>= lift
       . encode
+      . resolve
       . desugar
       . forget
