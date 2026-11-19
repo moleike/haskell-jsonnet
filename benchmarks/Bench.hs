@@ -10,13 +10,14 @@ import Language.Jsonnet.Syntax.Annotated (Expr)
 import Language.Jsonnet.TH.QQ
 import Prettyprinter (Doc)
 import Test.Tasty.Bench
+import Language.Jsonnet.Core (resolve)
 
 render :: (a -> Doc ann) -> a -> LBS.ByteString
 render printer = encodeUtf8 . pack . show . printer
 
 eval :: Expr -> IO LBS.ByteString
 eval expr = do
-    outp <- runJsonnetM defaultConfig (evaluate $ desugar expr)
+    outp <- runJsonnetM defaultConfig (evaluate $ resolve $ desugar expr)
     pure (either (render prettyError) (render (ppJsonIndent 4)) outp)
 
 main :: IO ()

@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {- |
 Module                  : Language.Jsonnet.Eval.Monad
@@ -11,21 +11,22 @@ Portability             : non-portable
 -}
 module Language.Jsonnet.Eval.Monad where
 
-import Control.Lens (locally, view, (%~), (^.))
+import Control.Lens (locally, view, (%~), (^.), (?~), (.~))
 import Control.Monad.Catch
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Reader (MonadReader, ReaderT (..), local)
 import Data.IORef
 import Data.Map
-import Data.Map.Lazy qualified as M (union)
 import Data.Text qualified as T
-import Language.Jsonnet.Common (Backtrace (..), StackFrame (..), Name)
+import Language.Jsonnet.Common (Backtrace (..), Name, StackFrame (..))
 import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Error (Error (EvalError), EvalError (..))
 import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan, spanBegin)
 import Text.Megaparsec.Pos
+import Data.Primitive (SmallArray)
+import {-# SOURCE #-} Language.Jsonnet.Value (Value)
 
 newtype EvalM a = EvalM
     { unEval :: ReaderT EvalState IO a
@@ -64,21 +65,24 @@ throwE :: EvalError -> EvalM a
 throwE e = throwM . EvalError e =<< getBacktrace
 
 liftMaybe :: EvalError -> Maybe a -> EvalM a
-liftMaybe e =
-    \case
-        Nothing -> throwE e
-        Just a -> pure a
+liftMaybe e = maybe (throwE e) pure
 
 asEvalError :: SomeException -> EvalM a
 asEvalError ex = case fromException ex of
     Just (e :: Error) -> throwM e
     Nothing -> throwE (RuntimeError (T.pack (show ex)))
 
-extendEnv :: Env -> EvalM a -> EvalM a
-extendEnv = locally env . M.union
+extendVars :: SmallArray Value -> EvalM a -> EvalM a
+extendVars arr = local (env . vars %~ (arr :))
+
+withSelf :: Value -> EvalM a -> EvalM a
+withSelf v = local (env . self ?~ v)
+
+withSuper :: Maybe Value -> EvalM a  -> EvalM a
+withSuper v = local (env . super .~ v)
 
 withEnv :: Env -> EvalM a -> EvalM a
-withEnv = locally env . const
+withEnv e = local (env .~ e)
 
 withCurrentFile :: FilePath -> EvalM a -> EvalM a
 withCurrentFile = locally currentFile . const
@@ -89,7 +93,7 @@ withBaseEnv = local (\st -> st{_env = _baseEnv st})
 emptyStack :: CallStack
 emptyStack = CallStack{_spans = [], _scopes = ["top-level"]}
 
-pushStackFrame :: (Name Core, Maybe SrcSpan) -> EvalM a -> EvalM a
+pushStackFrame :: (Name, Maybe SrcSpan) -> EvalM a -> EvalM a
 pushStackFrame (name, sp) action = do
     ref <- view callStack
     old@(CallStack sps scs) <- liftIO $ readIORef ref

@@ -1,7 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
@@ -19,8 +21,8 @@ module Language.Jsonnet.Eval where
 
 import Control.Applicative
 import Control.Arrow ((&&&))
-import Control.Lens (locally, view)
-import Control.Monad (foldM, forM, join, (<=<), (>=>))
+import Control.Lens (view, (&), (.~), (^.))
+import Control.Monad (foldM, forM, join, when, (<=<), (>=>))
 import Control.Monad.Catch (handle)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson qualified as JSON
@@ -35,8 +37,10 @@ import Data.HashMap.Lazy qualified as H
 import Data.HashSet qualified as HS
 import Data.IORef
 import Data.Int (Int64)
-import Data.Map.Lazy qualified as M
+import Data.Map qualified as M
 import Data.Maybe
+import Data.Primitive (indexSmallArray)
+import Data.Primitive.SmallArray (smallArrayFromList)
 import Data.Scientific
 import Data.Text (Text)
 import Data.Text qualified as T
@@ -44,7 +48,8 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Text.Encoding qualified as TE
 import Data.Vector (Vector, (!?))
 import Data.Vector qualified as V
-import Language.Jsonnet.Common
+import Language.Jsonnet.Common hiding (Super)
+import Language.Jsonnet.Common qualified as Prim
 import Language.Jsonnet.Compiler
 import Language.Jsonnet.Core hiding (fieldVal, fieldVis, mkField)
 import Language.Jsonnet.Error
@@ -62,7 +67,7 @@ rnf :: Core -> Eval Value
 rnf = handle asEvalError . whnf >=> force
 
 whnf :: Core -> Eval Value
-whnf (CVar n) = lookupVar n
+whnf (CVar _ v) = lookupVar v
 whnf (CLoc sp c) = withCurrentPos sp (whnf c)
 whnf (CLit l) = pure (whnfLiteral l)
 whnf (CObj fields) = whnfObj fields
@@ -114,28 +119,18 @@ mkThunk c = do
     e <- view env
     pure $ VThunk (withEnv e (whnf c))
 
-getSelf :: Eval Value
-getSelf = view env >>= liftMaybe UnboundSelf . M.lookup "self"
-
-getSuper :: Eval Value
-getSuper = do
-    rho <- view env
-    case M.lookup "super" rho of
-        Just v -> pure v
-        Nothing ->
-            if M.member "self" rho
-                -- Gracefully yield an empty object to satisfy the "+:" desugaring
-                then VObj (mkBaseObject H.empty) <$> liftIO (newIORef H.empty)
-                else throwE UnboundSuper
-
-lookupVar :: Text -> Eval Value
+lookupVar :: Var -> Eval Value
 lookupVar = \case
-    "self" -> getSelf
-    "super" -> getSuper
-    n -> do
-        rho <- view env
-        v <- liftMaybe (VarNotFound n) (M.lookup n rho)
-        force v
+    Self -> liftMaybe UnboundSelf =<< view (env . self)
+    Super -> do
+        e <- view env
+        case (e ^. super, e ^. self) of
+            (Just sup, _) -> pure sup
+            (Nothing, Just _) -> emptyObject -- satisfy :+ semantics
+            (Nothing, Nothing) -> throwE UnboundSuper
+    Std -> view (env . std)
+    Idx d off -> flip indexSmallArray off . (!! d) <$> view (env . vars)
+    Unbound v -> throwE (VarNotFound v)
 
 whnfLiteral :: Literal -> Value
 whnfLiteral = \case
@@ -177,64 +172,51 @@ whnfApp e es = withStackFrame e $ do
         v -> throwTypeMismatch "function" v
 
 withStackFrame :: Core -> Eval a -> Eval a
-withStackFrame (CLoc sp (CVar n)) e =
+withStackFrame (CLoc sp (CVar n _)) e =
     pushStackFrame (n, Just sp) e
 withStackFrame (CLoc sp _) e =
     pushStackFrame ("anonymous", Just sp) e
-withStackFrame (CVar _) e = e
+withStackFrame (CVar _ _) e = e
 withStackFrame _ e = e
 
-whnfClos :: Env -> ([Param Core], Core) -> [Arg Value] -> Eval Value
-whnfClos rho (params, body) args = do
-    (rs, ps, ns) <- splitArgs args params
-    withEnv rho $ extendEnv (M.fromList $ ps ++ ns) (appDefaults rs body)
+whnfClos :: Env -> ([Param Core], Core) -> [Arg Value] -> EvalM Value
+whnfClos rho (params, body) args = withEnv rho $ mdo
+    -- 1. Split provided arguments into Positionals and Named
+    let (posArgs, namedArgs) = foldr splitArg ([], []) args
+        splitArg (Pos v) (ps, ns) = (v : ps, ns)
+        -- The fix is here: T.pack the name so it matches the AST's Name type!
+        splitArg (Named n v) (ps, ns) = (ps, (T.pack n, v) : ns)
 
-appDefaults :: [Param Core] -> Core -> Eval Value
-appDefaults [] e = whnf e
-appDefaults rs e = mdo
-    bnds <-
-        M.fromList
-            <$> mapM
-                ( \(n, e') -> do
-                    th <- extendEnv bnds (mkValue e')
-                    pure (n, th)
-                )
-                rs
-    extendEnv bnds (whnf e)
+    let namedMap = M.fromList namedArgs
 
-splitArgs :: [Arg c] -> [Param b] -> EvalM ([Param b], [Param c], [Param c])
-splitArgs args bnds = do
-    named <- getNamed
-    pos <- getPos
-    unapp <- getUnapp named
-    pure (unapp, pos, named)
-  where
-    (bnds1, bnds2) = splitAt (length ps) bnds
-    (ps, ns) = split args
-    pNames = map fst bnds
+    -- 2. Validate we didn't get too many positionals
+    when (length posArgs > length params) $
+        throwE $
+            TooManyArgs (length params)
 
-    getPos =
-        if length ps > length bnds
-            then throwE $ TooManyArgs (length bnds)
-            else pure $ zip (map fst bnds1) ps
+    -- 3. Align arguments to the exact order of the parameter declarations
+    --    This guarantees De Bruijn offsets perfectly match the array indices!
+    let alignArgs [] [] = pure []
+        -- We still have positionals to consume
+        alignArgs (p : ps) ((_, _) : pms) = do
+            rest <- alignArgs ps pms
+            pure (p : rest)
 
-    getNamed = traverse f ns
-      where
-        f (a, b) = case g (T.pack a) of
-            Nothing -> throwE $ BadParam (T.pack a)
-            Just n -> pure (n, b)
-        g a = find (a ==) pNames
+        -- Positionals are exhausted, check Named or fallback to Default
+        alignArgs [] ((name, defExpr) : pms) = do
+            v <- case M.lookup name namedMap of
+                Just val -> pure val
+                -- Tie the knot: evaluate the default in the context of the FUTURE rib!
+                Nothing -> extendVars rib (mkValue defExpr)
+            rest <- alignArgs [] pms
+            pure (v : rest)
 
-    getUnapp named =
-        pure $ filter ((`notElem` ns') . fst) bnds2
-      where
-        ns' = map fst named
+    -- 4. Build the array of values (evaluating any defaults along the way)
+    vals <- alignArgs posArgs params
 
-    split [] = ([], [])
-    split (Pos p : xs) =
-        let (ys, zs) = split xs in (p : ys, zs)
-    split (Named n v : xs) =
-        let (ys, zs) = split xs in (ys, (n, v) : zs)
+    -- 5. Create the rib and evaluate the body
+    let rib = smallArrayFromList vals
+    extendVars rib (whnf body)
 
 whnfPrim :: Prim -> [Arg Value] -> Eval Value
 whnfPrim (UnyOp op) [Pos e] = force e >>= whnfUnyOp op
@@ -304,16 +286,12 @@ whnfUnyOp LNot x = inj <$> fmap not (force x)
 whnfUnyOp Minus x = inj <$> fmap (negate @Double) (force x)
 whnfUnyOp Plus x = inj <$> fmap (id @Double) (force x)
 whnfUnyOp Err x = (toString >=> throwE . RuntimeError) x
-whnfUnyOp Super x = do
-    rho <- view env
-    let err =
-            if M.member "self" rho
-                then NoSuperClass
-                else UnboundSuper
-
-    case M.lookup "super" rho of
-        Just (VObj s c) -> force x >>= objectLookup s c
-        _ -> throwE err
+whnfUnyOp Prim.Super x = do
+    e <- view env
+    case (e ^. super, e ^. self) of
+        (Just (VObj s c), _) -> force x >>= objectLookup s c
+        (_, Just _)          -> throwE NoSuperClass
+        (_, Nothing)         -> throwE UnboundSuper
 
 whnfImport :: Import -> FilePath -> Eval Value
 whnfImport it fp = do
@@ -366,17 +344,10 @@ whnfLookup (VStr _) _ =
     throwE (InvalidIndex "string index was not integer")
 whnfLookup v _ = throwTypeMismatch "array/object/string" v
 
-whnfLetrec :: [(Name Core, Core)] -> Core -> Eval Value
+whnfLetrec :: [(Name, Core)] -> Core -> Eval Value
 whnfLetrec binds body = mdo
-    bnds <-
-        M.fromList
-            <$> mapM
-                ( \(n, e) -> do
-                    v <- extendEnv bnds (mkValue e)
-                    pure (n, v)
-                )
-                binds
-    extendEnv bnds (mkValue body)
+    vars <- smallArrayFromList <$> mapM (\(_, e) -> extendVars vars (mkValue e)) binds
+    extendVars vars (mkValue body)
 
 whnfObj :: [CField Core] -> Eval Value
 whnfObj xs = do
@@ -387,26 +358,23 @@ whnfObj xs = do
   where
     insertField acc f = foldr (uncurry H.insert) acc <$> whnfField f
 
-extendWithLateBound :: Env -> Eval a -> Eval a
+extendWithLateBound :: Env -> EvalM a -> EvalM a
 extendWithLateBound baseEnv m = do
     dynEnv <- view env
-    let inherit key = M.alter (const $ M.lookup key dynEnv) key
-    withEnv (inherit "self" . inherit "super" $ baseEnv) m
+    withEnv (baseEnv & self .~ (dynEnv ^. self) & super .~ (dynEnv ^. super)) m
 
 whnfField :: CField Core -> Eval (Maybe (Text, Field))
 whnfField (CRegularField (RegularField k v vis)) = do
     fieldKey <- whnf k
-    force fieldKey
-        >>= traverse
-            ( \key -> do
-                env' <- M.insert "$$key" (VStr key) <$> view env
-                let fieldVal = VThunk $ extendWithLateBound env' (whnf v)
-                pure (key, Field fieldKey fieldVal vis False)
-            )
+    force fieldKey >>= traverse \key -> do
+        baseEnv <- view env
+        let fieldVal = VThunk $ extendWithLateBound baseEnv (whnf v)
+        pure (key, Field fieldKey fieldVal vis False)
+
 whnfField (CAssertField assertion) = do
-    env' <- view env
+    baseEnv <- view env
     let keyName = "$$assert_runtime"
-    let val = VThunk $ extendWithLateBound env' (whnf assertion)
+    let val = VThunk $ extendWithLateBound baseEnv (whnf assertion)
     pure $ Just (keyName, Field (VStr keyName) val Visible True)
 
 flattenArrays :: Vector (Vector Value) -> Vector Value
@@ -416,20 +384,22 @@ whnfIfs :: [Core] -> Eval Bool
 whnfIfs = foldM (\b c -> (b &&) <$> (whnf c >>= force)) True
 
 whnfComp :: Comp Core -> Core -> Eval Value
-whnfComp (ArrC varName (e, conds)) cs = do
+whnfComp (ArrC _ (e, conds)) cs = do
     xs <- comp
     liftF flattenArrays $ VArr $ V.mapMaybe id xs
   where
     comp =
         whnf cs >>= \case
             VArr xs -> forM xs $ \x -> do
-                extendEnv (M.singleton varName x) $ do
+                let rib = smallArrayFromList [x]
+                extendVars rib $ do
                     b <- whnfIfs conds
                     if b
                         then Just <$> mkValue e
                         else pure Nothing
+                        
             v -> throwTypeMismatch "array" v
-whnfComp (ObjC varName (cField, conds)) cs = do
+whnfComp (ObjC _ (cField, conds)) cs = do
     xs <- mkBaseObject . H.fromList . catMaybes <$> comp
     cache <- liftIO (newIORef H.empty)
     pure (VObj xs cache)
@@ -437,28 +407,19 @@ whnfComp (ObjC varName (cField, conds)) cs = do
     comp =
         whnf cs >>= force >>= \case
             VArr arr -> forM (V.toList arr) $ \x -> do
-                extendEnv (M.singleton varName x) $ do
+                let rib = smallArrayFromList [x]
+                extendVars rib $ do
                     b <- whnfIfs conds
                     if b
                         then whnfField cField
                         else pure Nothing
             v -> throwTypeMismatch "array" v
 
-withSelf :: Value -> Eval a -> Eval a
-withSelf selfVal action =
-    extendEnv (M.singleton "self" selfVal) action
-
-withSuper :: Maybe Object -> Eval a -> Eval a
-withSuper (Just s) action = do
-    cache <- liftIO (newIORef H.empty)
-    extendEnv (M.singleton "super" (VObj s cache)) action
-withSuper Nothing action =
-    locally env (M.delete "super") action
-
 evalField :: Object -> Text -> Value
 evalField obj key = VThunk $ do
     (field, superTree) <- liftMaybe (NoSuchKey key) (Object.lookupField key obj)
-    withSuper superTree (force $ fieldVal field)
+    cache <- liftIO (newIORef H.empty)
+    withSuper (flip VObj cache <$> superTree) (force $ fieldVal field)
 
 objectLookup o c = memoizedLookup c <*> evalField o
 
@@ -531,16 +492,13 @@ liftF ::
     (a -> b) ->
     (Value -> Eval Value)
 liftF f v = inj . f <$> force v
-{-# INLINE liftF #-}
 
-liftF2 ::
-    (HasValue a, HasValue b, HasValue c) =>
-    (a -> b -> c) ->
-    Value ->
-    Value ->
-    Eval Value
-liftF2 f v1 v2 = inj <$> liftA2 f (force v1) (force v2)
-{-# INLINE liftF2 #-}
+liftF2 :: (HasValue a, HasValue b, HasValue c) => (a -> b -> c) -> Value -> Value -> Eval Value
+liftF2 f v1 v2 = do
+    x <- force v1
+    y <- force v2
+    let !result = f x y
+    pure (inj result)
 
 throwTypeMismatch :: Text -> Value -> Eval a
 throwTypeMismatch e = throwE . TypeMismatch e <=< showTy

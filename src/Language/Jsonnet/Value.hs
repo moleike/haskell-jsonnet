@@ -20,7 +20,7 @@ import Data.Scientific
 import Data.Text (Text)
 import Data.Vector (Vector)
 import Language.Jsonnet.Common
-import Language.Jsonnet.Core hiding (fieldVis, mkField)
+import Language.Jsonnet.Core hiding (Env, fieldVis, mkField)
 import Language.Jsonnet.Eval.Monad
 import Language.Jsonnet.Eval.Types
 import Language.Jsonnet.Object
@@ -59,6 +59,9 @@ mkObject =
         . VObj
         . mkBaseObject
         . H.mapWithKey mkField
+
+emptyObject :: (MonadIO m) => m Value
+emptyObject = VObj (mkBaseObject H.empty) <$> liftIO (newIORef H.empty)
 
 allocate :: (MonadIO m) => Value -> m (IORef Value)
 allocate = liftIO . newIORef

@@ -11,7 +11,7 @@ Stability               : experimental
 Portability             : non-portable
 -}
 module Language.Jsonnet.Std.Lib (
-    std,
+    stdlib,
     objectHasEx,
     ExtVars (..),
     UserFuncs (..),
@@ -60,7 +60,7 @@ newtype UserFuncs = UserFuncs {unUserFuncs :: Map Text Value}
 nonnative :: Value
 nonnative =
     unsafePerformIO $
-        runEvalM "<stdlib>" dummyImporter Map.empty (whnf core)
+        runEvalM "<stdlib>" dummyImporter (Env mempty Nothing Nothing VNull) (whnf core)
   where
     core = decode $(mkStdlib)
     dummyImporter = Importer $ \_ _ ->
@@ -69,8 +69,8 @@ nonnative =
 {- | the jsonnet stdlib is written in both jsonnet and Haskell, here we merge
   the native (a small subset) with the interpreted (the splice mkStdlib)
 -}
-std :: (MonadIO m) => ExtVars -> UserFuncs -> m Value
-std (ExtVars extVars) (UserFuncs userFuncs) =
+stdlib :: (MonadIO m) => ExtVars -> UserFuncs -> m Value
+stdlib (ExtVars extVars) (UserFuncs userFuncs) =
     mkIndirV $ VThunk $ do
         cache <- liftIO (newIORef H.empty)
         let native = VObj (mkBaseObject (H.fromList xs)) cache

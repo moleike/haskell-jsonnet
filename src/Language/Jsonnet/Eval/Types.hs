@@ -1,24 +1,30 @@
 {-# LANGUAGE TemplateHaskell #-}
--- | 
 
 module Language.Jsonnet.Eval.Types where
 
 import Control.Lens (makeLenses)
 import Data.ByteString (ByteString)
-import Data.IORef ( IORef )
-import Data.Map ( Map )
+import Data.IORef (IORef)
+import Data.Map (Map)
+import Data.Primitive.SmallArray
 import Language.Jsonnet.Common (Import, Name)
-import Language.Jsonnet.Core (Core)
 import Language.Jsonnet.Parser.SrcSpan (SrcSpan)
 import {-# SOURCE #-} Language.Jsonnet.Value (Value)
 
-type Env = Map (Name Core) Value
+data Env = Env
+    { _vars :: ![SmallArray Value]
+    , _self :: !(Maybe Value)
+    , _super :: !(Maybe Value)
+    , _std :: !Value
+    }
+
+makeLenses ''Env
 
 -- | Simulate a call-stack to report stack traces
 data CallStack = CallStack
     { _spans :: ![Maybe SrcSpan]
     -- ^ source location of call-sites
-    , _scopes :: ![Name Core]
+    , _scopes :: ![Name]
     -- ^ names of called functions
     }
 
@@ -52,4 +58,3 @@ data EvalState = EvalState
     }
 
 makeLenses ''EvalState
-
